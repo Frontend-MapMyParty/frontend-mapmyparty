@@ -1,82 +1,83 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, MapPin, Users, DollarSign, Edit2, Trash2, Eye, Search, ChevronLeft, ChevronRight, Loader } from "lucide-react";
-
-const baseURL = import.meta.env.VITE_API_BASE_URL;
+import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { Calendar, MapPin, Edit2, Trash2, Eye, Search, ChevronLeft, ChevronRight, Loader, Clock, Tag } from "lucide-react";
+import { useOrganizerEvents } from "@/hooks/useOrganizerEvents";
+import { apiFetch } from "@/config/api";
+import { toast } from "sonner";
 
 const MyEvents = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4; // 2 cards per row, 2 rows per page
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  const [events, setEvents] = useState([]);
+  // Use the shared hook instead of direct API call
+  const {
+    events: rawEvents,
+    loading,
+    error,
+    updateFilters,
+    invalidateCache,
+    refresh,
+  } = useOrganizerEvents();
 
-  // Fetch events from API
+  // Log component mount and state
   useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch(`${baseURL}api/event/my-events`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-          },
-        });
+    console.log("📄 MyEvents component mounted");
+    console.log("📊 Hook state - Loading:", loading, "Error:", error, "Events count:", rawEvents?.length || 0);
+  }, [loading, error, rawEvents]);
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch events: ${response.statusText}`);
-        }
+  // Use raw events directly with all the API fields
+  const events = useMemo(() => {
+    if (!Array.isArray(rawEvents)) {
+      return [];
+    }
+    return rawEvents.map((event) => {
+      const startDate = event.startDate ? new Date(event.startDate) : null;
+      const endDate = event.endDate ? new Date(event.endDate) : null;
+      
+      return {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        flyerImage: event.flyerImage || 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800',
+        category: event.category,
+        subCategory: event.subCategory,
+        status1: event.status1,
+        status2: event.status2,
+        startDate: startDate,
+        endDate: endDate,
+        createdAt: event.createdAt ? new Date(event.createdAt) : null,
+        venues: event.venues || [],
+        stats: event.stats || {},
+        _count: event._count || {},
+        // Formatted display values
+        formattedDate: startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'TBD',
+        formattedTime: startDate ? startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+        formattedEndTime: endDate ? endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null,
+        location: event.venues && event.venues.length > 0 
+          ? `${event.venues[0].city || ''}${event.venues[0].city && event.venues[0].state ? ', ' : ''}${event.venues[0].state || ''}`.trim()
+          : 'Location TBD',
+        isPublished: event.status2 === 'ACTIVE' || event.status2 === 'PUBLISHED',
+        attendees: event._count?.bookings || 0,
+        revenue: event.stats?.totalRevenue || 0,
+        ticketsSold: event.stats?.totalTicketsSold || 0,
+      };
+    });
+  }, [rawEvents]);
 
-        const data = await response.json();
-        // Handle different response formats
-        let eventsArray = [];
-        if (Array.isArray(data)) {
-          eventsArray = data;
-        } else if (Array.isArray(data.data)) {
-          eventsArray = data.data;
-        } else if (data.data && Array.isArray(data.data.events)) {
-          eventsArray = data.data.events;
-        } else if (Array.isArray(data.events)) {
-          eventsArray = data.events;
-        }
-        
-        // Map API response to card format
-        const mappedEvents = eventsArray.map((event) => ({
-          id: event.id,
-          title: event.title,
-          date: event.startDate ? new Date(event.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'TBD',
-          time: event.startDate ? new Date(event.startDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
-          location: event.venues && event.venues.length > 0 ? `${event.venues[0].city}, ${event.venues[0].state}` : 'Location TBD',
-          attendees: event._count?.bookings || 0,
-          revenue: `₹${event.stats?.totalRevenue || 0}`,
-          image: event.flyerImage || 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=500&h=300&fit=crop',
-          status: event.status2 === 'PUBLISHED' ? 'Published' : 'Draft',
-          ticketsSold: event.stats?.totalTicketsSold || 0,
-        }));
-        
-        setEvents(mappedEvents);
-      } catch (err) {
-        console.error("Error fetching events:", err);
-        setError(err.message || "Failed to load events");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-  }, []);
-
-  // Filter events based on search term
+  // Filter events based on search term (client-side for this component's UI)
   const filteredEvents = useMemo(() => {
     if (!Array.isArray(events)) {
       return [];
     }
+    if (!searchTerm.trim()) {
+      return events;
+    }
+    const searchLower = searchTerm.toLowerCase();
     return events.filter((event) =>
-      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.location.toLowerCase().includes(searchTerm.toLowerCase())
+      event.title?.toLowerCase().includes(searchLower) ||
+      event.location?.toLowerCase().includes(searchLower) ||
+      event.category?.toLowerCase().includes(searchLower) ||
+      event.subCategory?.toLowerCase().includes(searchLower)
     );
   }, [events, searchTerm]);
 
@@ -86,28 +87,51 @@ const MyEvents = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
 
-  const getStatusColor = (status) => {
-    return status === "Published"
-      ? "bg-green-100 text-green-800"
-      : "bg-yellow-100 text-yellow-800";
+  const getStatusBadge = (status2, status1) => {
+    if (status2 === 'PUBLISHED' || status2 === 'ACTIVE') {
+      return {
+        text: 'Published',
+        className: 'bg-green-100 text-green-700 border border-green-200',
+      };
+    } else if (status2 === 'DRAFT') {
+      return {
+        text: 'Draft',
+        className: 'bg-amber-100 text-amber-700 border border-amber-200',
+      };
+    } else if (status2 === 'PENDING') {
+      return {
+        text: 'Pending',
+        className: 'bg-blue-100 text-blue-700 border border-blue-200',
+      };
+    }
+    return {
+      text: status2 || 'Unknown',
+      className: 'bg-gray-100 text-gray-700 border border-gray-200',
+    };
   };
 
-  const handleDelete = async (id) => {
+  const getCategoryColor = (category) => {
+    return 'bg-gray-100 text-gray-700 border border-gray-200';
+  };
+
+  const handleDelete = useCallback(async (id) => {
     try {
-      const response = await fetch(`${baseURL}delete-event/${id}`, {
+      const response = await apiFetch(`delete-event/${id}`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-        },
+        credentials: "include",
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete event: ${response.statusText}`);
+      if (!response || response.error) {
+        throw new Error(response?.message || "Failed to delete event");
       }
 
-      // Remove event from local state
-      setEvents(events.filter((event) => event.id !== id));
+      // Invalidate cache to force refetch
+      invalidateCache();
+      
+      // Update search filter to trigger refetch
+      updateFilters({ search: searchTerm || null });
+
+      toast.success("Event deleted successfully");
       
       // Reset to first page if current page is now empty
       if (startIndex >= filteredEvents.length - 1 && currentPage > 1) {
@@ -115,26 +139,30 @@ const MyEvents = () => {
       }
     } catch (err) {
       console.error("Error deleting event:", err);
-      alert("Failed to delete event. Please try again.");
+      toast.error(err.message || "Failed to delete event. Please try again.");
     }
-  };
+  }, [invalidateCache, updateFilters, searchTerm, startIndex, filteredEvents.length, currentPage]);
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
+  const handleSearch = useCallback((e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
     setCurrentPage(1); // Reset to first page on search
-  };
+    
+    // Update hook filters for server-side search (optional, can keep client-side only)
+    // updateFilters({ search: value || null });
+  }, []);
 
-  const handlePreviousPage = () => {
+  const handlePreviousPage = useCallback(() => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
     }
-  };
+  }, [currentPage]);
 
-  const handleNextPage = () => {
+  const handleNextPage = useCallback(() => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
     }
-  };
+  }, [currentPage, totalPages]);
 
   return (
     <div className="space-y-6">
@@ -165,6 +193,22 @@ const MyEvents = () => {
         </div>
       )}
 
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.6s ease-out;
+        }
+      `}</style>
+      
       {!loading && (
         <>
           {/* Search Bar */}
@@ -181,86 +225,95 @@ const MyEvents = () => {
 
           {/* Events Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {paginatedEvents.map((event) => (
-          <div
-            key={event.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-          >
-            {/* Event Image */}
-            <div className="relative h-48 bg-gray-200 overflow-hidden">
-              <img
-                src={event.image}
-                alt={event.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 right-4">
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                    event.status
-                  )}`}
+            {paginatedEvents.map((event, index) => {
+              const statusBadge = getStatusBadge(event.status2, event.status1);
+              
+              return (
+                <div
+                  key={event.id}
+                  className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md border border-gray-200 transition-shadow duration-200 opacity-0 animate-fadeInUp"
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                    animationFillMode: 'forwards'
+                  }}
                 >
-                  {event.status}
-                </span>
-              </div>
-            </div>
+                  {/* Event Image */}
+                  <div className="relative h-48 bg-gray-100 overflow-hidden">
+                    <img
+                      src={event.flyerImage}
+                      alt={event.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
 
-            {/* Event Details */}
-            <div className="p-6 space-y-4">
-              {/* Title */}
-              <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-                {event.title}
-              </h3>
+                  {/* Event Details */}
+                  <div className="p-5 space-y-4">
+                    {/* Header with Status and Category */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
+                          {event.title}
+                        </h3>
+                        {event.subCategory && (
+                          <p className="text-sm text-gray-500">{event.subCategory}</p>
+                        )}
+                      </div>
+                      <span className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap ${statusBadge.className}`}>
+                        {statusBadge.text}
+                      </span>
+                    </div>
 
-              {/* Date, Time, Location */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="w-4 h-4 text-red-600" />
-                  <span>{event.date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 text-red-600" />
-                  <span>{event.location}</span>
-                </div>
-              </div>
+                    {/* Date & Time */}
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="font-medium">{event.formattedDate}</span>
+                      <span className="text-gray-400">•</span>
+                      <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span>{event.formattedTime}</span>
+                      {event.formattedEndTime && (
+                        <>
+                          <span className="text-gray-400">-</span>
+                          <span>{event.formattedEndTime}</span>
+                        </>
+                      )}
+                    </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-medium">Attendees</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Users className="w-4 h-4 text-gray-600" />
-                    <p className="text-sm font-semibold text-gray-900">{event.attendees}</p>
+                    {/* Location */}
+                    {event.location !== 'Location TBD' && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span>{event.location}</span>
+                      </div>
+                    )}
+
+                    {/* Category */}
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Tag className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{event.category || 'Event'}</span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                      <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium">
+                        <Eye className="w-4 h-4" />
+                        View
+                      </button>
+                      <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+                        <Edit2 className="w-4 h-4" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase font-medium">Revenue</p>
-                  <div className="flex items-center gap-1 mt-1">
-                    <DollarSign className="w-4 h-4 text-gray-600" />
-                    <p className="text-sm font-semibold text-gray-900">{event.revenue}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-4">
-                <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
-                  <Eye className="w-4 h-4" />
-                  View
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(event.id)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* No Results State */}

@@ -1,6 +1,5 @@
  import { useState, useMemo, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { isAuthenticated as checkAuth } from "@/utils/auth";
 import {
   Plus,
   Calendar,
@@ -52,20 +51,8 @@ import { toast } from "sonner";
 const OrganizerDashboard = () => {
   const navigate = useNavigate();
 
-  // Validate authentication on page load
-  useEffect(() => {
-    const validateAuth = () => {
-      const isAuthenticated = checkAuth();
-      const userType = sessionStorage.getItem("userType");
-      
-      if (!isAuthenticated || userType?.toLowerCase() !== "organizer") {
-        navigate("/auth");
-        return;
-      }
-    };
-
-    validateAuth();
-  }, [navigate]);
+  // Note: Authentication is handled by ProtectedRoute wrapper
+  // No need for redundant auth check here
   
   // Use the new hook to fetch events from API
   const {

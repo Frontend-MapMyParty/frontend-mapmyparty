@@ -10,25 +10,14 @@ import PromoterTopPerformers from "@/components/promoter/PromoterTopPerformers";
 import PromoterUsers from "@/components/promoter/PromoterUsers";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated as checkAuth } from "@/utils/auth";
+// Authentication handled by ProtectedRoute wrapper
 
 const PromoterDashboard = () => {
   const navigate = useNavigate();
 
   // Validate authentication on page load
-  useEffect(() => {
-    const validateAuth = () => {
-      const isAuthenticated = checkAuth();
-      const userType = sessionStorage.getItem("userType");
-      
-      if (!isAuthenticated || userType?.toLowerCase() !== "promoter") {
-        navigate("/auth");
-        return;
-      }
-    };
-
-    validateAuth();
-  }, [navigate]);
+  // Note: Authentication is handled by ProtectedRoute wrapper
+  // No need for redundant auth check here
 
   // Log component mount for debugging
   useEffect(() => {

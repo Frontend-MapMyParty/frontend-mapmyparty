@@ -97,11 +97,16 @@ const customFetch = async (url, options = {}) => {
       // Handle 401 Unauthorized - session is invalid or expired
       if (res.status === 401) {
         console.error('🔴 401 UNAUTHORIZED after refresh attempt: Session is invalid or expired!');
-        sessionStorage.clear();
+        // Import and use clearSessionData from auth utils (avoid circular dependency by using dynamic import if needed)
+        // For now, clear sessionStorage here
+        sessionStorage.removeItem("isAuthenticated");
+        sessionStorage.removeItem("role");
+        sessionStorage.removeItem("userType");
+        sessionStorage.removeItem("userProfile");
+        sessionStorage.removeItem("authToken");
+        sessionStorage.removeItem("accessToken");
         localStorage.removeItem("userProfile");
-        setTimeout(() => {
-          window.location.href = '/auth';
-        }, 500);
+        // Don't redirect here - let ProtectedRoute handle it
       }
       
       // Handle 500 Internal Server Error - log details

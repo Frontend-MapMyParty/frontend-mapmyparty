@@ -36,17 +36,23 @@ const UserDashboardHeader = () => {
     return { name, email };
   }, []);
 
-  const handleLogout = () => {
-    // Clear session storage
-    sessionStorage.removeItem("authToken");
-    sessionStorage.removeItem("accessToken");
-    sessionStorage.removeItem("userType");
-    sessionStorage.removeItem("role");
-    sessionStorage.removeItem("isAuthenticated");
-    sessionStorage.removeItem("userName");
-    sessionStorage.removeItem("userEmail");
-    sessionStorage.removeItem("userPhone");
-    sessionStorage.removeItem("userProfile");
+  const handleLogout = async () => {
+    // Call logout API to clear cookies on backend (if available)
+    try {
+      const { buildUrl } = await import("@/config/api");
+      await fetch(buildUrl("auth/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      // Continue even if logout API fails
+      console.warn("Logout API call failed:", err);
+    }
+    
+    // Clear all session data using centralized function
+    const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
+    clearSessionData();
+    resetSessionCache();
     
     // Redirect to home
     navigate("/");

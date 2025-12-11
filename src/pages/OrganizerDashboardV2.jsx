@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated as checkAuth } from "@/utils/auth";
+import { clearSessionData, resetSessionCache } from "@/utils/auth";
+import { buildUrl } from "@/config/api";
 import {
   Calendar,
   X,
@@ -524,44 +525,62 @@ const OrganizerDashboardV2 = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
 
-  // Validate authentication on page load
-  useEffect(() => {
-    const validateAuth = () => {
-      const isAuthenticated = checkAuth();
-      const userType = sessionStorage.getItem("userType");
-      
-      if (!isAuthenticated || userType?.toLowerCase() !== "organizer") {
-        navigate("/auth");
-        return;
-      }
-    };
+  // Note: Authentication is handled by ProtectedRoute wrapper
+  // No need for redundant auth check here
 
-    validateAuth();
-  }, [navigate]);
-
-  // Organizer profile from session
+  // Organizer profile from session - will be populated after ProtectedRoute validates
   const [user, setUser] = useState({ name: "Organizer", email: "" });
   useEffect(() => {
-    try {
-      const profileRaw = sessionStorage.getItem("userProfile");
-      const profile = profileRaw ? JSON.parse(profileRaw) : {};
-      const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
-      const email = sessionStorage.getItem("userEmail") || profile.email || "";
-      setUser({ name, email });
-    } catch {}
+    // Fetch user data from validated session (ProtectedRoute ensures we're authenticated)
+    const loadUserData = async () => {
+      try {
+        const { fetchSession } = await import("@/utils/auth");
+        const session = await fetchSession();
+        if (session?.user) {
+          setUser({
+            name: session.user.name || sessionStorage.getItem("userName") || "Organizer",
+            email: session.user.email || sessionStorage.getItem("userEmail") || "",
+          });
+        } else {
+          // Fallback to sessionStorage if session.user not available yet
+          const profileRaw = sessionStorage.getItem("userProfile");
+          const profile = profileRaw ? JSON.parse(profileRaw) : {};
+          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
+          const email = sessionStorage.getItem("userEmail") || profile.email || "";
+          setUser({ name, email });
+        }
+      } catch (err) {
+        console.warn("Failed to load user data:", err);
+        // Fallback to sessionStorage
+        try {
+          const profileRaw = sessionStorage.getItem("userProfile");
+          const profile = profileRaw ? JSON.parse(profileRaw) : {};
+          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
+          const email = sessionStorage.getItem("userEmail") || profile.email || "";
+          setUser({ name, email });
+        } catch {}
+      }
+    };
+    loadUserData();
   }, []);
 
-  const handleLogout = () => {
-    // Clear all session storage data
-    sessionStorage.removeItem("authToken");
-    sessionStorage.removeItem("accessToken");
-    sessionStorage.removeItem("userType");
-    sessionStorage.removeItem("role");
-    sessionStorage.removeItem("isAuthenticated");
-    sessionStorage.removeItem("userProfile");
-    sessionStorage.removeItem("userName");
-    sessionStorage.removeItem("userEmail");
-    sessionStorage.removeItem("userPhone");
+  const handleLogout = async () => {
+    // Call logout API to clear cookies on backend (if available)
+    try {
+      await fetch(buildUrl("auth/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      // Continue even if logout API fails
+      console.warn("Logout API call failed:", err);
+    }
+    
+    // Clear all session data using centralized function
+    clearSessionData();
+    resetSessionCache();
+    
+    // Redirect to home
     navigate("/");
   };
 

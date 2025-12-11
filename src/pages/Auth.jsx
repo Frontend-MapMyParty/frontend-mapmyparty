@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, User, Building2, UserCog, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
-import { resetSessionCache } from "@/utils/auth";
+import { resetSessionCache, fetchSession } from "@/utils/auth";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -101,11 +101,78 @@ const Auth = () => {
         });
 
         const userDataCandidate = extractUserFromResponse(res);
-        persistUserProfile(userDataCandidate, { email, role });
+        // Ensure role is included in user data
+        const userDataWithRole = userDataCandidate ? { ...userDataCandidate, role } : { email, role };
+        persistUserProfile(userDataWithRole, { email, role, type });
         resetSessionCache(); // ensure subsequent guards refetch session
         if (role) sessionStorage.setItem("role", role);
         sessionStorage.setItem("isAuthenticated", "true");
         if (type) sessionStorage.setItem("userType", type);
+        
+        // Wait a bit for cookies to be set by the browser
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Try to validate session, but don't fail if it doesn't work immediately
+        // (cookies might take a moment to propagate)
+        let sessionValidated = false;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (!sessionValidated && retryCount < maxRetries) {
+          try {
+            console.log(`🔄 Validating session (attempt ${retryCount + 1}/${maxRetries})...`);
+            resetSessionCache(); // Force fresh fetch
+            const session = await fetchSession();
+            
+            if (session?.isAuthenticated) {
+              // Verify role matches
+              const sessionRole = (session.user?.role || session.role || role || "").toString().toUpperCase();
+              const expectedRole = role.toString().toUpperCase();
+              
+              console.log(`✅ Session validated - Role: ${sessionRole}, Expected: ${expectedRole}`);
+              
+              if (sessionRole === expectedRole || retryCount === maxRetries - 1) {
+                sessionValidated = true;
+              } else {
+                console.warn(`⚠️ Role mismatch, retrying... (got ${sessionRole}, expected ${expectedRole})`);
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+              }
+            } else {
+              // If fetchSession failed but we have sessionStorage data, trust it for now
+              // The ProtectedRoute will re-validate when it mounts
+              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
+                                    sessionStorage.getItem("role") === role;
+              if (hasStorageData && retryCount === maxRetries - 1) {
+                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
+                sessionValidated = true; // Trust sessionStorage as fallback
+              } else {
+                console.warn(`⚠️ Session not authenticated, retrying... (attempt ${retryCount + 1})`);
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+              }
+            }
+          } catch (err) {
+            console.warn(`⚠️ Session fetch error (attempt ${retryCount + 1}):`, err);
+            retryCount++;
+            if (retryCount < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+            } else {
+              // Final attempt failed, but if we have sessionStorage, trust it
+              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
+                                    sessionStorage.getItem("role") === role;
+              if (hasStorageData) {
+                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
+                sessionValidated = true; // Trust sessionStorage as fallback
+              }
+            }
+          }
+        }
+        
+        if (!sessionValidated) {
+          console.error("❌ Failed to validate session after login, but proceeding with navigation");
+        }
+        
         toast.success("Logged in successfully!");
       } else {
         const name = form.querySelector("#name")?.value?.trim();
@@ -134,26 +201,99 @@ const Auth = () => {
           role,
         };
 
-        persistUserProfile(signupUserData, {
+        // Ensure role and type are included in user data
+        const signupDataWithRole = { ...signupUserData, role, type };
+        persistUserProfile(signupDataWithRole, {
           name,
           email,
           phone: phoneDigits,
           role,
+          type,
         });
         resetSessionCache();
         if (role) sessionStorage.setItem("role", role);
         sessionStorage.setItem("isAuthenticated", "true");
         if (type) sessionStorage.setItem("userType", type);
+        
+        // Wait a bit for cookies to be set by the browser
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Try to validate session, but don't fail if it doesn't work immediately
+        // (cookies might take a moment to propagate)
+        let sessionValidated = false;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (!sessionValidated && retryCount < maxRetries) {
+          try {
+            console.log(`🔄 Validating session (attempt ${retryCount + 1}/${maxRetries})...`);
+            resetSessionCache(); // Force fresh fetch
+            const session = await fetchSession();
+            
+            if (session?.isAuthenticated) {
+              // Verify role matches
+              const sessionRole = (session.user?.role || session.role || role || "").toString().toUpperCase();
+              const expectedRole = role.toString().toUpperCase();
+              
+              console.log(`✅ Session validated - Role: ${sessionRole}, Expected: ${expectedRole}`);
+              
+              if (sessionRole === expectedRole || retryCount === maxRetries - 1) {
+                sessionValidated = true;
+              } else {
+                console.warn(`⚠️ Role mismatch, retrying... (got ${sessionRole}, expected ${expectedRole})`);
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+              }
+            } else {
+              // If fetchSession failed but we have sessionStorage data, trust it for now
+              // The ProtectedRoute will re-validate when it mounts
+              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
+                                    sessionStorage.getItem("role") === role;
+              if (hasStorageData && retryCount === maxRetries - 1) {
+                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
+                sessionValidated = true; // Trust sessionStorage as fallback
+              } else {
+                console.warn(`⚠️ Session not authenticated, retrying... (attempt ${retryCount + 1})`);
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+              }
+            }
+          } catch (err) {
+            console.warn(`⚠️ Session fetch error (attempt ${retryCount + 1}):`, err);
+            retryCount++;
+            if (retryCount < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
+            } else {
+              // Final attempt failed, but if we have sessionStorage, trust it
+              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
+                                    sessionStorage.getItem("role") === role;
+              if (hasStorageData) {
+                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
+                sessionValidated = true; // Trust sessionStorage as fallback
+              }
+            }
+          }
+        }
+        
+        if (!sessionValidated) {
+          console.error("❌ Failed to validate session after signup, but proceeding with navigation");
+        }
+        
         toast.success("Account created successfully!");
       }
 
-      if (type === "organizer") {
-        navigate("/organizer/dashboard-v2");
-      } else if (type === "promoter") {
-        navigate("/promoter/dashboard");
-      } else {
-        navigate("/dashboard");
-      }
+      // Small delay to ensure cookies are set and propagated
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Navigate after session is established
+      const dashboardPath = type === "organizer" 
+        ? "/organizer/dashboard-v2" 
+        : type === "promoter" 
+        ? "/promoter/dashboard" 
+        : "/dashboard";
+      
+      console.log(`🚀 Navigating to dashboard: ${dashboardPath}`);
+      navigate(dashboardPath, { replace: true });
     } catch (err) {
       toast.error(err?.message || "Authentication failed");
     } finally {
