@@ -1,5 +1,78 @@
 import { buildUrl, apiFetch } from "@/config/api";
 
+// -------- Cloudinary Signature + Upload Helpers (internal) --------
+async function getCloudinarySignature(folder) {
+  // Ensure folder starts with mapmyparty
+  const safeFolder = folder && folder.startsWith("mapmyparty") ? folder : "mapmyparty";
+  const url = buildUrl(`cloudinary/sign?folder=${encodeURIComponent(safeFolder)}`);
+  const res = await fetch(url, { method: "GET", credentials: "include" });
+  if (res.status === 429) {
+    throw new Error("Upload rate limit reached. Please try again in a few moments.");
+  }
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.errorMessage || errJson.message || "Cloudinary not configured");
+  }
+  return res.json();
+}
+
+async function uploadToCloudinary(file, signaturePayload) {
+  const {
+    cloudName,
+    apiKey,
+    timestamp,
+    folder,
+    signature,
+    uploadPreset,
+    resourceType = "image",
+  } = signaturePayload || {};
+
+  if (!cloudName || !apiKey || !timestamp || !signature || !folder) {
+    throw new Error("Missing Cloudinary configuration");
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("api_key", apiKey);
+  form.append("timestamp", timestamp);
+  form.append("folder", folder);
+  form.append("signature", signature);
+  if (uploadPreset) form.append("upload_preset", uploadPreset);
+
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+  const res = await fetch(uploadUrl, { method: "POST", body: form });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || errJson.message || "Upload failed");
+  }
+  return res.json();
+}
+
+/**
+ * Upload Artist Image (Cloudinary direct)
+ * Returns normalized shape: { data: { image: <url>, url: <url>, publicId: <id> } }
+ */
+export async function uploadArtistImage(eventId, file) {
+  if (!eventId) throw new Error("Event ID is required");
+  if (!file || !(file instanceof File)) throw new Error("Valid artist image file is required");
+
+  const folder = `mapmyparty/events/${eventId}/artists`;
+
+  const sig = await getCloudinarySignature(folder);
+  const uploadJson = await uploadToCloudinary(file, sig);
+
+  const secureUrl = uploadJson.secure_url || uploadJson.url;
+  const publicId = uploadJson.public_id || uploadJson.publicId;
+
+  return {
+    data: {
+      image: secureUrl,
+      url: secureUrl,
+      publicId,
+    },
+  };
+}
+
 /**
  * Create event - Step 1: Basic Details
  * 
@@ -190,37 +263,72 @@ export async function updateEventStep1(eventId, eventData) {
  * @param {File} flyerImage - Flyer image file
  * @returns {Promise<Object>} Response with uploaded image URL
  */
+// Upload/Replace Flyer Image (Cloudinary direct)
+// Preserves old response shape: { data: { flyerImage: <url>, url: <url>, publicId: <id> } }
 export async function uploadFlyerImage(eventId, flyerImage) {
-  const url = buildUrl(`/api/event/update-flyer/${eventId}`);
-  
-  console.log("📸 Uploading Flyer Image");
+  console.log("📸 Uploading Flyer Image (Cloudinary direct)");
   console.log("📋 Event ID:", eventId);
-  
+
   if (!eventId) {
     throw new Error("Event ID is required");
   }
-  
+
   if (!flyerImage || !(flyerImage instanceof File)) {
     throw new Error("Valid flyer image file is required");
   }
-  
-  const formData = new FormData();
-  formData.append("flyerImage", flyerImage);
-  
-  console.log("📸 Uploading flyer image:", {
-    name: flyerImage.name,
-    size: `${(flyerImage.size / 1024 / 1024).toFixed(2)} MB`,
-    type: flyerImage.type
-  });
-  
-  try {
-    const response = await apiFetch(url, {
+
+  // Preserve folder naming: mapmyparty/events/<eventId>/flyer
+  const folder = `mapmyparty/events/${eventId}/flyer`;
+
+  // Helper to persist the uploaded URL to backend DB (keeps old behavior)
+  const persistFlyerToBackend = async (imageUrl, publicId) => {
+    // Spec: PATCH /api/event/update-flyer/:id expects imageUrl (and publicId)
+    const url = buildUrl(`/api/event/update-flyer/${eventId}`);
+    const payload = {
+      imageUrl,        // primary key per spec
+      publicId,
+      // Legacy compat (old UI expects these fields to exist on the row)
+      flyerImage: imageUrl,
+      url: imageUrl,
+    };
+
+    console.log("🔗 Persisting flyer URL to backend:", payload);
+
+    const res = await apiFetch(url, {
       method: "PATCH",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
-    
-    console.log("✅ Flyer image uploaded successfully:", response);
-    return response;
+
+    return res;
+  };
+
+  try {
+    const sig = await getCloudinarySignature(folder);
+    const uploadJson = await uploadToCloudinary(flyerImage, sig);
+
+    const secureUrl = uploadJson.secure_url || uploadJson.url;
+    const publicId = uploadJson.public_id || uploadJson.publicId;
+
+    // Persist to backend DB to match old behavior
+    try {
+      await persistFlyerToBackend(secureUrl, publicId);
+      console.log("✅ Flyer URL persisted to backend");
+    } catch (persistErr) {
+      console.error("❌ Failed to persist flyer URL to backend:", persistErr);
+      throw new Error(persistErr?.message || "Failed to save flyer image. Please try again.");
+    }
+
+    const normalized = {
+      data: {
+        flyerImage: secureUrl,
+        url: secureUrl,
+        publicId,
+      },
+    };
+
+    console.log("✅ Flyer image uploaded successfully:", normalized);
+    return normalized;
   } catch (error) {
     console.error("❌ Failed to upload flyer image:");
     console.error("   Error message:", error.message);
@@ -269,48 +377,101 @@ export async function deleteFlyerImage(eventId) {
  * @param {File[]} galleryImages - Array of gallery image files (1-10 images, JPEG/PNG/WebP/GIF, ≤10MB each)
  * @returns {Promise<Object>} Response with uploaded image URLs
  */
+// Upload Gallery Images (Cloudinary direct)
+// Preserves old response shape: { data: { images: [ { id, url, type: 'EVENT_GALLERY' } ] } }
 export async function uploadGalleryImages(eventId, galleryImages) {
-  const url = buildUrl(`/api/event/${eventId}/images`);
-  
-  console.log("📸 Uploading Gallery Images");
+  console.log("📸 Uploading Gallery Images (Cloudinary direct)");
   console.log("📋 Event ID:", eventId);
-  
+
   if (!eventId) {
     throw new Error("Event ID is required");
   }
-  
+
   if (!galleryImages || galleryImages.length === 0) {
     throw new Error("At least one gallery image is required");
   }
-  
+
   if (galleryImages.length > 10) {
     throw new Error("Maximum 10 gallery images allowed");
   }
-  
-  const formData = new FormData();
-  
-  // Append images to FormData as galleryImages[]
-  galleryImages.forEach((image, index) => {
-    if (image instanceof File) {
-      formData.append("galleryImages", image);
-      console.log(`📸 Adding gallery image ${index + 1}:`, {
-        name: image.name,
-        size: `${(image.size / 1024 / 1024).toFixed(2)} MB`,
-        type: image.type
-      });
-    }
-  });
-  
-  console.log(`📤 Uploading ${galleryImages.length} gallery image(s) to POST /api/event/:id/images`);
-  
-  try {
-    const response = await apiFetch(url, {
+
+  // Preserve folder naming: mapmyparty/events/<eventId>/gallery
+  const folder = `mapmyparty/events/${eventId}/gallery`;
+
+  // Persist gallery images to backend DB (creates gallery records)
+  const persistGalleryToBackend = async (imageUrls) => {
+    const url = buildUrl(`/api/event/${eventId}/images`);
+    // Spec allows imageUrls (array). Keep legacy compat by also sending images if backend accepts.
+    const payload = {
+      imageUrls,
+    };
+
+    console.log("🔗 Persisting gallery URLs to backend:", payload);
+
+    const res = await apiFetch(url, {
       method: "POST",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
-    
-    console.log("✅ Gallery images uploaded successfully:", response);
-    return response;
+
+    return res;
+  };
+
+  try {
+    const sig = await getCloudinarySignature(folder);
+
+    const uploads = await Promise.all(
+      galleryImages.map(async (image, index) => {
+        if (!(image instanceof File)) {
+          throw new Error(`Gallery file at index ${index} is not a File`);
+        }
+        const uploadJson = await uploadToCloudinary(image, sig);
+        const secureUrl = uploadJson.secure_url || uploadJson.url;
+        const publicId = uploadJson.public_id || uploadJson.publicId;
+        return {
+          id: publicId, // temporary; will be replaced by DB ID after persist
+          url: secureUrl,
+          type: "EVENT_GALLERY",
+        };
+      })
+    );
+
+    let backendImages = [];
+
+    // Persist to backend DB
+    try {
+      const imageUrls = uploads.map((u) => u.url);
+      const persistRes = await persistGalleryToBackend(imageUrls);
+      // Expect response: { data: { images: [ { id, url, ... } ] } }
+      backendImages =
+        persistRes?.data?.images ||
+        persistRes?.images ||
+        persistRes?.data ||
+        [];
+      console.log("✅ Gallery URLs persisted to backend");
+    } catch (persistErr) {
+      console.error("❌ Failed to persist gallery URLs to backend:", persistErr);
+      throw new Error(persistErr?.message || "Failed to save gallery images. Please try again.");
+    }
+
+    // Prefer backend IDs (DB UUID) for delete route compatibility
+    const imagesForUi =
+      Array.isArray(backendImages) && backendImages.length > 0
+        ? backendImages.map((img, idx) => ({
+            id: img.id || uploads[idx]?.id, // DB ID preferred
+            url: img.url || uploads[idx]?.url,
+            type: img.type || "EVENT_GALLERY",
+          }))
+        : uploads;
+
+    const normalized = {
+      data: {
+        images: imagesForUi,
+      },
+    };
+
+    console.log("✅ Gallery images uploaded successfully:", normalized);
+    return normalized;
   } catch (error) {
     console.error("❌ Failed to upload gallery images:");
     console.error("   Error message:", error.message);
@@ -613,6 +774,7 @@ export async function createArtist(artistData) {
     instagramLink: artistData.instagramLink || "",
     spotifyLink: artistData.spotifyLink || "",
     image: artistData.image || "", // Image URL or base64
+    imageUrl: artistData.image || "", // Extra key for backends expecting imageUrl
   };
 
   console.log("📤 Sending artist payload:", JSON.stringify(payload, null, 2));

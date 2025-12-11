@@ -24,7 +24,7 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, publishEvent } from "@/services/eventService";
+import { updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, publishEvent, uploadArtistImage } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
 
@@ -1222,13 +1222,6 @@ const CreateEvent = () => {
       return;
     }
 
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error(`File is too large. Maximum size is 10MB. Your file: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-      return;
-    }
-
     try {
       setUploadingCover(true);
       setLoadingMessage("Uploading cover image...");
@@ -1313,7 +1306,7 @@ const CreateEvent = () => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Check file types and sizes
+    // Check file types
     const validFiles = [];
     const invalidFiles = [];
 
@@ -1322,15 +1315,11 @@ const CreateEvent = () => {
         invalidFiles.push(file.name);
         continue;
       }
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        invalidFiles.push(`${file.name} (too large)`);
-        continue;
-      }
       validFiles.push(file);
     }
 
     if (invalidFiles.length > 0) {
-      toast.error(`Invalid files (${invalidFiles.join(', ')}) - Only images under 5MB are allowed`);
+      toast.error(`Invalid files (${invalidFiles.join(', ')}) - Only images are allowed`);
       if (validFiles.length === 0) return;
     }
 
@@ -1566,18 +1555,37 @@ const CreateEvent = () => {
     }
   };
 
-  const handleArtistPhotoChange = (index, e) => {
+  const handleArtistPhotoChange = async (index, e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newArtists = [...artists];
-        if (typeof reader.result === 'string') {
-          newArtists[index].photo = reader.result;
-          setArtists(newArtists);
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (!backendEventId) {
+      toast.error("Please complete Step 1 first to create the event");
+      return;
+    }
+
+    try {
+      setShowLoading(true);
+      setLoadingMessage("Uploading artist photo...");
+
+      const res = await uploadArtistImage(backendEventId, file);
+      const imageUrl = res?.data?.image || res?.data?.url || res?.url;
+
+      if (!imageUrl) {
+        throw new Error("Image uploaded but URL was not returned. Please try again.");
+      }
+
+      const newArtists = [...artists];
+      newArtists[index].photo = imageUrl;
+      setArtists(newArtists);
+
+      toast.success("Artist photo uploaded successfully!");
+    } catch (err) {
+      console.error("Failed to upload artist photo:", err);
+      toast.error(err?.message || "Failed to upload artist photo. Please try again.");
+    } finally {
+      setShowLoading(false);
+      setLoadingMessage("");
     }
   };
 
@@ -2011,7 +2019,7 @@ const CreateEvent = () => {
                         disabled={uploadingCover || !backendEventId}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Recommended size: 1920x1080px. Max file size: 10MB
+                        Recommended size: 1920x1080px.
                       </p>
                       
                       {/* Loading indicator for cover upload */}
@@ -2471,27 +2479,30 @@ const CreateEvent = () => {
                   </div>
 
                   {artists.map((artist, index) => (
-                    <Card key={index} className="p-4">
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold">Artist {index + 1}</h3>
-                          {artists.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setArtists(artists.filter((_, i) => i !== index))}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-
+                    <Card key={index} className="p-4 border border-border/60 shadow-sm">
+                      <div className="flex items-start justify-between mb-4">
                         <div>
+                          <p className="text-sm text-muted-foreground">Artist {index + 1}</p>
+                          <h3 className="font-semibold leading-tight">Add details</h3>
+                        </div>
+                        {artists.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setArtists(artists.filter((_, i) => i !== index))}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
                           <Label htmlFor={`artist-name-${index}`}>Artist Name *</Label>
                           <Input
                             id={`artist-name-${index}`}
-                            placeholder="Enter artist name"
+                            placeholder="e.g., John Doe"
                             value={artist.name}
                             onChange={(e) => {
                               const newArtists = [...artists];
@@ -2501,7 +2512,7 @@ const CreateEvent = () => {
                           />
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor={`artist-gender-${index}`}>Gender</Label>
                           <Select 
                             value={artist.gender || "PREFER_NOT_TO_SAY"} 
@@ -2522,10 +2533,12 @@ const CreateEvent = () => {
                             </SelectContent>
                           </Select>
                         </div>
+                      </div>
 
-                        <div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
                           <Label htmlFor={`artist-photo-${index}`}>Artist Photo *</Label>
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <Input
                               id={`artist-photo-${index}`}
                               type="file"
@@ -2542,14 +2555,15 @@ const CreateEvent = () => {
                                 />
                               </div>
                             )}
+                            <p className="text-xs text-muted-foreground">JPG/PNG/WebP</p>
                           </div>
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                           <Label htmlFor={`artist-instagram-${index}`}>Instagram *</Label>
                           <Input
                             id={`artist-instagram-${index}`}
-                            placeholder="Enter Instagram handle"
+                            placeholder="@artist_handle"
                             value={artist.instagram}
                             onChange={(e) => {
                               const newArtists = [...artists];
@@ -2557,21 +2571,22 @@ const CreateEvent = () => {
                               setArtists(newArtists);
                             }}
                           />
+                          <p className="text-xs text-muted-foreground">Use full handle or profile URL</p>
                         </div>
+                      </div>
 
-                        <div>
-                          <Label htmlFor={`artist-spotify-${index}`}>Spotify (Optional)</Label>
-                          <Input
-                            id={`artist-spotify-${index}`}
-                            placeholder="Enter Spotify URL"
-                            value={artist.spotify}
-                            onChange={(e) => {
-                              const newArtists = [...artists];
-                              newArtists[index].spotify = e.target.value;
-                              setArtists(newArtists);
-                            }}
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`artist-spotify-${index}`}>Spotify (Optional)</Label>
+                        <Input
+                          id={`artist-spotify-${index}`}
+                          placeholder="https://open.spotify.com/artist/..."
+                          value={artist.spotify}
+                          onChange={(e) => {
+                            const newArtists = [...artists];
+                            newArtists[index].spotify = e.target.value;
+                            setArtists(newArtists);
+                          }}
+                        />
                       </div>
                     </Card>
                   ))}
