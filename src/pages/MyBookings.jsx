@@ -112,7 +112,7 @@ const MyBookings = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#000000] text-white">
       <main className="py-6">
         <div className="container">
           <div className="mb-8">
@@ -120,35 +120,35 @@ const MyBookings = () => {
               <Receipt className="w-8 h-8 text-primary" />
               <h1 className="text-4xl font-bold">My Orders</h1>
             </div>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-[rgba(255,255,255,0.65)] text-lg">
               View and manage all your event orders and bookings
             </p>
           </div>
 
           {loading ? (
-            <Card>
+            <Card className="bg-[#000000] border border-[rgba(255,255,255,0.18)] text-white">
               <CardContent className="p-12 text-center space-y-4">
                 <Loader2 className="w-10 h-10 mx-auto animate-spin text-primary" />
-                <p className="text-muted-foreground">Loading your bookings...</p>
+                <p className="text-[rgba(255,255,255,0.65)]">Loading your bookings...</p>
               </CardContent>
             </Card>
           ) : error ? (
-            <Card>
+            <Card className="bg-[#000000] border border-[rgba(255,255,255,0.18)] text-white">
               <CardContent className="p-12 text-center space-y-4">
                 <AlertCircle className="w-12 h-12 mx-auto text-destructive" />
                 <h3 className="text-xl font-semibold">Unable to load bookings</h3>
-                <p className="text-muted-foreground">{error}</p>
+                <p className="text-[rgba(255,255,255,0.65)]">{error}</p>
                 <Button variant="accent" onClick={handleRetry}>
                   Try Again
                 </Button>
               </CardContent>
             </Card>
           ) : tickets.length === 0 ? (
-            <Card>
+            <Card className="bg-[#000000] border border-[rgba(255,255,255,0.18)] text-white">
               <CardContent className="p-12 text-center">
-                <Receipt className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <Receipt className="w-16 h-16 text-[rgba(255,255,255,0.65)] mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No orders yet</h3>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-[rgba(255,255,255,0.65)] mb-6">
                   Start exploring events and place your first order!
                 </p>
                 <Button variant="accent" asChild>
@@ -161,20 +161,20 @@ const MyBookings = () => {
               {tickets.map((order) => (
                 <Card
                   key={order.id}
-                  className="overflow-hidden border-2 hover:shadow-lg transition-all"
+                  className="overflow-hidden border border-[rgba(255,255,255,0.18)] bg-[#000000] text-white hover:shadow-[0_18px_50px_-20px_rgba(0,0,0,0.65)] transition-all"
                 >
                   {/* Order Header */}
-                  <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+                  <CardHeader className="bg-[#000000] border-b border-[rgba(255,255,255,0.18)]">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-2">
-                          <Hash className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Order ID:</span>
+                          <Hash className="w-4 h-4 text-[rgba(255,255,255,0.65)]" />
+                          <span className="text-sm text-[rgba(255,255,255,0.65)]">Order ID:</span>
                           <span className="text-sm font-mono font-semibold">{order.orderId}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
+                          <Clock className="w-4 h-4 text-[rgba(255,255,255,0.65)]" />
+                          <span className="text-sm text-[rgba(255,255,255,0.65)]">
                             Ordered on {order.bookingDate} at {order.bookingTime}
                           </span>
                         </div>
@@ -221,7 +221,7 @@ const MyBookings = () => {
                           </div>
                           <div className="flex-1">
                             <h3 className="text-xl font-bold mb-2">{order.eventTitle}</h3>
-                            <div className="space-y-2 text-sm text-muted-foreground">
+                            <div className="space-y-2 text-sm text-[rgba(255,255,255,0.65)]">
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
                                 <span>{order.eventDate} at {order.eventTime}</span>
@@ -239,27 +239,27 @@ const MyBookings = () => {
                         </div>
 
                         {/* Order Details Section */}
-                        <div className="border-t pt-4">
+                        <div className="border-t border-[rgba(255,255,255,0.18)] pt-4">
                           <h4 className="font-semibold mb-3 flex items-center gap-2">
                             <Ticket className="w-4 h-4" />
                             Order Details
                           </h4>
-                          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                          <div className="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] rounded-lg p-4 space-y-3">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Ticket Type:</span>
+                              <span className="text-sm text-[rgba(255,255,255,0.65)]">Ticket Type:</span>
                               <span className="text-sm font-medium">{order.ticketType}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Quantity:</span>
+                              <span className="text-sm text-[rgba(255,255,255,0.65)]">Quantity:</span>
                               <span className="text-sm font-medium">{order.quantity} {order.quantity > 1 ? "tickets" : "ticket"}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Unit Price:</span>
+                              <span className="text-sm text-[rgba(255,255,255,0.65)]">Unit Price:</span>
                               <span className="text-sm font-medium">₹{order.unitPrice}</span>
                             </div>
                             {order.tax > 0 && (
                               <div className="flex justify-between items-center">
-                                <span className="text-sm text-muted-foreground">Tax:</span>
+                                <span className="text-sm text-[rgba(255,255,255,0.65)]">Tax:</span>
                                 <span className="text-sm font-medium">₹{order.tax}</span>
                               </div>
                             )}
@@ -271,18 +271,18 @@ const MyBookings = () => {
                         </div>
 
                         {/* Payment Info */}
-                        <div className="border-t pt-4">
+                        <div className="border-t border-[rgba(255,255,255,0.18)] pt-4">
                           <h4 className="font-semibold mb-3 flex items-center gap-2">
                             <CreditCard className="w-4 h-4" />
                             Payment Information
                           </h4>
                           <div className="grid sm:grid-cols-2 gap-3 text-sm">
                             <div>
-                              <span className="text-muted-foreground">Payment Method:</span>
+                              <span className="text-[rgba(255,255,255,0.65)]">Payment Method:</span>
                               <span className="ml-2 font-medium">{order.paymentMethod}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Payment Status:</span>
+                              <span className="text-[rgba(255,255,255,0.65)]">Payment Status:</span>
                               <Badge
                                 variant={order.paymentStatus === "completed" ? "default" : "secondary"}
                                 className="ml-2"
@@ -296,16 +296,16 @@ const MyBookings = () => {
 
                       {/* Action Sidebar */}
                       <div className="lg:col-span-1 space-y-4">
-                        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 border border-primary/20">
+                        <div className="bg-[rgba(255,255,255,0.08)] rounded-lg p-4 border border-[rgba(255,255,255,0.18)]">
                           <h4 className="font-semibold mb-3">Order Summary</h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-muted-foreground">Subtotal:</span>
+                              <span className="text-[rgba(255,255,255,0.65)]">Subtotal:</span>
                               <span>₹{order.subtotal}</span>
                             </div>
                             {order.tax > 0 && (
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Tax:</span>
+                                <span className="text-[rgba(255,255,255,0.65)]">Tax:</span>
                                 <span>₹{order.tax}</span>
                               </div>
                             )}

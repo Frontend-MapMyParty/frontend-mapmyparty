@@ -364,7 +364,7 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="w-full h-full p-4 md:p-6 lg:p-8 flex items-center justify-center">
+      <div className="w-full h-full p-4 md:p-6 lg:p-8 flex items-center justify-center bg-[#000000] text-white">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           <p className="text-muted-foreground">Loading profile...</p>
@@ -375,8 +375,8 @@ export default function UserProfile() {
 
   if (error) {
     return (
-      <div className="w-full h-full p-4 md:p-6 lg:p-8 flex items-center justify-center">
-        <Card className="max-w-md w-full">
+      <div className="w-full h-full p-4 md:p-6 lg:p-8 flex items-center justify-center bg-[#000000] text-white">
+        <Card className="max-w-md w-full bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
           <CardHeader>
             <CardTitle className="text-destructive">Error Loading Profile</CardTitle>
           </CardHeader>
@@ -392,10 +392,10 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="w-full h-full p-4 md:p-6 lg:p-8 overflow-y-auto">
+    <div className="w-full h-full p-4 md:p-6 lg:p-8 overflow-y-auto bg-[#000000] text-white">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Profile Header */}
-        <Card className="overflow-hidden border-0 shadow-md">
+        <Card className="overflow-hidden border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)]">
           <CardContent className="p-6">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
@@ -403,16 +403,16 @@ export default function UserProfile() {
                   <Dialog>
                     <DialogTrigger asChild>
                       <button type="button" className="relative">
-                        <Avatar className="h-24 w-24 border-4 border-background shadow-lg transition-transform hover:scale-[1.02]">
+                        <Avatar className="h-24 w-24 border-4 border-[rgba(255,255,255,0.18)] bg-[#000000] shadow-lg transition-transform hover:scale-[1.02]">
                           {profile.avatarUrl ? (
                             <AvatarImage src={profile.avatarUrl} alt={profile.name} />
                           ) : (
-                            <AvatarFallback className="text-xl font-semibold">
+                            <AvatarFallback className="text-xl font-semibold bg-[rgba(255,255,255,0.08)] text-white">
                               {getInitials(profile.name, profile.email)}
                             </AvatarFallback>
                           )}
                         </Avatar>
-                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-xs font-semibold text-primary-foreground shadow">Change</span>
+                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-[#D60024] px-3 py-0.5 text-xs font-semibold text-white shadow">Change</span>
                       </button>
                     </DialogTrigger>
                     <DialogContent className="max-w-lg">
@@ -441,14 +441,14 @@ export default function UserProfile() {
                 </div>
 
                 <div className="mt-4 flex-1 space-y-3 sm:mt-0 text-center sm:text-left">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground justify-center sm:justify-start">
-                    <MapPin className="h-4 w-4 text-primary" />
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-[rgba(255,255,255,0.65)] justify-center sm:justify-start">
+                    <MapPin className="h-4 w-4 text-[#D60024]" />
                     <span>Member since {memberSince}</span>
-                    <Badge variant="secondary" className="uppercase tracking-wide">
+                    <Badge variant="secondary" className="uppercase tracking-wide bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
                       {roleLabelMap[role] || "Attendee"}
                     </Badge>
                     {profile.isVerified && (
-                      <Badge variant="outline" className="gap-1">
+                      <Badge variant="outline" className="gap-1 bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         Verified
                       </Badge>
@@ -457,7 +457,7 @@ export default function UserProfile() {
 
                   <h1 className="text-3xl font-semibold tracking-tight">{profile.name}</h1>
 
-                  <div className="flex flex-wrap gap-4 pt-2 text-sm text-muted-foreground justify-center sm:justify-start">
+                  <div className="flex flex-wrap gap-4 pt-2 text-sm text-[rgba(255,255,255,0.65)] justify-center sm:justify-start">
                     <span className="inline-flex items-center gap-2">
                       <Mail className="h-4 w-4" />
                       {profile.email}
@@ -474,7 +474,7 @@ export default function UserProfile() {
         </Card>
 
         {/* Profile Details */}
-        <Card className="border-0 shadow-md">
+        <Card className="border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)]">
           <CardHeader>
             <CardTitle>Account Details</CardTitle>
           </CardHeader>
@@ -482,10 +482,10 @@ export default function UserProfile() {
             <div className="grid gap-6 text-sm md:grid-cols-2">
               {detailRows.map((row) => (
                 <div key={row.label} className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[rgba(255,255,255,0.65)]">
                     {row.label}:
                   </p>
-                  <div className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <div className="flex items-center gap-2 text-base font-semibold text-white">
                     <span>{row.value}</span>
                     {row.actions
                       ?.filter((action) => action.type === "icon")
@@ -493,7 +493,7 @@ export default function UserProfile() {
                         <button
                           key={action.label}
                           type="button"
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-primary/10 hover:text-primary"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.65)] transition hover:bg-[#D60024] hover:text-white"
                           aria-label={action.label}
                           onClick={action.onClick}
                         >
@@ -510,7 +510,7 @@ export default function UserProfile() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editField} onOpenChange={(open) => !open && !isSaving && setEditField(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
           <form onSubmit={handleEditSubmit} className="space-y-5 py-2">
             <DialogHeader>
               <DialogTitle>

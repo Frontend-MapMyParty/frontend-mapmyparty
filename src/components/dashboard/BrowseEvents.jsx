@@ -98,27 +98,27 @@ export default function BrowseEvents() {
   };
 
   return (
-    <div className="w-full p-4 md:p-6 lg:p-8">
+    <div className="w-full p-4 md:p-6 lg:p-8 bg-[#000000] text-white space-y-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Browse Events</h1>
-        <p className="text-gray-600">Discover upcoming events near you</p>
+        <h1 className="text-2xl font-bold text-white">Browse Events</h1>
+        <p className="text-[rgba(255,255,255,0.65)]">Discover upcoming events near you</p>
       </div>
 
       {/* Search and Filter Bar */}
       <div className="mb-6 flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[rgba(255,255,255,0.65)]" />
           <Input
             type="text"
             placeholder="Search events..."
-            className="pl-10"
+            className="pl-10 bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white placeholder:text-[rgba(255,255,255,0.65)]"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
           <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="flex h-10 w-full rounded-md border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#D60024]"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -129,7 +129,7 @@ export default function BrowseEvents() {
             <option value="art">Art & Culture</option>
             <option value="business">Business</option>
           </select>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2 border-[rgba(255,255,255,0.18)] text-white hover:bg-[rgba(255,255,255,0.08)]">
             <Filter className="h-4 w-4" />
             <span className="hidden sm:inline">Filters</span>
           </Button>
@@ -140,12 +140,12 @@ export default function BrowseEvents() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+            <Card key={i} className="animate-pulse bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)]">
+              <div className="h-48 bg-[rgba(255,255,255,0.12)] rounded-t-lg"></div>
               <CardContent className="p-4 space-y-3">
-                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-6 bg-[rgba(255,255,255,0.18)] rounded w-3/4"></div>
+                <div className="h-4 bg-[rgba(255,255,255,0.14)] rounded w-1/2"></div>
+                <div className="h-4 bg-[rgba(255,255,255,0.14)] rounded w-1/3"></div>
               </CardContent>
             </Card>
           ))}
@@ -162,8 +162,8 @@ export default function BrowseEvents() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {apiEvents.map((event) => (
             <Link to={`/events/${event.id}`} key={event.id} className="group">
-              <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg">
-                <div className="relative h-48 overflow-hidden">
+              <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
+                <div className="relative h-48 overflow-hidden bg-[#000]">
                   <img
                     src={getEventImage(event) || "/placeholder-event.jpg"}
                     alt={event.title || "Event"}
@@ -173,20 +173,20 @@ export default function BrowseEvents() {
                       e.target.src = "/placeholder-event.jpg";
                     }}
                   />
-                  <div className="absolute bottom-2 left-2 bg-red-600 text-white text-xs font-medium px-2 py-1 rounded">
+                  <div className="absolute bottom-2 left-2 bg-[#D60024] text-white text-xs font-medium px-2 py-1 rounded">
                     {getEventPriceDisplay(event)}
                   </div>
                 </div>
                 <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg mb-1 line-clamp-1 group-hover:text-red-600 transition-colors">
+                  <h3 className="font-semibold text-lg mb-1 line-clamp-1 group-hover:text-[#D60024] transition-colors">
                     {event.title || "Untitled Event"}
                   </h3>
-                  <div className="flex items-center text-sm text-gray-600 mb-2">
-                    <Calendar className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center text-sm text-[rgba(255,255,255,0.65)] mb-2">
+                    <Calendar className="h-4 w-4 mr-1.5 text-[rgba(255,255,255,0.65)] flex-shrink-0" />
                     <span>{formatDate(event.startDate || event.date)}</span>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <MapPin className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" />
+                  <div className="flex items-center text-sm text-[rgba(255,255,255,0.65)]">
+                    <MapPin className="h-4 w-4 mr-1.5 text-[rgba(255,255,255,0.65)] flex-shrink-0" />
                     <span className="line-clamp-1">{getEventLocation(event)}</span>
                   </div>
                 </CardContent>
@@ -199,7 +199,7 @@ export default function BrowseEvents() {
       {/* Load More Button */}
       {apiEvents.length > 0 && (
         <div className="mt-8 text-center">
-          <Button variant="outline" className="px-8">
+          <Button variant="outline" className="px-8 border-[rgba(255,255,255,0.18)] text-white hover:bg-[rgba(255,255,255,0.08)]">
             Load More Events
           </Button>
         </div>

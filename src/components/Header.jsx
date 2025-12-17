@@ -79,35 +79,35 @@ const Header = ({
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b-2 border-border/50 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-sm">
+    <header className="sticky top-0 z-50 w-full border-b border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] backdrop-blur-xl shadow-[0_18px_60px_-24px_rgba(0,0,0,0.65)]">
       <div className="container flex h-16 items-center justify-between px-4 md:px-6">
         {/* Brand */}
         {/* Always show Map MyParty logo that links to home */}
-        <Link to="/" className="flex items-center gap-3 font-bold text-xl group">
-          <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+        <Link to="/" className="flex items-center gap-3 font-bold text-xl group text-white">
+          <div className="w-10 h-10 rounded-2xl bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] flex items-center justify-center shadow-[0_15px_40px_-15px_rgba(0,0,0,0.7)] transition-all duration-300 group-hover:scale-105">
             <Calendar className="w-5 h-5 text-white" />
           </div>
-          <span className="text-red-600">Map MyParty</span>
+          <span className="text-white">Map MyParty</span>
         </Link>
 
         {/* Desktop Navigation - Show main nav for non-authenticated users or when forced */}
         {(!resolvedIsAuthenticated || forceMainHeader) && (
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[rgba(255,255,255,0.65)]">
             <Link
               to="/events"
-              className="text-sm font-medium hover:text-primary transition-colors"
+              className="hover:text-white transition-colors duration-200"
             >
               Browse Events
             </Link>
             <Link
               to="/about"
-              className="text-sm font-medium hover:text-primary transition-colors"
+              className="hover:text-white transition-colors duration-200"
             >
               About
             </Link>
             <Link
               to="/contact"
-              className="text-sm font-medium hover:text-primary transition-colors"
+              className="hover:text-white transition-colors duration-200"
             >
               Contact
             </Link>
@@ -121,23 +121,23 @@ const Header = ({
               {isAttendee ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-2 hover:bg-accent/50 transition-colors">
+                    <Button variant="ghost" className="gap-2 text-white hover:bg-[rgba(255,255,255,0.08)] hover:text-white border border-[rgba(255,255,255,0.18)] rounded-full px-4">
                       <User className="h-4 w-4" />
                       Profile
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent align="end" className="w-52 rounded-xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.65)] backdrop-blur-xl">
                     <DropdownMenuItem
                       onClick={() => navigate("/profile")}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
                     >
                       <User className="mr-2 h-4 w-4" />
                       Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => navigate("/my-bookings")}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
                     >
                       <Ticket className="mr-2 h-4 w-4" />
                       My Bookings
@@ -147,30 +147,30 @@ const Header = ({
               ) : isPromoter ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-2 hover:bg-accent/50 transition-colors">
+                    <Button variant="ghost" className="gap-2 text-white hover:bg-[rgba(255,255,255,0.08)] hover:text-white border border-[rgba(255,255,255,0.18)] rounded-full px-4">
                       <User className="h-4 w-4" />
                       Profile
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 rounded-xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.65)] backdrop-blur-xl">
                     <DropdownMenuItem
                       onClick={() => navigate("/promoter/profile")}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
                     >
                       <User className="mr-2 h-4 w-4" />
                       My Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => navigate("/promoter/dashboard")}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       Dashboard
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleLogout}
-                      className="cursor-pointer text-destructive focus:text-destructive"
+                      className="cursor-pointer text-[#FF5555] focus:text-[#FF5555] hover:bg-[rgba(255,255,255,0.08)]"
                     >
                       <LogOut className="mr-2 h-4 w-4" />
                       Logout
@@ -182,11 +182,11 @@ const Header = ({
                   <Button
                     variant="ghost"
                     onClick={() => navigate("/organizer/dashboard-v2")}
-                    className="hover:bg-accent/50 transition-colors"
+                    className="text-white border border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.08)] rounded-full px-4"
                   >
                     Dashboard
                   </Button>
-                  <Button variant="outline" onClick={handleLogout} className="hover:bg-destructive/10 hover:text-destructive transition-colors">
+                  <Button variant="outline" onClick={handleLogout} className="bg-[#D60024] text-white hover:opacity-90 rounded-full px-4 border border-transparent">
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </Button>
@@ -195,10 +195,10 @@ const Header = ({
             </>
           ) : (
             <>
-              <Button variant="ghost" onClick={handleAuthClick} className="hover:bg-accent/50 transition-colors">
+              <Button variant="ghost" onClick={handleAuthClick} className="text-white hover:text-white border border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.08)] rounded-full px-4">
                 Login
               </Button>
-              <Button variant="default" onClick={handleAuthClick} className="bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300">
+              <Button variant="default" onClick={handleAuthClick} className="bg-[#D60024] text-white hover:opacity-90 rounded-full px-5 shadow-[0_12px_35px_-18px_rgba(0,0,0,0.7)]">
                 Sign Up
               </Button>
             </>
