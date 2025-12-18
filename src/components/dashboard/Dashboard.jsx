@@ -726,7 +726,7 @@ const Dashboard = () => {
               <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Your confirmed event experiences</p>
             </div>
             {bookedEvents.length > 0 && (
-              <Link to="/dashboard/my-bookings">
+              <Link to="/dashboard/bookings">
                 <Button variant="outline" className="border-[rgba(255,255,255,0.18)] text-white hover:bg-[rgba(255,255,255,0.08)]">
                   View All <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
@@ -848,7 +848,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Quick Actions Card */}
-          <Card className="border-2 border-[rgba(255,255,255,0.12)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(214,0,36,0.4)] hover:border-[#D60024]/30 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(255,255,255,0.04)] rounded-2xl">
+          <Card className="border-2 border-[rgba(255,255,255,0.12)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(214,0,36,0.4)] hover:border-[#D60024]/30 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(255,255,255,0.04)] rounded-2xl flex flex-col h-full">
             <CardHeader className="p-6 pb-4 border-b border-[rgba(255,255,255,0.12)]">
               <div>
                 <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
@@ -857,41 +857,49 @@ const Dashboard = () => {
                 <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Get started in seconds</p>
               </div>
             </CardHeader>
-            <CardContent className="p-6 pt-4">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
+              <div className="grid grid-cols-2 gap-3 flex-1 auto-rows-fr">
                 {[
                   { 
-                    icon: <Ticket className="h-6 w-6" />, 
+                    icon: <Ticket className="h-5 w-5" />, 
                     label: 'Browse Events',
                     path: '/dashboard/browse-events',
-                    color: 'from-blue-500/20 to-blue-600/10'
+                    gradient: 'from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)]',
+                    iconBg: 'from-[rgba(59,130,246,0.25)] to-[rgba(59,130,246,0.1)]',
+                    iconColor: 'text-[#60a5fa]'
                   },
                   { 
-                    icon: <Calendar className="h-6 w-6" />, 
+                    icon: <Calendar className="h-5 w-5" />, 
                     label: 'My Bookings',
-                    path: '/dashboard/my-bookings',
-                    color: 'from-purple-500/20 to-purple-600/10'
+                    path: '/dashboard/bookings',
+                    gradient: 'from-[rgba(168,85,247,0.15)] to-[rgba(168,85,247,0.05)]',
+                    iconBg: 'from-[rgba(168,85,247,0.25)] to-[rgba(168,85,247,0.1)]',
+                    iconColor: 'text-[#a855f7]'
                   },
                   { 
-                    icon: <Download className="h-6 w-6" />, 
+                    icon: <Download className="h-5 w-5" />, 
                     label: 'My Tickets',
-                    path: '/dashboard/my-bookings',
-                    color: 'from-green-500/20 to-green-600/10'
+                    path: '/dashboard/bookings',
+                    gradient: 'from-[rgba(34,197,94,0.15)] to-[rgba(34,197,94,0.05)]',
+                    iconBg: 'from-[rgba(34,197,94,0.25)] to-[rgba(34,197,94,0.1)]',
+                    iconColor: 'text-[#22c55e]'
                   },
                   { 
-                    icon: <MapPin className="h-6 w-6" />, 
+                    icon: <MapPin className="h-5 w-5" />, 
                     label: 'Nearby',
                     path: '/dashboard/browse-events',
-                    color: 'from-orange-500/20 to-orange-600/10'
+                    gradient: 'from-[rgba(249,115,22,0.15)] to-[rgba(249,115,22,0.05)]',
+                    iconBg: 'from-[rgba(249,115,22,0.25)] to-[rgba(249,115,22,0.1)]',
+                    iconColor: 'text-[#f97316]'
                   },
                 ].map((action, index) => (
                   <Link key={index} to={action.path}>
-                    <button className={`w-full flex flex-col items-center justify-center p-5 rounded-xl transition-all bg-gradient-to-br ${action.color} text-white hover:shadow-[0_15px_40px_-10px_rgba(100,180,255,0.4)] hover:scale-105 border border-[rgba(100,200,255,0.2)] hover:border-[#60a5fa] group transform`} style={{animationDelay: `${index * 100}ms`}}>
-                      <div className="p-3 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] text-[#60a5fa] mb-2 group-hover:bg-gradient-to-br group-hover:from-[rgba(214,0,36,0.3)] group-hover:to-[rgba(59,130,246,0.3)] group-hover:scale-110 transition-all duration-300">
+                    <div className={`h-full flex flex-col items-center justify-center p-4 rounded-xl transition-all bg-gradient-to-br ${action.gradient} text-white hover:shadow-[0_10px_25px_-10px_rgba(100,180,255,0.3)] hover:scale-[1.03] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.4)] group cursor-pointer`}>
+                      <div className={`p-3 rounded-lg bg-gradient-to-br ${action.iconBg} ${action.iconColor} mb-2.5 group-hover:scale-110 transition-all duration-300`}>
                         {action.icon}
                       </div>
-                      <span className="text-sm font-bold text-center group-hover:text-[#60a5fa] transition-colors">{action.label}</span>
-                    </button>
+                      <span className="text-xs font-semibold text-center text-white group-hover:text-white transition-colors leading-tight">{action.label}</span>
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -899,7 +907,7 @@ const Dashboard = () => {
           </Card>
 
           {/* Event Calendar Card */}
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl overflow-hidden">
+          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl overflow-hidden flex flex-col h-full">
             <CardHeader className="p-6 pb-4 border-b border-[rgba(100,200,255,0.15)]">
               <div className="flex items-center justify-between">
                 <div>
@@ -913,20 +921,24 @@ const Dashboard = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
               {loadingUpcoming ? (
-                <div className="p-6 text-center">
-                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#D60024]"></div>
-                  <p className="text-[rgba(255,255,255,0.65)] mt-2 text-sm">Loading events...</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#D60024]"></div>
+                    <p className="text-[rgba(255,255,255,0.65)] mt-2 text-sm">Loading events...</p>
+                  </div>
                 </div>
               ) : upcomingEvents.length === 0 ? (
-                <div className="p-6 text-center">
-                  <Calendar className="h-10 w-10 text-[rgba(255,255,255,0.65)] mx-auto mb-2" />
-                  <p className="text-white text-sm font-medium">No upcoming events</p>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <Calendar className="h-10 w-10 text-[rgba(255,255,255,0.65)] mx-auto mb-2" />
+                    <p className="text-white text-sm font-medium">No upcoming events</p>
+                  </div>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-3">
+                <div className="flex flex-col flex-1">
+                  <div className="space-y-3 flex-1">
                     {upcomingEvents.slice(0, 4).map((event, idx) => (
                       <Link key={`cal-${event.id}`} to={`/events/${event.id}`} className="block group">
                         <div className="flex items-start p-3 bg-gradient-to-r from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-lg hover:from-[rgba(59,130,246,0.15)] hover:to-[rgba(214,0,36,0.1)] transition-all border border-[rgba(100,200,255,0.15)] hover:border-[#60a5fa]/60 group-hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]">
@@ -938,101 +950,115 @@ const Dashboard = () => {
                               {new Date(event.date).getDate()}
                             </div>
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-white group-hover:text-[#60a5fa] transition-colors truncate text-sm">{event.title}</h4>
                             <div className="flex items-center text-xs text-[rgba(255,255,255,0.65)] mt-1 gap-2 group-hover:text-[rgba(255,255,255,0.8)] transition-colors">
-                              <Clock className="h-3 w-3 text-[#60a5fa]" />
+                              <Clock className="h-3 w-3 text-[#60a5fa] flex-shrink-0" />
                               <span>{event.time}</span>
                             </div>
                           </div>
-                          <ChevronRight className="h-4 w-4 text-[rgba(255,255,255,0.4)] group-hover:text-[#60a5fa] transition-all group-hover:translate-x-1" />
+                          <ChevronRight className="h-4 w-4 text-[rgba(255,255,255,0.4)] group-hover:text-[#60a5fa] transition-all group-hover:translate-x-1 flex-shrink-0" />
                         </div>
                       </Link>
                     ))}
                   </div>
-                  <Link to="/dashboard/browse-events">
-                    <Button className="w-full mt-4 bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all">
+                  <Link to="/dashboard/browse-events" className="mt-4">
+                    <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]">
                       View All Events
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>
           
           {/* Activity Stats */}
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl">
+          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl flex flex-col h-full">
             <CardHeader className="p-6 pb-4 border-b border-[rgba(100,200,255,0.15)]">
-              <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                📊 Your Activity
-              </CardTitle>
-              <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Track your event journey</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
+                    📊 Your Activity
+                  </CardTitle>
+                  <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Track your event journey</p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] border border-[rgba(214,0,36,0.3)] hover:border-[#D60024]/50 transition-all group cursor-pointer">
-                    <div className="flex items-center justify-between mb-2">
-                      <Ticket className="h-5 w-5 text-[#D60024] group-hover:scale-110 transition-transform" />
-                      <TrendingUp className="h-4 w-4 text-[#60a5fa]" />
+            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
+              <div className="space-y-5 flex-1 flex flex-col">
+                {/* Stats Grid - API Ready: GET /api/user/stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Total Bookings Stat */}
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] border border-[rgba(214,0,36,0.3)] hover:border-[#D60024]/50 hover:shadow-[0_8px_20px_-8px_rgba(214,0,36,0.3)] transition-all group cursor-pointer">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.25)] to-[rgba(214,0,36,0.1)]">
+                        <Ticket className="h-5 w-5 text-[#D60024] group-hover:scale-110 transition-transform" />
+                      </div>
+                      <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
                     </div>
-                    <p className="text-2xl font-bold text-white mb-1">{totalBooked}</p>
-                    <p className="text-xs text-[rgba(255,255,255,0.65)]">Total Bookings</p>
+                    <p className="text-3xl font-bold text-white mb-1">{totalBooked}</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">Total Bookings</p>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.3)] hover:border-[#60a5fa]/50 transition-all group cursor-pointer">
-                    <div className="flex items-center justify-between mb-2">
-                      <Calendar className="h-5 w-5 text-[#60a5fa] group-hover:scale-110 transition-transform" />
-                      <Zap className="h-4 w-4 text-[#D60024]" />
+                  {/* This Week Stat */}
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.3)] hover:border-[#60a5fa]/50 hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)] transition-all group cursor-pointer">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(59,130,246,0.25)] to-[rgba(59,130,246,0.1)]">
+                        <Calendar className="h-5 w-5 text-[#60a5fa] group-hover:scale-110 transition-transform" />
+                      </div>
+                      <Zap className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
                     </div>
-                    <p className="text-2xl font-bold text-white mb-1">{upcomingThisWeek}</p>
-                    <p className="text-xs text-[rgba(255,255,255,0.65)]">This Week</p>
+                    <p className="text-3xl font-bold text-white mb-1">{upcomingThisWeek}</p>
+                    <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">This Week</p>
                   </div>
                 </div>
 
-                {/* Progress Section */}
-                <div className="p-4 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.2)]">
+                {/* Progress Section - API Ready: GET /api/user/progress */}
+                <div className="p-5 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.35)] transition-all">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Heart className="h-4 w-4 text-[#D60024]" />
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)]">
+                        <Heart className="h-4 w-4 text-[#D60024]" />
+                      </div>
                       <span className="text-sm font-semibold text-white">Event Explorer</span>
                     </div>
-                    <span className="text-xs text-[#60a5fa] font-bold">{Math.min(totalBooked * 10, 100)}%</span>
+                    <span className="text-sm text-[#60a5fa] font-bold">{Math.min(totalBooked * 10, 100)}%</span>
                   </div>
-                  <Progress value={Math.min(totalBooked * 10, 100)} className="h-2 bg-[rgba(255,255,255,0.1)]" />
-                  <p className="text-xs text-[rgba(255,255,255,0.5)] mt-2">
-                    {totalBooked < 5 ? 'Book 5 events to unlock rewards!' : totalBooked < 10 ? 'Almost there! Keep exploring!' : 'Amazing! You\'re an event pro! 🎉'}
+                  <Progress value={Math.min(totalBooked * 10, 100)} className="h-2.5 bg-[rgba(255,255,255,0.1)]" />
+                  <p className="text-xs text-[rgba(255,255,255,0.5)] mt-2.5 leading-relaxed">
+                    {totalBooked < 5 ? 'Almost there! Keep exploring!' : totalBooked < 10 ? 'Great progress! Keep going!' : 'Amazing! You\'re an event pro! 🎉'}
                   </p>
                 </div>
 
-                {/* Quick Stats */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.1)] hover:border-[rgba(100,200,255,0.3)] transition-all group">
+                {/* User Preferences - API Ready: GET /api/user/preferences */}
+                <div className="space-y-3">
+                  {/* Favorite Category */}
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.15)] hover:border-[rgba(100,200,255,0.35)] hover:bg-gradient-to-r hover:from-[rgba(59,130,246,0.08)] hover:to-transparent transition-all group">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)]">
+                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] group-hover:from-[rgba(214,0,36,0.3)] group-hover:to-[rgba(59,130,246,0.3)] transition-all">
                         <Star className="h-4 w-4 text-[#60a5fa]" />
                       </div>
                       <span className="text-sm text-white font-medium">Favorite Category</span>
                     </div>
-                    <span className="text-xs text-[#60a5fa] font-bold">Music</span>
+                    <span className="text-sm text-[#60a5fa] font-bold">Music</span>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.1)] hover:border-[rgba(100,200,255,0.3)] transition-all group">
+                  {/* Top Location */}
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.15)] hover:border-[rgba(100,200,255,0.35)] hover:bg-gradient-to-r hover:from-[rgba(59,130,246,0.08)] hover:to-transparent transition-all group">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)]">
+                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] group-hover:from-[rgba(214,0,36,0.3)] group-hover:to-[rgba(59,130,246,0.3)] transition-all">
                         <MapPin className="h-4 w-4 text-[#D60024]" />
                       </div>
                       <span className="text-sm text-white font-medium">Top Location</span>
                     </div>
-                    <span className="text-xs text-[#60a5fa] font-bold">Mumbai</span>
+                    <span className="text-sm text-[#60a5fa] font-bold">Mumbai</span>
                   </div>
                 </div>
 
                 {/* CTA Button */}
-                <Link to="/dashboard/browse-events">
-                  <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all">
+                <Link to="/dashboard/browse-events" className="block">
+                  <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]">
                     Discover More Events
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>

@@ -38,6 +38,7 @@ import UserDashboardHeader from "@/components/UserDashboardHeader";
 import Footer from "@/components/Footer";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { fetchSession } from "@/utils/auth";
+import logoSvg from '@/assets/MMP.svg';
 
 const getInitials = (name, email) => {
   if (name) {
@@ -197,7 +198,7 @@ const NewUserDashboard = () => {
   const navItems = [
     { name: 'Dashboard', icon: <Home className="h-5 w-5" />, path: '/dashboard' },
     { name: 'Browse Events', icon: <MapPin className="h-5 w-5" />, path: '/dashboard/browse-events' },
-    { name: 'My Bookings', icon: <Ticket className="h-5 w-5" />, path: '/dashboard/my-bookings' },
+    { name: 'My Bookings', icon: <Ticket className="h-5 w-5" />, path: '/dashboard/bookings' },
   ];
 
   return (
@@ -205,7 +206,12 @@ const NewUserDashboard = () => {
       {/* Mobile Header */}
       <header className={`lg:hidden bg-gradient-to-r from-[rgba(0,0,0,0.7)] via-[rgba(59,130,246,0.15)] to-[rgba(214,0,36,0.1)] border-b border-[rgba(100,200,255,0.25)] fixed w-full z-40 p-3 backdrop-blur-2xl shadow-[0_8px_32px_-8px_rgba(100,180,255,0.3)] transition-all duration-500 ease-in-out ${isHeaderVisible ? 'top-0 opacity-100' : '-top-24 opacity-0'}`}>
         <div className="flex items-center justify-between">
-          <Link to="/" className="font-bold text-lg text-white">MapMyParty</Link>
+          <Link to="/" className="flex items-center gap-2 font-bold text-lg text-white hover:opacity-80 transition-opacity">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D60024] to-[#ff4d67] p-1.5 flex items-center justify-center shadow-lg">
+              <img src={logoSvg} alt="MMP Logo" className="w-full h-full object-contain" />
+            </div>
+            <span>MapMyParty</span>
+          </Link>
           <div className="flex items-center space-x-2">
             <Button 
               variant="ghost" 
@@ -317,8 +323,11 @@ const NewUserDashboard = () => {
           <header className={`hidden lg:flex items-center justify-between p-4 bg-gradient-to-r from-[rgba(0,0,0,0.75)] via-[rgba(59,130,246,0.2)] to-[rgba(214,0,36,0.15)] border-b border-[rgba(100,200,255,0.3)] fixed right-0 left-0 z-30 backdrop-blur-2xl shadow-[0_12px_48px_-12px_rgba(100,180,255,0.4)] transition-all duration-500 ease-in-out ${isHeaderVisible ? 'top-0 opacity-100' : '-top-32 opacity-0'}`}>
             <div className="flex items-center gap-8">
               {/* Logo */}
-              <Link to="/" className="font-bold text-xl text-white hover:text-[#60a5fa] transition-all duration-300 hover:scale-105">
-                MapMyParty
+              <Link to="/" className="flex items-center gap-3 font-bold text-xl text-white hover:text-[#60a5fa] transition-all duration-300 hover:scale-105">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D60024] to-[#ff4d67] p-2 flex items-center justify-center shadow-lg ring-2 ring-[rgba(214,0,36,0.3)] hover:ring-[rgba(214,0,36,0.6)] transition-all">
+                  <img src={logoSvg} alt="MMP Logo" className="w-full h-full object-contain" />
+                </div>
+                <span>MapMyParty</span>
               </Link>
 
               {/* Navigation Items */}

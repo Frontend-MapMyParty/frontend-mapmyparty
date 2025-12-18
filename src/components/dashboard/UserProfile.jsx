@@ -19,6 +19,16 @@ import {
   Phone,
   ShieldCheck,
   PencilLine,
+  User,
+  Lock,
+  Edit2,
+  Check,
+  X,
+  Camera,
+  Ticket,
+  TrendingUp,
+  Heart,
+  Star
 } from "lucide-react";
 import { isAuthenticated } from "@/utils/auth";
 import { apiFetch } from "@/config/api";
@@ -60,6 +70,7 @@ const sampleProfile = {
   email: "rachel@calme.io",
   phone: "+1 (231) 342-3245",
   passwordMasked: "********",
+  dateOfBirth: "1995-06-15",
   memberSince: "2023-06-12T00:00:00Z",
   avatarUrl: "https://api.dicebear.com/7.x/adventurer-neutral/png?seed=MapMyParty&backgroundColor=fff1d6",
 };
@@ -202,17 +213,23 @@ export default function UserProfile() {
 
   const handleEditClick = useCallback((field) => {
     setEditField(field);
-    if (field === "email") {
+    if (field === "name") {
+      setEditValue(profile.name || "");
+      setPasswordValues({ current: "", new: "", confirm: "" });
+    } else if (field === "email") {
       setEditValue(profile.email || "");
       setPasswordValues({ current: "", new: "", confirm: "" });
     } else if (field === "phone") {
       setEditValue(profile.phone || "");
       setPasswordValues({ current: "", new: "", confirm: "" });
+    } else if (field === "dateOfBirth") {
+      setEditValue(profile.dateOfBirth || "");
+      setPasswordValues({ current: "", new: "", confirm: "" });
     } else {
       setEditValue("");
       setPasswordValues({ current: "", new: "", confirm: "" });
     }
-  }, [profile.email, profile.phone]);
+  }, [profile.name, profile.email, profile.phone, profile.dateOfBirth]);
 
   const handleEditSubmit = async (event) => {
     event.preventDefault();
@@ -225,7 +242,29 @@ export default function UserProfile() {
 
     let payload = {};
     let endpoint = "/api/user/profile";
-    if (editField === "email") {
+    if (editField === "name") {
+      const trimmedValue = editValue.trim();
+      if (!trimmedValue) {
+        toast.error("Please enter a valid name.");
+        setIsSaving(false);
+        return;
+      }
+
+      payload = {
+        name: trimmedValue,
+      };
+    } else if (editField === "dateOfBirth") {
+      const trimmedValue = editValue.trim();
+      if (!trimmedValue) {
+        toast.error("Please select a date of birth.");
+        setIsSaving(false);
+        return;
+      }
+
+      payload = {
+        dateOfBirth: trimmedValue,
+      };
+    } else if (editField === "email") {
       const trimmedValue = editValue.trim();
       if (!trimmedValue) {
         toast.error("Please enter a value before saving.");
@@ -299,11 +338,16 @@ export default function UserProfile() {
 
       const optimisticData = {
         ...(profileData || {}),
+        name: payload.name ?? profile.name,
         email: payload.email ?? profile.email,
         phone: payload.phone ?? profile.phone,
+        dateOfBirth: payload.dateOfBirth ?? profile.dateOfBirth,
       };
       setProfileData(optimisticData);
 
+      if (payload.name !== undefined) {
+        sessionStorage.setItem("userName", payload.name || "");
+      }
       if (payload.email !== undefined) {
         sessionStorage.setItem("userEmail", payload.email || "");
       }
@@ -323,8 +367,44 @@ export default function UserProfile() {
     }
   };
 
+  const formatDateOfBirth = (dob) => {
+    if (!dob) return "Not set";
+    try {
+      const date = new Date(dob);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return "Not set";
+    }
+  };
+
   const detailRows = useMemo(
     () => [
+      {
+        label: "Full Name",
+        value: profile.name,
+        actions: [
+          {
+            label: "Edit name",
+            type: "icon",
+            onClick: () => handleEditClick("name"),
+          },
+        ],
+      },
+      {
+        label: "Date of Birth",
+        value: formatDateOfBirth(profile.dateOfBirth),
+        actions: [
+          {
+            label: "Edit date of birth",
+            type: "icon",
+            onClick: () => handleEditClick("dateOfBirth"),
+          },
+        ],
+      },
       {
         label: "Email",
         value: profile.email,
@@ -392,45 +472,56 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="w-full h-full p-4 md:p-6 lg:p-8 overflow-y-auto bg-[#000000] text-white">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Profile Header */}
-        <Card className="overflow-hidden border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)]">
+    <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 sm:py-8 md:py-10 text-white bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] min-h-screen">
+      <div className="max-w-5xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="mb-8 mt-4">
+          <h1 className="text-3xl sm:text-4xl font-bold text-white flex items-center gap-3 mb-2">
+            <User className="h-8 w-8 text-[#D60024]" />
+            My Profile
+          </h1>
+          <p className="text-[rgba(255,255,255,0.65)] text-sm sm:text-base">Manage your account settings and preferences</p>
+        </div>
+        {/* Profile Header - Compact */}
+        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-xl shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] transition-all duration-300">
           <CardContent className="p-6">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:gap-6">
-                <div className="flex flex-col items-center gap-3">
+            <div className="flex gap-6">
+              {/* Left: Avatar Thumbnail */}
+              <div className="flex-shrink-0">
+                <div className="relative group">
                   <Dialog>
                     <DialogTrigger asChild>
                       <button type="button" className="relative">
-                        <Avatar className="h-24 w-24 border-4 border-[rgba(255,255,255,0.18)] bg-[#000000] shadow-lg transition-transform hover:scale-[1.02]">
+                        <Avatar className="h-24 w-24 border-3 border-[rgba(100,200,255,0.3)] bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] shadow-lg transition-all hover:scale-105 hover:border-[rgba(100,200,255,0.5)]">
                           {profile.avatarUrl ? (
                             <AvatarImage src={profile.avatarUrl} alt={profile.name} />
                           ) : (
-                            <AvatarFallback className="text-xl font-semibold bg-[rgba(255,255,255,0.08)] text-white">
+                            <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-[rgba(214,0,36,0.3)] to-[rgba(59,130,246,0.3)] text-white">
                               {getInitials(profile.name, profile.email)}
                             </AvatarFallback>
                           )}
                         </Avatar>
-                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-[#D60024] px-3 py-0.5 text-xs font-semibold text-white shadow">Change</span>
+                        <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Camera className="h-6 w-6 text-white" />
+                        </div>
                       </button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg">
+                    <DialogContent className="max-w-lg bg-[#0a0a0a] border-2 border-[rgba(100,200,255,0.3)] text-white">
                       <DialogHeader>
-                        <DialogTitle>Select your vibe</DialogTitle>
+                        <DialogTitle className="text-white">Choose Your Avatar</DialogTitle>
                       </DialogHeader>
                       <div className="grid grid-cols-2 gap-4">
                         {avatarOptions.map((option) => (
                           <button
                             key={option.id}
                             type="button"
-                            className="group flex flex-col items-center gap-2 rounded-xl border border-border/60 bg-background/80 p-3 transition hover:border-primary hover:bg-primary/10"
+                            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-[rgba(100,200,255,0.2)] bg-[rgba(255,255,255,0.05)] p-4 transition-all hover:border-[#D60024] hover:bg-[rgba(214,0,36,0.1)] hover:scale-105"
                           >
-                            <Avatar className="h-16 w-16 border-2 border-border/60 shadow">
+                            <Avatar className="h-20 w-20 border-2 border-[rgba(100,200,255,0.3)] shadow-lg">
                               <AvatarImage src={option.url} alt={option.label} />
                               <AvatarFallback>{option.label.slice(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
-                            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">
+                            <span className="text-sm font-semibold text-white group-hover:text-[#D60024]">
                               {option.label}
                             </span>
                           </button>
@@ -439,33 +530,37 @@ export default function UserProfile() {
                     </DialogContent>
                   </Dialog>
                 </div>
+              </div>
 
-                <div className="mt-4 flex-1 space-y-3 sm:mt-0 text-center sm:text-left">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-[rgba(255,255,255,0.65)] justify-center sm:justify-start">
-                    <MapPin className="h-4 w-4 text-[#D60024]" />
-                    <span>Member since {memberSince}</span>
-                    <Badge variant="secondary" className="uppercase tracking-wide bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
-                      {roleLabelMap[role] || "Attendee"}
+              {/* Right: Profile Details */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <Badge className="bg-[#D60024]/20 text-[#D60024] border border-[#D60024]/30 px-2.5 py-0.5 text-xs font-semibold">
+                    {roleLabelMap[role] || "Attendee"}
+                  </Badge>
+                  {profile.isVerified && (
+                    <Badge className="bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/30 px-2.5 py-0.5 text-xs font-semibold">
+                      <ShieldCheck className="h-3 w-3 mr-1" />
+                      Verified
                     </Badge>
-                    {profile.isVerified && (
-                      <Badge variant="outline" className="gap-1 bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Verified
-                      </Badge>
-                    )}
+                  )}
+                </div>
+
+                <h1 className="text-2xl font-bold text-white mb-2">{profile.name}</h1>
+
+                <div className="flex items-center gap-2 text-sm text-[rgba(255,255,255,0.65)] mb-4">
+                  <CalendarIcon className="h-4 w-4 text-[#60a5fa]" />
+                  <span>Member since {memberSince}</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
+                    <Mail className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
+                    <span className="text-sm text-white truncate">{profile.email}</span>
                   </div>
-
-                  <h1 className="text-3xl font-semibold tracking-tight">{profile.name}</h1>
-
-                  <div className="flex flex-wrap gap-4 pt-2 text-sm text-[rgba(255,255,255,0.65)] justify-center sm:justify-start">
-                    <span className="inline-flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      {profile.email}
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      {profile.phone}
-                    </span>
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
+                    <Phone className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
+                    <span className="text-sm text-white">{profile.phone}</span>
                   </div>
                 </div>
               </div>
@@ -473,48 +568,99 @@ export default function UserProfile() {
           </CardContent>
         </Card>
 
-        {/* Profile Details */}
-        <Card className="border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)]">
-          <CardHeader>
-            <CardTitle>Account Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 text-sm md:grid-cols-2">
-              {detailRows.map((row) => (
-                <div key={row.label} className="space-y-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[rgba(255,255,255,0.65)]">
-                    {row.label}:
-                  </p>
-                  <div className="flex items-center gap-2 text-base font-semibold text-white">
-                    <span>{row.value}</span>
-                    {row.actions
-                      ?.filter((action) => action.type === "icon")
-                      .map((action) => (
-                        <button
-                          key={action.label}
-                          type="button"
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.65)] transition hover:bg-[#D60024] hover:text-white"
-                          aria-label={action.label}
-                          onClick={action.onClick}
-                        >
-                          <PencilLine className="h-3.5 w-3.5" />
-                        </button>
-                      ))}
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Account Details */}
+          <div className="lg:col-span-2">
+            <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+              <CardHeader className="border-b border-[rgba(100,200,255,0.15)]">
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Lock className="h-5 w-5 text-[#D60024]" />
+                  Account Security
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {detailRows.map((row) => (
+                    <div key={row.label} className="p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)] hover:border-[rgba(100,200,255,0.3)] transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[rgba(255,255,255,0.65)] mb-1">
+                            {row.label}
+                          </p>
+                          <p className="text-base font-semibold text-white">{row.value}</p>
+                        </div>
+                        {row.actions
+                          ?.filter((action) => action.type === "icon")
+                          .map((action) => (
+                            <Button
+                              key={action.label}
+                              variant="ghost"
+                              size="sm"
+                              onClick={action.onClick}
+                              className="text-[#60a5fa] hover:text-white hover:bg-[rgba(59,130,246,0.2)]"
+                            >
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              Edit
+                            </Button>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Stats Sidebar */}
+          <div className="lg:col-span-1 space-y-4">
+            <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] rounded-xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Ticket className="h-5 w-5 text-[#D60024]" />
+                  <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">12</p>
+                <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">Total Bookings</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)] rounded-xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Heart className="h-5 w-5 text-[#60a5fa]" />
+                  <Star className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">8</p>
+                <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">Favorite Events</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(34,197,94,0.15)] to-[rgba(34,197,94,0.05)] rounded-xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Star className="h-5 w-5 text-[#22c55e]" />
+                  <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
+                </div>
+                <p className="text-3xl font-bold text-white mb-1">4.8</p>
+                <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">Average Rating</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Edit Dialog */}
       <Dialog open={!!editField} onOpenChange={(open) => !open && !isSaving && setEditField(null)}>
-        <DialogContent className="sm:max-w-md bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.18)] text-white">
+        <DialogContent className="sm:max-w-md bg-[#0a0a0a] border-2 border-[rgba(100,200,255,0.3)] text-white">
           <form onSubmit={handleEditSubmit} className="space-y-5 py-2">
             <DialogHeader>
-              <DialogTitle>
-                {editField === "email"
+              <DialogTitle className="text-white flex items-center gap-2">
+                <Edit2 className="h-5 w-5 text-[#D60024]" />
+                {editField === "name"
+                  ? "Update Name"
+                  : editField === "dateOfBirth"
+                  ? "Update Date of Birth"
+                  : editField === "email"
                   ? "Update Email"
                   : editField === "phone"
                   ? "Update Phone"
@@ -525,7 +671,7 @@ export default function UserProfile() {
             {editField === "password" ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-current-password">Current Password</Label>
+                  <Label htmlFor="profile-current-password" className="text-white">Current Password</Label>
                   <Input
                     id="profile-current-password"
                     type="password"
@@ -536,10 +682,11 @@ export default function UserProfile() {
                     }
                     required
                     autoComplete="current-password"
+                    className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-new-password">New Password</Label>
+                  <Label htmlFor="profile-new-password" className="text-white">New Password</Label>
                   <Input
                     id="profile-new-password"
                     type="password"
@@ -550,10 +697,11 @@ export default function UserProfile() {
                     }
                     required
                     autoComplete="new-password"
+                    className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-confirm-password">Confirm New Password</Label>
+                  <Label htmlFor="profile-confirm-password" className="text-white">Confirm New Password</Label>
                   <Input
                     id="profile-confirm-password"
                     type="password"
@@ -564,24 +712,42 @@ export default function UserProfile() {
                     }
                     required
                     autoComplete="new-password"
+                    className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
                   />
                 </div>
               </>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="profile-edit-input">{editField === "email" ? "Email" : "Phone"}</Label>
+                <Label htmlFor="profile-edit-input" className="text-white">
+                  {editField === "name"
+                    ? "Full Name"
+                    : editField === "dateOfBirth"
+                    ? "Date of Birth"
+                    : editField === "email"
+                    ? "Email"
+                    : "Phone"}
+                </Label>
                 <Input
                   id="profile-edit-input"
-                  type={editField === "email" ? "email" : "tel"}
-                  placeholder={editField === "email" ? "Enter new email" : "Enter new phone"}
+                  type={editField === "name" ? "text" : editField === "dateOfBirth" ? "date" : editField === "email" ? "email" : "tel"}
+                  placeholder={
+                    editField === "name"
+                      ? "Enter your full name"
+                      : editField === "dateOfBirth"
+                      ? "Select date of birth"
+                      : editField === "email"
+                      ? "Enter new email"
+                      : "Enter new phone"
+                  }
                   value={editValue}
                   onChange={(event) => setEditValue(event.target.value)}
                   required
+                  className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
                 />
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isSaving}>
+            <Button type="submit" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)]" disabled={isSaving}>
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </form>

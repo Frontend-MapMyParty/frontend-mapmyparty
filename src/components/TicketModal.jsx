@@ -1,10 +1,23 @@
- import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Ticket, User, Download, Share2 } from "lucide-react";
+import { Calendar, MapPin, Ticket, User, Download, Share2, Clock, Hash, Mail } from "lucide-react";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
 
 const TicketModal = ({ isOpen, onClose, ticket }) => {
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+
+  useEffect(() => {
+    if (ticket && isOpen) {
+      const qrData = `Order: ${ticket.orderId}\nEvent: ${ticket.eventTitle}\nDate: ${ticket.eventDate}\nQR: ${ticket.qrCode || ticket.id}`;
+      QRCode.toDataURL(qrData, { width: 200, margin: 2 })
+        .then(url => setQrCodeUrl(url))
+        .catch(err => console.error(err));
+    }
+  }, [ticket, isOpen]);
+
   const handleDownload = () => {
     alert("Ticket downloaded! (This is a demo)");
   };
@@ -20,100 +33,114 @@ const TicketModal = ({ isOpen, onClose, ticket }) => {
     }
   };
 
+  if (!ticket) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-center">Your Ticket</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 animate-fade-in">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-[#0a0a0a] border-2 border-[rgba(100,200,255,0.3)] text-white p-0">
+        <div className="space-y-4 p-6">
           {/* Ticket Card */}
-          <Card className="overflow-hidden border-2 border-primary/20">
-            <div className="bg-gradient-to-br from-primary to-primary-glow p-6 text-primary-foreground">
+          <Card className="overflow-hidden border-none bg-gradient-to-br from-[#D60024] via-[#b8001f] to-[#8b0017] rounded-xl">
+            <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+                <Badge className="bg-white/20 text-white border-white/30 text-xs px-3 py-1">
                   E-Ticket
                 </Badge>
-                <Ticket className="w-8 h-8" />
+                <Ticket className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">{ticket.eventTitle}</h3>
-              <p className="text-sm text-primary-foreground/90">{ticket.ticketType}</p>
-            </div>
-
-            <div className="p-6 space-y-4 bg-gradient-to-b from-background to-muted/30">
-              {/* QR Code Placeholder */}
-              <div className="bg-white rounded-lg p-4 flex items-center justify-center border-2 border-dashed border-border">
-                <div className="w-32 h-32 bg-gradient-to-br from-primary/10 to-accent/10 rounded flex items-center justify-center">
-                  <div className="text-center">
-                    <Ticket className="w-12 h-12 mx-auto mb-2 text-primary" />
-                    <p className="text-xs text-muted-foreground">QR Code</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Ticket Details */}
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Date & Time</p>
-                    <p className="text-muted-foreground">
-                      {ticket.eventDate} at {ticket.eventTime}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Location</p>
-                    <p className="text-muted-foreground">{ticket.location}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <User className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Quantity</p>
-                    <p className="text-muted-foreground">
-                      {ticket.quantity} ticket{ticket.quantity > 1 ? "s" : ""}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Ticket className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Ticket ID</p>
-                    <p className="text-muted-foreground font-mono text-xs">
-                      {ticket.id.toUpperCase()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Total */}
-              <div className="pt-4 border-t border-border flex justify-between items-center">
-                <span className="font-semibold">Total Paid</span>
-                <span className="text-2xl font-bold text-primary">₹{ticket.totalPrice}</span>
-              </div>
+              <h3 className="text-2xl font-bold mb-2 text-white">{ticket.eventTitle}</h3>
+              <p className="text-sm text-white/90">{ticket.ticketType}</p>
             </div>
           </Card>
 
+          {/* QR Code Section */}
+          <div className="bg-gradient-to-br from-[rgba(255,255,255,0.95)] to-[rgba(240,240,240,0.95)] rounded-xl p-6 flex items-center justify-center">
+            {qrCodeUrl ? (
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] rounded-lg blur-xl"></div>
+                <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48 relative z-10" />
+              </div>
+            ) : (
+              <div className="w-48 h-48 bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] rounded-lg flex items-center justify-center">
+                <div className="text-center">
+                  <Ticket className="w-12 h-12 mx-auto mb-2 text-[#D60024]" />
+                  <p className="text-xs text-gray-600">QR Code</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Ticket Details */}
+          <div className="space-y-3 bg-[rgba(255,255,255,0.05)] rounded-xl p-5 border border-[rgba(100,200,255,0.2)]">
+            <div className="flex items-start gap-3">
+              <Calendar className="w-5 h-5 text-[#D60024] mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-white text-sm mb-1">Date & Time</p>
+                <p className="text-[rgba(255,255,255,0.75)] text-sm">
+                  {typeof ticket.eventDate === 'string' && ticket.eventDate.includes('T') 
+                    ? new Date(ticket.eventDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                    : ticket.eventDate} at {ticket.eventTime}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-[#D60024] mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-white text-sm mb-1">Location</p>
+                <p className="text-[rgba(255,255,255,0.75)] text-sm">{ticket.location}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <User className="w-5 h-5 text-[#D60024] mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-white text-sm mb-1">Quantity</p>
+                <p className="text-[rgba(255,255,255,0.75)] text-sm">
+                  {ticket.quantity} ticket{ticket.quantity > 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Hash className="w-5 h-5 text-[#D60024] mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-white text-sm mb-1">Ticket ID</p>
+                <p className="text-[rgba(255,255,255,0.75)] text-sm font-mono">
+                  {ticket.id || ticket.orderId}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Total */}
+          <div className="bg-gradient-to-r from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] rounded-xl p-5 border border-[rgba(214,0,36,0.3)]">
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-white text-lg">Total Paid</span>
+              <span className="text-3xl font-bold text-[#D60024]">₹{ticket.totalPrice?.toLocaleString()}</span>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={handleDownload}>
-              <Download className="w-4 h-4" />
+            <Button 
+              className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)]"
+              onClick={handleDownload}
+            >
+              <Download className="w-4 h-4 mr-2" />
               Download
             </Button>
-            <Button variant="outline" onClick={handleShare}>
-              <Share2 className="w-4 h-4" />
+            <Button 
+              variant="outline"
+              className="border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)]"
+              onClick={handleShare}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
               Share
             </Button>
           </div>
 
-          <p className="text-xs text-center text-muted-foreground">
+          <p className="text-xs text-center text-[rgba(255,255,255,0.5)] pt-2">
             Please show this ticket at the venue entrance
           </p>
         </div>
