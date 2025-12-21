@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, MapPin, Loader2 } from "lucide-react";
 import EventDescription from "@/components/event-detail/EventDescription";
+import EventOverview from "@/components/event-detail/EventOverview";
 import EventGallery from "@/components/event-detail/EventGallery";
 import EventSchedule from "@/components/event-detail/EventSchedule";
 import TicketSection from "@/components/event-detail/TicketSection";
@@ -91,6 +92,19 @@ const ClassicDetailTemplate = ({
 
         {/* Main Content */}
         <div className="container py-16 space-y-24">
+          {/* Overview */}
+          <EventOverview event={{
+            ...event,
+            date: eventDate,
+            time: eventTime,
+            venue: eventVenue,
+            address: eventAddress,
+            description: eventDescription,
+            id: event.id || '',
+            organizerName: event.organizer?.name || event.organizerName,
+            organizerContact: event.organizer?.email || event.organizerEmail
+          }} />
+
           {/* Description */}
           <EventDescription
             description={eventDescription}

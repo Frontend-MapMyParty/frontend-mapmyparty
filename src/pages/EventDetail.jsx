@@ -22,9 +22,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { apiFetch } from "@/config/api";
 import { isAuthenticated } from "@/utils/auth";
-import eventMusic from "@/assets/event-music.jpg";
-import eventConference from "@/assets/event-conference.jpg";
-import eventFood from "@/assets/event-food.jpg";
+
+const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 
 const getStoredBookingDetails = () => ({
   name: sessionStorage.getItem("userName") || "",
@@ -697,25 +696,21 @@ const EventDetail = () => {
         // Always try to fetch from API first for fresh data
         console.log(`🔍 Fetching event ${id} from API...`);
         try {
-          const response = await apiFetch(`api/event/${id}`, {
+          const response = await apiFetch(`/api/event/${id}`, {
             method: "GET",
-            headers: {
-
-            },
           });
           
           console.log("📅 Fetched event from API:", response);
           
           // Handle different response structures
-          foundEvent = response.data?.event || response.event || response.data || response;
+          foundEvent = response.data?.event || response.data || response.event || response;
           
-          // If we got the event from API, save it to localStorage for caching
+          // If we got the event from API, cache it to localStorage
           if (foundEvent && foundEvent.id) {
             const STORAGE_KEY = "mapMyParty_events";
             const stored = localStorage.getItem(STORAGE_KEY);
             const events = stored ? JSON.parse(stored) : [];
             
-            // Update or add the event in localStorage
             const existingIndex = events.findIndex(e => e.id === foundEvent.id || e.eventId === foundEvent.id);
             if (existingIndex >= 0) {
               events[existingIndex] = foundEvent;
@@ -729,8 +724,7 @@ const EventDetail = () => {
         } catch (apiError) {
           console.error("❌ Error fetching from API:", apiError);
           
-          // Fallback to localStorage if API fails
-          console.log("📦 Trying localStorage as fallback...");
+          // Fallback to cached events only (no dummy)
           const STORAGE_KEY = "mapMyParty_events";
           const stored = localStorage.getItem(STORAGE_KEY);
           const events = stored ? JSON.parse(stored) : [];
@@ -754,13 +748,12 @@ const EventDetail = () => {
           });
           setEvent(foundEvent);
         } else {
-          // Show mock data if neither API nor localStorage has the event
-          console.log("⚠️ Event not found, showing sample data");
-          setEvent(getMockEvent(id));
+          // No dummy fallback
+          setEvent(null);
         }
       } catch (error) {
         console.error("💥 Error fetching event:", error);
-        setEvent(getMockEvent(id));
+        setEvent(null);
       } finally {
         setLoading(false);
       }
@@ -815,36 +808,6 @@ const EventDetail = () => {
     };
   }, [id]);
   
-  // Mock event data fallback
-  const getMockEvent = (eventId) => {
-    return {
-      id: eventId,
-      title: "Sample Event",
-      date: new Date().toISOString(),
-      time: "6:00 PM - 11:00 PM",
-      location: "Event Location",
-      address: "Event Address",
-      venue: "Event Venue",
-      image: eventMusic,
-      gallery: [eventMusic, eventConference, eventFood],
-      category: "Music",
-      attendees: 5000,
-      description: "This is a sample event. Create your own events to see them here!",
-      highlights: [
-        "Great venue",
-        "Amazing atmosphere",
-        "Professional organization"
-      ],
-      schedule: [],
-      tickets: [],
-      organizer: {
-        name: "Event Organizer",
-        bio: "Professional event organizer",
-        organizerId: "1",
-      },
-    };
-  };
-
   // Format date and time from event data
   const formatEventDate = (dateString) => {
     if (!dateString) return "Date TBA";
@@ -982,25 +945,31 @@ const EventDetail = () => {
     );
   }
   
-  // Prepare event data with fallbacks
+  // Prepare event data with API fields
   const eventTitle = event.title || event.eventTitle || "Untitled Event";
   const eventDate = formatEventDate(event.startDate || event.date);
   const eventTime = formatEventTime(event.startDate, event.endDate);
-  const eventImage = event.flyerImage || event.flyerImageUrl || event.image || eventMusic;
+  const eventImage =
+    event.flyerImage ||
+    event.flyerImageUrl ||
+    event.coverImage ||
+    event.image ||
+    FALLBACK_IMAGE;
   
-  // Get gallery images - filter for EVENT_GALLERY type
-  const eventGallery = event.images 
-    ? event.images
-        .filter(img => img.type === 'EVENT_GALLERY')
-        .map(img => img.url)
-    : (event.galleryImages || event.gallery || []);
+  // Gallery from explicit galleryImages or generic gallery/images
+  const eventGallery = event.galleryImages && Array.isArray(event.galleryImages)
+    ? event.galleryImages
+    : event.images 
+      ? event.images
+          .filter(img => !img.type || img.type === 'EVENT_GALLERY')
+          .map(img => img.url || img)
+      : (event.gallery || []);
     
-  // If no gallery images found, use the event image as fallback
   const galleryImages = eventGallery.length > 0 ? eventGallery : [eventImage];
   
-  const eventDescription = event.description || "No description available.";
+  const eventDescription = event.description || event.summary || "No description available.";
   
-  // Handle location from venues array (backend structure)
+  // Location mapping
   let eventLocation = "Location TBA";
   let eventAddress = "Address TBA";
   let eventVenue = "Venue TBA";
@@ -1011,9 +980,16 @@ const EventDetail = () => {
     eventAddress = venue.fullAddress || venue.address || eventLocation;
     eventVenue = venue.name || venue.venueName || eventLocation;
   } else {
-    eventLocation = event.location || event.venue || "Location TBA";
-    eventAddress = event.fullAddress || event.address || eventLocation;
-    eventVenue = event.venue || event.venueName || "Venue TBA";
+    const cityState = `${event.city || ""}${event.city && event.state ? ", " : ""}${event.state || ""}`.trim();
+    eventLocation = cityState || event.location || event.venue || "Location TBA";
+    const addrParts = [
+      event.address || event.fullAddress,
+      event.venue,
+      cityState,
+      event.pincode
+    ].filter(Boolean);
+    eventAddress = addrParts.join(", ") || eventLocation;
+    eventVenue = event.venue || event.venueName || eventLocation;
   }
 
   const scrollToLocation = () => {

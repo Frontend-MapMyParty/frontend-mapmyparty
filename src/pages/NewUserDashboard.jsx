@@ -38,7 +38,7 @@ import UserDashboardHeader from "@/components/UserDashboardHeader";
 import Footer from "@/components/Footer";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { fetchSession } from "@/utils/auth";
-import logoSvg from '@/assets/MMP.svg';
+import logoSvg from '@/assets/MMP logo.svg';
 
 const getInitials = (name, email) => {
   if (name) {
@@ -198,7 +198,6 @@ const NewUserDashboard = () => {
   const navItems = [
     { name: 'Dashboard', icon: <Home className="h-5 w-5" />, path: '/dashboard' },
     { name: 'Browse Events', icon: <MapPin className="h-5 w-5" />, path: '/dashboard/browse-events' },
-    { name: 'My Bookings', icon: <Ticket className="h-5 w-5" />, path: '/dashboard/bookings' },
   ];
 
   return (
@@ -207,8 +206,8 @@ const NewUserDashboard = () => {
       <header className={`lg:hidden bg-gradient-to-r from-[rgba(0,0,0,0.7)] via-[rgba(59,130,246,0.15)] to-[rgba(214,0,36,0.1)] border-b border-[rgba(100,200,255,0.25)] fixed w-full z-40 p-3 backdrop-blur-2xl shadow-[0_8px_32px_-8px_rgba(100,180,255,0.3)] transition-all duration-500 ease-in-out ${isHeaderVisible ? 'top-0 opacity-100' : '-top-24 opacity-0'}`}>
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-bold text-lg text-white hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D60024] to-[#ff4d67] p-1.5 flex items-center justify-center shadow-lg">
-              <img src={logoSvg} alt="MMP Logo" className="w-full h-full object-contain" />
+            <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg p-1.5 transition-all duration-300 hover:scale-105 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border border-[rgba(255,255,255,0.1)]">
+              <img src={logoSvg} alt="MMP Logo" className="w-14 h-14 object-contain opacity-90 hover:opacity-100 transition-opacity duration-300" />
             </div>
             <span>MapMyParty</span>
           </Link>
@@ -269,6 +268,14 @@ const NewUserDashboard = () => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-red-700" />
                 <DropdownMenuItem 
+                  onClick={() => navigate("/dashboard/bookings")} 
+                  className="cursor-pointer hover:bg-red-800 transition-all"
+                >
+                  <Ticket className="mr-2 h-4 w-4 text-red-600" />
+                  My Bookings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-red-700" />
+                <DropdownMenuItem 
                   onClick={handleLogout} 
                   className="text-red-600 focus:text-red-600 hover:bg-red-900 transition-all cursor-pointer"
                 >
@@ -324,8 +331,8 @@ const NewUserDashboard = () => {
             <div className="flex items-center gap-8">
               {/* Logo */}
               <Link to="/" className="flex items-center gap-3 font-bold text-xl text-white hover:text-[#60a5fa] transition-all duration-300 hover:scale-105">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D60024] to-[#ff4d67] p-2 flex items-center justify-center shadow-lg ring-2 ring-[rgba(214,0,36,0.3)] hover:ring-[rgba(214,0,36,0.6)] transition-all">
-                  <img src={logoSvg} alt="MMP Logo" className="w-full h-full object-contain" />
+                <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg p-1.5 transition-all duration-300 hover:scale-105 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border border-[rgba(255,255,255,0.1)]">
+                  <img src={logoSvg} alt="MMP Logo" className="w-14 h-14 object-contain opacity-90 hover:opacity-100 transition-opacity duration-300" />
                 </div>
                 <span>MapMyParty</span>
               </Link>
@@ -420,6 +427,14 @@ const NewUserDashboard = () => {
                   >
                     <UserIcon className="mr-2 h-4 w-4 text-[#60a5fa]" />
                     Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/dashboard/bookings")} 
+                    className="cursor-pointer hover:bg-[rgba(59,130,246,0.15)] transition-all duration-300"
+                  >
+                    <Ticket className="mr-2 h-4 w-4 text-[#60a5fa]" />
+                    My Bookings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
                   <DropdownMenuItem 

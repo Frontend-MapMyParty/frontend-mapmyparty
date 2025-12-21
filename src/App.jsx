@@ -23,6 +23,7 @@ import Profile from "./pages/Profile";
 import PromoterProfile from "./pages/PromoterProfile";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
 import ProtectedRoute from "./components/ProtectedRoute";
+import EventOverviewPage from "./pages/EventOverviewPage";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/events" element={<Events />} />
             <Route path="/events/:id" element={<EventDetail />} />
+            <Route path="/events/:id/overview" element={<EventOverviewPage />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/google/callback" element={<GoogleCallback />} />
             

@@ -11,139 +11,9 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
-// Comprehensive dummy data for My Bookings
-const DUMMY_BOOKINGS = [
-  {
-    id: "BK001",
-    orderId: "ORD-2024-001",
-    eventTitle: "Coldplay Live Concert 2024",
-    eventDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "7:00 PM",
-    location: "DY Patil Stadium, Mumbai, India",
-    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=300&fit=crop",
-    category: "Music",
-    ticketType: "VIP Premium",
-    quantity: 2,
-    unitPrice: 2500,
-    totalPrice: 5000,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "Credit Card",
-    bookingDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "Live Nation India",
-    organizerEmail: "contact@livenation.in",
-    qrCode: "QR-BK001-COLDPLAY"
-  },
-  {
-    id: "BK002",
-    orderId: "ORD-2024-002",
-    eventTitle: "Tech Summit 2024",
-    eventDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "9:00 AM",
-    location: "Bangalore International Exhibition Centre, Bangalore, India",
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=300&fit=crop",
-    category: "Business",
-    ticketType: "Conference Pass",
-    quantity: 1,
-    unitPrice: 1500,
-    totalPrice: 1500,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "UPI",
-    bookingDate: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "TechEvents India",
-    organizerEmail: "info@techevents.in",
-    qrCode: "QR-BK002-TECHSUMMIT"
-  },
-  {
-    id: "BK003",
-    orderId: "ORD-2024-003",
-    eventTitle: "Food & Wine Festival",
-    eventDate: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "6:00 PM",
-    location: "Jawaharlal Nehru Stadium, Delhi, India",
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561404?w=500&h=300&fit=crop",
-    category: "Food",
-    ticketType: "General Admission",
-    quantity: 3,
-    unitPrice: 1200,
-    totalPrice: 3600,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "Debit Card",
-    bookingDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "Culinary Events Co.",
-    organizerEmail: "hello@culinaryevents.com",
-    qrCode: "QR-BK003-FOODFEST"
-  },
-  {
-    id: "BK004",
-    orderId: "ORD-2024-004",
-    eventTitle: "EDM Festival Night",
-    eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "10:00 PM",
-    location: "Vagator Beach, Goa, India",
-    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&h=300&fit=crop",
-    category: "Music",
-    ticketType: "Early Bird",
-    quantity: 2,
-    unitPrice: 1800,
-    totalPrice: 3600,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "Net Banking",
-    bookingDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "Sunburn Events",
-    organizerEmail: "tickets@sunburn.in",
-    qrCode: "QR-BK004-EDMFEST"
-  },
-  {
-    id: "BK005",
-    orderId: "ORD-2024-005",
-    eventTitle: "Stand-up Comedy Night",
-    eventDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "8:00 PM",
-    location: "Phoenix Marketcity, Pune, India",
-    image: "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?w=500&h=300&fit=crop",
-    category: "Entertainment",
-    ticketType: "Premium Seating",
-    quantity: 2,
-    unitPrice: 800,
-    totalPrice: 1600,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "Wallet",
-    bookingDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "Comedy Central India",
-    organizerEmail: "bookings@comedycentral.in",
-    qrCode: "QR-BK005-COMEDY"
-  },
-  {
-    id: "BK006",
-    orderId: "ORD-2024-006",
-    eventTitle: "Marathon 2024",
-    eventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    eventTime: "6:00 AM",
-    location: "Necklace Road, Hyderabad, India",
-    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500&h=300&fit=crop",
-    category: "Sports",
-    ticketType: "10K Run",
-    quantity: 1,
-    unitPrice: 500,
-    totalPrice: 500,
-    status: "confirmed",
-    paymentStatus: "completed",
-    paymentMethod: "UPI",
-    bookingDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    organizerName: "Hyderabad Runners",
-    organizerEmail: "register@hydrunners.com",
-    qrCode: "QR-BK006-MARATHON"
-  }
-];
-
 const MyBookings = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [bookings, setBookings] = useState(DUMMY_BOOKINGS);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,32 +25,96 @@ const MyBookings = () => {
       setError(null);
       const response = await apiFetch("/api/user/bookings", { method: "GET" });
       if (response?.success && Array.isArray(response?.data?.items)) {
-        setBookings(response.data.items);
+        const normalized = response.data.items.map((item) => {
+          const evt = item.event || {};
+          const amounts = item.analytics?.amounts || {};
+          const tickets = Array.isArray(item.tickets) ? item.tickets : [];
+          const totalTickets =
+            item.analytics?.totalTickets ??
+            tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
+
+          const primaryTicket = tickets[0];
+          const startDate = evt.startDate || null;
+          const endDate = evt.endDate || null;
+          const statusNormalized = (item.status || "").toLowerCase();
+          const paymentStatus = (item.payment?.status || "").toLowerCase();
+
+          const location = evt.venue
+            ? [evt.venue.city, evt.venue.state].filter(Boolean).join(", ")
+            : "Venue TBA";
+
+          const formatTime = (date) => {
+            if (!date) return "Time TBA";
+            const d = new Date(date);
+            if (isNaN(d)) return "Time TBA";
+            return d.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+            });
+          };
+
+          const fallbackTotal =
+            tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) ||
+            tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
+
+          return {
+            id: item.id,
+            orderId: item.payment?.transactionId || item.id,
+            bookingDate: item.createdAt || evt.createdAt,
+            status: statusNormalized,
+            paymentStatus,
+            eventTitle: evt.title || "Event",
+            eventDate: startDate || endDate,
+            eventEndDate: endDate,
+            eventTime: formatTime(startDate),
+            image:
+              evt.flyerImage ||
+              evt.image ||
+              "https://via.placeholder.com/600x400?text=Event",
+            category: evt.category || evt.subCategory || "Event",
+            location,
+            ticketType: primaryTicket?.name || "Ticket",
+            quantity: totalTickets || 0,
+            totalPrice: amounts.total || fallbackTotal || 0,
+            tickets,
+            analytics: item.analytics,
+            payment: item.payment,
+            status1: evt.status1,
+            status2: evt.status2,
+          };
+        });
+
+        setBookings(normalized);
       } else {
-        setBookings(DUMMY_BOOKINGS);
+        setBookings([]);
       }
     } catch (err) {
       console.error("Failed to load bookings", err);
       setError(err?.message || "Failed to load your bookings.");
-      setBookings(DUMMY_BOOKINGS);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Comment out API call to use dummy data
-    // fetchBookings();
+    fetchBookings();
   }, [fetchBookings]);
 
   const formatDate = (dateString) => {
+    if (!dateString) return "Date TBA";
+    const d = new Date(dateString);
+    if (isNaN(d)) return "Date TBA";
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    return d.toLocaleDateString('en-US', options);
   };
 
   const formatBookingDate = (dateString) => {
+    if (!dateString) return "Date TBA";
+    const d = new Date(dateString);
+    if (isNaN(d)) return "Date TBA";
     const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    return d.toLocaleDateString('en-US', options);
   };
 
   const handleDownloadTicket = (booking) => {
@@ -211,8 +145,9 @@ const MyBookings = () => {
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(booking => {
-      const matchesSearch = booking.eventTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           booking.orderId.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        (booking.eventTitle || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (booking.orderId || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFilter = filterStatus === 'all' || booking.status === filterStatus;
       return matchesSearch && matchesFilter;
     });
@@ -220,10 +155,14 @@ const MyBookings = () => {
 
   const stats = useMemo(() => {
     const total = bookings.length;
-    const totalSpent = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-    const upcoming = bookings.filter(b => new Date(b.eventDate) > new Date()).length;
+    const totalSpent = bookings.reduce((sum, b) => sum + (b?.totalPrice || 0), 0);
+    const upcoming = bookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length;
     return { total, totalSpent, upcoming };
   }, [bookings]);
+
+  const hasBookings = bookings.length > 0;
+  const hasFilteredBookings = filteredBookings.length > 0;
+  const showEmptyState = !loading && !hasBookings;
 
   const handleRetry = () => {
     fetchBookings();
@@ -313,7 +252,7 @@ const MyBookings = () => {
       </div>
 
       {/* Upcoming Events Section */}
-      {filteredBookings.filter(b => new Date(b.eventDate) > new Date()).length > 0 && (
+      {filteredBookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
@@ -321,13 +260,13 @@ const MyBookings = () => {
               Upcoming Events
             </h2>
             <Badge className="bg-[#D60024]/20 text-[#D60024] border border-[#D60024]/30 px-3 py-1">
-              {filteredBookings.filter(b => new Date(b.eventDate) > new Date()).length} Events
+              {filteredBookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length} Events
             </Badge>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredBookings
-              .filter(b => new Date(b.eventDate) > new Date())
+              .filter(b => b?.eventDate && new Date(b.eventDate) > new Date())
               .slice(0, 3)
               .map((booking) => (
                 <Card
@@ -411,13 +350,13 @@ const MyBookings = () => {
             <p className="text-[rgba(255,255,255,0.65)]">Loading your bookings...</p>
           </CardContent>
         </Card>
-      ) : filteredBookings.length === 0 ? (
+      ) : showEmptyState ? (
         <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
           <CardContent className="p-12 text-center">
             <Ticket className="w-16 h-16 text-[rgba(255,255,255,0.4)] mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2 text-white">No bookings found</h3>
+            <h3 className="text-xl font-semibold mb-2 text-white">You don’t have any bookings yet</h3>
             <p className="text-[rgba(255,255,255,0.65)] mb-6">
-              {searchQuery ? 'Try adjusting your search' : 'Start exploring events and book your first ticket!'}
+              Start exploring events and book your first ticket.
             </p>
             <Link to="/dashboard/browse-events">
               <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold">
@@ -425,6 +364,16 @@ const MyBookings = () => {
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
+          </CardContent>
+        </Card>
+      ) : !hasFilteredBookings ? (
+        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+          <CardContent className="p-12 text-center">
+            <Search className="w-16 h-16 text-[rgba(255,255,255,0.4)] mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-white">No matching bookings</h3>
+            <p className="text-[rgba(255,255,255,0.65)]">
+              Try adjusting your search or filters.
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -446,13 +395,13 @@ const MyBookings = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500/20 text-green-300 border border-green-500/30 text-xs px-2 py-0.5">
+                    <Badge className={`${booking.status === 'confirmed' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       {booking.status === 'confirmed' ? 'Confirmed' : 'Pending'}
                     </Badge>
-                    <Badge className="bg-[#60a5fa]/20 text-[#93c5fd] border border-[#60a5fa]/30 text-xs px-2 py-0.5">
+                    <Badge className={`${booking.paymentStatus === 'success' ? 'bg-[#60a5fa]/20 text-[#bfdbfe] border border-[#60a5fa]/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
                       <CreditCard className="h-3 w-3 mr-1" />
-                      Paid
+                      {booking.paymentStatus ? booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1) : 'Payment'}
                     </Badge>
                   </div>
                 </div>

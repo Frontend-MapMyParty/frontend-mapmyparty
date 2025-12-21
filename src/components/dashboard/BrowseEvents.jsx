@@ -1,168 +1,82 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Search, Filter, TrendingUp, Star, Music, Utensils, Briefcase, Palette, Trophy, Heart, ChevronRight, Users, Ticket } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  Search,
+  TrendingUp,
+  Star,
+  Users,
+  Ticket,
+  SlidersHorizontal,
+  Sparkles,
+  Briefcase,
+  Music,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { usePublicEvents } from "@/hooks/usePublicEvents";
-import { buildUrl } from "@/config/api";
 
-// Comprehensive dummy event data
-const DUMMY_EVENTS = [
+const CATEGORY_CONFIG = [
   {
-    id: "evt001",
-    title: "Coldplay Music of the Spheres Tour",
-    category: "MUSIC",
-    image: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "DY Patil Stadium, Mumbai",
-    price: 2500,
-    tickets: [{ price: 2500 }, { price: 5000 }],
-    attendees: 45000,
-    trending: true,
-    featured: true
+    id: "WORKSHOP",
+    label: "Workshop",
+    icon: Briefcase,
+    gradient: "from-[#ff8a05] via-[#ff4d67] to-[#ff2257]",
+    accent: "border-[#ff8a05]/40",
   },
   {
-    id: "evt002",
-    title: "Sunburn EDM Festival 2024",
-    category: "MUSIC",
-    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Vagator Beach, Goa",
-    price: 1800,
-    tickets: [{ price: 1800 }, { price: 3500 }],
-    attendees: 25000,
-    trending: true
+    id: "MUSIC",
+    label: "Music",
+    icon: Music,
+    gradient: "from-[#2563eb] via-[#7c3aed] to-[#a855f7]",
+    accent: "border-[#7c9dff]/40",
   },
-  {
-    id: "evt003",
-    title: "Indie Music Night",
-    category: "MUSIC",
-    image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Hard Rock Cafe, Bangalore",
-    price: 800,
-    tickets: [{ price: 800 }],
-    attendees: 500
-  },
-  {
-    id: "evt004",
-    title: "IPL 2024 - Mumbai vs Chennai",
-    category: "SPORTS",
-    image: "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Wankhede Stadium, Mumbai",
-    price: 1500,
-    tickets: [{ price: 1500 }, { price: 3000 }],
-    attendees: 33000,
-    featured: true
-  },
-  {
-    id: "evt005",
-    title: "Mumbai Marathon 2024",
-    category: "SPORTS",
-    image: "https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Marine Drive, Mumbai",
-    price: 500,
-    tickets: [{ price: 500 }],
-    attendees: 15000
-  },
-  {
-    id: "evt006",
-    title: "Food & Wine Festival",
-    category: "FOOD",
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561404?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Jawaharlal Nehru Stadium, Delhi",
-    price: 1200,
-    tickets: [{ price: 1200 }],
-    attendees: 8000,
-    trending: true
-  },
-  {
-    id: "evt007",
-    title: "Street Food Carnival",
-    category: "FOOD",
-    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Phoenix Marketcity, Pune",
-    price: 300,
-    tickets: [{ price: 300 }],
-    attendees: 5000
-  },
-  {
-    id: "evt008",
-    title: "Tech Summit 2024",
-    category: "BUSINESS",
-    image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "BIEC, Bangalore",
-    price: 1500,
-    tickets: [{ price: 1500 }],
-    attendees: 10000,
-    featured: true
-  },
-  {
-    id: "evt009",
-    title: "Startup Networking Event",
-    category: "BUSINESS",
-    image: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "WeWork, Hyderabad",
-    price: 0,
-    tickets: [{ price: 0 }],
-    attendees: 200
-  },
-  {
-    id: "evt010",
-    title: "Art Exhibition - Modern India",
-    category: "ART",
-    image: "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "National Gallery, Delhi",
-    price: 200,
-    tickets: [{ price: 200 }],
-    attendees: 1000
-  },
-  {
-    id: "evt011",
-    title: "Stand-up Comedy Night",
-    category: "ART",
-    image: "https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Canvas Laugh Club, Mumbai",
-    price: 800,
-    tickets: [{ price: 800 }],
-    attendees: 300
-  },
-  {
-    id: "evt012",
-    title: "Yoga & Wellness Retreat",
-    category: "SPORTS",
-    image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&h=600&fit=crop",
-    startDate: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000).toISOString(),
-    location: "Rishikesh, Uttarakhand",
-    price: 5000,
-    tickets: [{ price: 5000 }],
-    attendees: 100
-  }
 ];
 
-const CATEGORIES = [
-  { id: 'all', name: 'All Events', icon: Star, color: 'from-[#D60024] to-[#ff4d67]' },
-  { id: 'MUSIC', name: 'Music', icon: Music, color: 'from-[#8b5cf6] to-[#a78bfa]' },
-  { id: 'SPORTS', name: 'Sports', icon: Trophy, color: 'from-[#22c55e] to-[#4ade80]' },
-  { id: 'FOOD', name: 'Food & Drink', icon: Utensils, color: 'from-[#f97316] to-[#fb923c]' },
-  { id: 'BUSINESS', name: 'Business', icon: Briefcase, color: 'from-[#3b82f6] to-[#60a5fa]' },
-  { id: 'ART', name: 'Art & Culture', icon: Palette, color: 'from-[#ec4899] to-[#f472b6]' },
-];
+const WORKSHOP_SUBCATEGORIES = [
+  "Sports",
+  "Arts",
+  "Meeting",
+  "Conference",
+  "Seminar",
+  "Yoga",
+  "Cooking",
+  "Dance",
+  "Self Help",
+  "Consultation",
+  "Corporate Event",
+  "Communication",
+].map((label) => ({ label, value: label.toUpperCase() }));
+
+const MUSIC_SUBCATEGORIES = [
+  "Bollywood",
+  "Hiphop",
+  "Electronic",
+  "Melodic",
+  "Live Music",
+  "Metal",
+  "Rap",
+  "Music House",
+  "Techno",
+  "K-pop",
+  "Hollywood",
+  "Pop",
+  "Punjabi",
+  "Disco",
+  "Rock",
+  "Afrobeat",
+  "Dancehall",
+  "Thumri",
+  "Bolly Tech",
+].map((label) => ({ label, value: label.toUpperCase() }));
 
 export default function BrowseEvents() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [category, setCategory] = useState("all");
-  const [viewMode, setViewMode] = useState("category"); // 'category' or 'grid'
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   
   const {
     events: apiEvents = [],
@@ -171,20 +85,21 @@ export default function BrowseEvents() {
     updateFilters,
   } = usePublicEvents();
 
-  // Use dummy data for now
-  const events = DUMMY_EVENTS;
+  // Use live events from API
+  const events = apiEvents;
 
   // Handle search input change with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       updateFilters({ 
         search: searchQuery || null,
-        category: category === "all" ? null : category.toUpperCase()
+        category: selectedCategory === "all" ? null : selectedCategory,
+        subCategory: selectedSubCategory === "all" ? null : selectedSubCategory,
       });
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [searchQuery, category, updateFilters]);
+  }, [searchQuery, selectedCategory, selectedSubCategory, updateFilters]);
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -226,28 +141,30 @@ export default function BrowseEvents() {
       : "Free";
   };
 
-  // Filter events
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = category === 'all' || event.category === category;
-      return matchesSearch && matchesCategory;
-    });
-  }, [events, searchQuery, category]);
+  const filteredEvents = events || [];
 
-  // Group events by category
-  const eventsByCategory = useMemo(() => {
-    const grouped = {};
-    CATEGORIES.forEach(cat => {
-      if (cat.id === 'all') return;
-      grouped[cat.id] = filteredEvents.filter(e => e.category === cat.id);
-    });
-    return grouped;
-  }, [filteredEvents]);
-
-  // Get trending and featured events
+  // Get trending and featured events if backend provides flags
   const trendingEvents = useMemo(() => filteredEvents.filter(e => e.trending).slice(0, 4), [filteredEvents]);
   const featuredEvents = useMemo(() => filteredEvents.filter(e => e.featured).slice(0, 3), [filteredEvents]);
+
+  const activeSubcategories =
+    selectedCategory === "all"
+      ? []
+      : selectedCategory === "WORKSHOP"
+      ? WORKSHOP_SUBCATEGORIES
+      : MUSIC_SUBCATEGORIES;
+
+  const groupedByCategory = useMemo(() => {
+    return CATEGORY_CONFIG.map((cat) => ({
+      ...cat,
+      events: filteredEvents.filter(
+        (event) => (event.category || event.mainCategory || "").toUpperCase() === cat.id
+      ),
+    }));
+  }, [filteredEvents]);
+
+  const totalCountLabel =
+    filteredEvents.length === 1 ? "1 event" : `${filteredEvents.length} events`;
 
   return (
     <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-6 sm:py-8 md:py-10 text-white bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] min-h-screen">
@@ -260,44 +177,148 @@ export default function BrowseEvents() {
         <p className="text-[rgba(255,255,255,0.65)] text-sm sm:text-base">Discover amazing events happening near you</p>
       </div>
 
-      {/* Search and Category Pills */}
+      {/* Search */}
       <div className="mb-8 space-y-4">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[rgba(100,200,255,0.7)]" />
           <Input
             type="search"
-            placeholder="Search events by name, location, or category..."
+            placeholder="Search events by name or location..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-3 bg-[rgba(255,255,255,0.08)] border-2 border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.6)] focus:ring-2 focus:ring-[#60a5fa] focus:border-[#60a5fa] rounded-xl text-base"
           />
         </div>
-        
-        {/* Category Pills */}
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            const isActive = category === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setCategory(cat.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-300 ${
-                  isActive
-                    ? `bg-gradient-to-r ${cat.color} text-white shadow-lg scale-105`
-                    : 'bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)] border border-[rgba(100,200,255,0.2)]'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {cat.name}
-              </button>
-            );
-          })}
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b1222] via-[#0c1428] to-[#0c1020] p-5 shadow-[0_24px_80px_-30px_rgba(0,0,0,0.75)] backdrop-blur-xl">
+          <div className="absolute inset-px rounded-[18px] border border-white/5 pointer-events-none" />
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 text-sm text-white/85">
+              <SlidersHorizontal className="h-4 w-4 text-[#D60024]" />
+              <span>Showing published events only</span>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              {selectedCategory !== "all" && (
+                <Badge className="bg-[#D60024]/15 text-white border-[#D60024]/30">
+                  Category: {CATEGORY_CONFIG.find((c) => c.id === selectedCategory)?.label}
+                </Badge>
+              )}
+              {selectedSubCategory !== "all" && (
+                <Badge className="bg-[#60a5fa]/15 text-[#bfdbfe] border-[#60a5fa]/30">
+                  Sub: {selectedSubCategory}
+                </Badge>
+              )}
+              {searchQuery && (
+                <Badge className="bg-white/10 text-white border-white/10">
+                  “{searchQuery}”
+                </Badge>
+              )}
+              {(selectedCategory !== "all" || selectedSubCategory !== "all" || searchQuery) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCategory("all");
+                    setSelectedSubCategory("all");
+                    setSearchQuery("");
+                  }}
+                  className="text-white bg-white/5 hover:bg-white/10 border border-white/10"
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="relative grid md:grid-cols-2 gap-3">
+            {CATEGORY_CONFIG.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = selectedCategory === cat.id;
+              const categoryCount = filteredEvents.filter(
+                (event) => (event.category || event.mainCategory || "").toUpperCase() === cat.id
+              ).length;
+
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setSelectedSubCategory("all");
+                  }}
+                  className={`relative w-full overflow-hidden rounded-xl border px-4 py-3 text-left transition-all duration-300 backdrop-blur ${
+                    isActive
+                      ? `border-transparent ring-2 ring-offset-0 ring-[#D60024]/70 shadow-[0_20px_40px_-24px_rgba(214,0,36,0.8)]`
+                      : `border-white/10 hover:border-white/25`
+                  }`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${cat.gradient} opacity-80`} />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_45%)]" />
+                  <div className="relative flex items-center justify-between gap-2 min-h-[96px]">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-black/30 backdrop-blur-sm rounded-lg p-2 border border-white/10 shadow-inner">
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-white/85">Category</p>
+                        <p className="text-lg font-semibold text-white">{cat.label}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-white/75">Events</p>
+                      <p className="text-xl font-bold text-white">
+                        {categoryCount}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeSubcategories.length > 0 && (
+            <div className="mt-5 border-t border-white/5 pt-4">
+              <div className="flex items-center gap-2 text-sm text-white/80 mb-3">
+                <Sparkles className="h-4 w-4 text-[#60a5fa]" />
+                <span>Focus by subcategory</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={selectedSubCategory === "all" ? "default" : "ghost"}
+                  className={`rounded-full border px-4 ${
+                    selectedSubCategory === "all"
+                      ? "bg-[#D60024] border-[#ff4d67] text-white shadow-[0_8px_24px_-10px_rgba(214,0,36,0.7)]"
+                      : "bg-white/5 text-white/85 border-white/10 hover:border-white/30"
+                  }`}
+                  onClick={() => setSelectedSubCategory("all")}
+                >
+                  All {CATEGORY_CONFIG.find((c) => c.id === selectedCategory)?.label}
+                </Button>
+                {activeSubcategories.map((sub) => {
+                  const isActive = selectedSubCategory === sub.value;
+                  return (
+                    <Button
+                      key={sub.value}
+                      size="sm"
+                      variant={isActive ? "default" : "ghost"}
+                      className={`rounded-full border px-4 ${
+                        isActive
+                          ? "bg-gradient-to-r from-[#60a5fa] to-[#22d3ee] border-[#7dd3fc] text-black font-semibold shadow-[0_8px_24px_-10px_rgba(96,165,250,0.65)]"
+                          : "bg-white/5 text-white/85 border-white/10 hover:border-white/30"
+                      }`}
+                      onClick={() => setSelectedSubCategory(sub.value)}
+                    >
+                      {sub.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Trending Events Section */}
-      {trendingEvents.length > 0 && category === 'all' && (
+      {trendingEvents.length > 0 && (
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -310,12 +331,12 @@ export default function BrowseEvents() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {trendingEvents.map((event) => (
-              <Link to={`/events/${event.id}`} key={event.id} className="group">
+              <Link to={`/events/${event.slug || event.id}`} key={event.id} className="group">
                 <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden h-full">
                   <div className="relative h-48 overflow-hidden">
                     <img
-                      src={event.image}
-                      alt={event.title}
+                      src={event.flyerImage || event.image || event.coverImage || event.thumbnail || "https://via.placeholder.com/400x250?text=Event"}
+                      alt={event.title || event.eventTitle}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
@@ -330,16 +351,16 @@ export default function BrowseEvents() {
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-bold text-base text-white mb-2 line-clamp-1 group-hover:text-[#D60024] transition-colors">
-                      {event.title}
+                      {event.title || event.eventTitle}
                     </h3>
                     <div className="space-y-1.5 text-xs text-[rgba(255,255,255,0.75)]">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-3.5 w-3.5 text-[#60a5fa]" />
-                        <span>{formatDate(event.startDate)}</span>
+                        <span>{formatDate(event.startDate || event.date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-[#60a5fa]" />
-                        <span className="line-clamp-1">{event.location}</span>
+                        <span className="line-clamp-1">{getEventLocation(event)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Users className="h-3.5 w-3.5 text-[#60a5fa]" />
@@ -354,78 +375,43 @@ export default function BrowseEvents() {
         </div>
       )}
 
-      {/* Featured Events Section */}
-      {featuredEvents.length > 0 && category === 'all' && (
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Star className="h-6 w-6 text-[#D60024]" />
-              Featured Events
-            </h2>
+      {/* Simple Grid (categories hidden) */}
+      <div>
+        <div className="mb-5 flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-[#D60024]" />
+            <h2 className="text-2xl font-bold text-white">Browse by category</h2>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {featuredEvents.map((event) => (
-              <Link to={`/events/${event.id}`} key={event.id} className="group">
-                <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden">
-                  <div className="relative h-56 overflow-hidden">
-                    <img
-                      src={event.image}
-                      alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
-                    <Badge className="absolute top-3 left-3 bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white text-xs px-3 py-1.5 font-semibold">
-                      Featured
-                    </Badge>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 className="font-bold text-xl text-white mb-2 line-clamp-2">
-                        {event.title}
-                      </h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-white/90">{formatDate(event.startDate)}</span>
-                        <span className="text-lg font-bold text-[#D60024]">{getEventPriceDisplay(event)}</span>
-                      </div>
+          <p className="text-[rgba(255,255,255,0.65)] text-sm">
+            {totalCountLabel} • Only published events from the live API
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {groupedByCategory.map((cat) => {
+            if (cat.events.length === 0) return null;
+            return (
+              <div key={cat.id} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl bg-gradient-to-r ${cat.gradient} flex items-center justify-center text-white border border-white/10`}>
+                      <cat.icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-white/60">Category</p>
+                      <h3 className="text-xl font-semibold text-white">{cat.label}</h3>
                     </div>
                   </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Category Sections */}
-      {category === 'all' ? (
-        <div className="space-y-10">
-          {CATEGORIES.filter(cat => cat.id !== 'all').map((cat) => {
-            const categoryEvents = eventsByCategory[cat.id] || [];
-            if (categoryEvents.length === 0) return null;
-            const Icon = cat.icon;
-            
-            return (
-              <div key={cat.id}>
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <Icon className="h-6 w-6 text-[#60a5fa]" />
-                    {cat.name}
-                  </h2>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setCategory(cat.id)}
-                    className="text-[#60a5fa] hover:text-white hover:bg-[rgba(59,130,246,0.15)]"
-                  >
-                    View All
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
+                  <Badge className="bg-white/10 text-white border-white/10">{cat.events.length} events</Badge>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {categoryEvents.slice(0, 4).map((event) => (
-                    <Link to={`/events/${event.id}`} key={event.id} className="group">
+                  {cat.events.map((event) => (
+                    <Link to={`/events/${event.slug || event.id}`} key={event.id} className="group">
                       <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden h-full">
-                        <div className="relative h-44 overflow-hidden">
+                        <div className="relative h-48 overflow-hidden">
                           <img
-                            src={event.image}
-                            alt={event.title}
+                            src={event.flyerImage || event.image || event.coverImage || event.thumbnail || "https://via.placeholder.com/400x250?text=Event"}
+                            alt={event.title || event.eventTitle}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
@@ -433,19 +419,34 @@ export default function BrowseEvents() {
                             {getEventPriceDisplay(event)}
                           </Badge>
                         </div>
-                        <CardContent className="p-3">
-                          <h3 className="font-bold text-sm text-white mb-2 line-clamp-1 group-hover:text-[#D60024] transition-colors">
-                            {event.title}
+                        <CardContent className="p-4">
+                          <h3 className="font-bold text-base text-white mb-2 line-clamp-1 group-hover:text-[#D60024] transition-colors">
+                            {event.title || event.eventTitle}
                           </h3>
-                          <div className="space-y-1 text-xs text-[rgba(255,255,255,0.75)]">
-                            <div className="flex items-center gap-1.5">
-                              <Calendar className="h-3 w-3 text-[#60a5fa]" />
-                              <span>{formatDate(event.startDate)}</span>
+                          <div className="space-y-1.5 text-xs text-[rgba(255,255,255,0.75)]">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3.5 w-3.5 text-[#60a5fa]" />
+                              <span>{formatDate(event.startDate || event.date)}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="h-3 w-3 text-[#60a5fa]" />
-                              <span className="line-clamp-1">{event.location}</span>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-[#60a5fa]" />
+                              <span className="line-clamp-1">{getEventLocation(event)}</span>
                             </div>
+                            <div className="flex flex-wrap gap-2 text-[10px] text-white/80">
+                              {event.category && <Badge className="bg-white/10 text-white border-white/10 px-2 py-0">{event.category}</Badge>}
+                              {event.subCategory && <Badge className="bg-white/10 text-white border-white/10 px-2 py-0">{event.subCategory}</Badge>}
+                              {(event.eventStatus || event.publishStatus) && (
+                                <Badge className="bg-[#60a5fa]/20 text-[#bfdbfe] border-[#60a5fa]/30 px-2 py-0">
+                                  {[event.eventStatus, event.publishStatus].filter(Boolean).join(" • ")}
+                                </Badge>
+                              )}
+                            </div>
+                            {event.attendees && (
+                              <div className="flex items-center gap-2">
+                                <Users className="h-3.5 w-3.5 text-[#60a5fa]" />
+                                <span>{event.attendees.toLocaleString()} interested</span>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -456,58 +457,7 @@ export default function BrowseEvents() {
             );
           })}
         </div>
-      ) : (
-        <div>
-          <div className="mb-5">
-            <h2 className="text-2xl font-bold text-white">
-              {CATEGORIES.find(c => c.id === category)?.name || 'Events'}
-            </h2>
-            <p className="text-[rgba(255,255,255,0.65)] text-sm">
-              {filteredEvents.length} events found
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredEvents.map((event) => (
-              <Link to={`/events/${event.id}`} key={event.id} className="group">
-                <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden h-full">
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={event.image}
-                      alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                    <Badge className="absolute top-3 left-3 bg-[#D60024] text-white text-xs px-2 py-1">
-                      {getEventPriceDisplay(event)}
-                    </Badge>
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-bold text-base text-white mb-2 line-clamp-1 group-hover:text-[#D60024] transition-colors">
-                      {event.title}
-                    </h3>
-                    <div className="space-y-1.5 text-xs text-[rgba(255,255,255,0.75)]">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-[#60a5fa]" />
-                        <span>{formatDate(event.startDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 text-[#60a5fa]" />
-                        <span className="line-clamp-1">{event.location}</span>
-                      </div>
-                      {event.attendees && (
-                        <div className="flex items-center gap-2">
-                          <Users className="h-3.5 w-3.5 text-[#60a5fa]" />
-                          <span>{event.attendees.toLocaleString()} interested</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Loading State */}
       {loading && (
@@ -537,7 +487,7 @@ export default function BrowseEvents() {
             <Button
               onClick={() => {
                 setSearchQuery('');
-                setCategory('all');
+                updateFilters({ search: null });
               }}
               className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold"
             >

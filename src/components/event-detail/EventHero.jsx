@@ -1,9 +1,12 @@
  import { useState, useEffect } from "react";
-import { Calendar, MapPin, Share2 } from "lucide-react";
+import { Calendar, MapPin, Share2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useNavigate, useParams } from "react-router-dom";
 
 const EventHero = ({ title, date, location, image, onLocationClick }) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
@@ -88,8 +91,18 @@ const EventHero = ({ title, date, location, image, onLocationClick }) => {
             </button>
           </div>
 
-          {/* Share Button */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 items-center">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="backdrop-blur-sm bg-white/20 hover:bg-white/30 text-white border-white/30 hover-scale"
+              onClick={() => navigate(`/events/${id}/overview`)}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Overview
+            </Button>
+            
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -97,8 +110,8 @@ const EventHero = ({ title, date, location, image, onLocationClick }) => {
                   size="lg"
                   className="backdrop-blur-sm bg-white/20 hover:bg-white/30 text-white border-white/30 hover-scale"
                 >
-                  <Share2 className="w-4 h-4" />
-                  Share this Event
+<Share2 className="w-4 h-4 mr-2" />
+                  Share
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-4">

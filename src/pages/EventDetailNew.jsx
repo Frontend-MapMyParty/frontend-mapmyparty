@@ -7,76 +7,12 @@ import {
   ChevronLeft, Calendar, MapPin, Clock, Users, Share2, Heart, 
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram, 
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
-  Navigation, Building, User
+  Navigation, Building, User, BookOpen
 } from "lucide-react";
 import { toast } from "sonner";
+import { apiFetch } from "@/config/api";
 
-// Comprehensive dummy event data
-const DUMMY_EVENT_DATA = {
-  evt004: {
-    id: "evt004",
-    title: "IPL 2024 - Mumbai vs Chennai",
-    category: "SPORTS",
-    image: "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=1200&h=600&fit=crop",
-    startDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-    endDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000).toISOString(),
-    location: "Wankhede Stadium, Mumbai",
-    venue: "Wankhede Stadium",
-    address: "D Road, Churchgate, Mumbai, Maharashtra 400020",
-    coordinates: { lat: 18.9388, lng: 72.8258 },
-    attendees: 33000,
-    rating: 4.8,
-    reviews: 1250,
-    description: "Experience the thrill of IPL cricket as Mumbai Indians take on Chennai Super Kings in this high-octane match. Witness world-class cricket, electrifying atmosphere, and unforgettable moments at the iconic Wankhede Stadium.",
-    about: `Get ready for an unforgettable cricket experience as two of IPL's most successful franchises clash in this highly anticipated match. Mumbai Indians, led by their star-studded lineup, will face off against the Chennai Super Kings in what promises to be a thrilling encounter.
-
-The match will feature some of the biggest names in cricket, including international superstars and emerging talents. Expect explosive batting, cunning bowling strategies, and spectacular fielding that will keep you on the edge of your seat throughout the match.
-
-Wankhede Stadium, with its electric atmosphere and passionate crowd, provides the perfect backdrop for this epic battle. Whether you're a die-hard cricket fan or just looking for an exciting evening out, this match promises entertainment, drama, and world-class sporting action.`,
-    highlights: [
-      "World-class cricket action",
-      "Star-studded player lineups",
-      "Electric stadium atmosphere",
-      "Premium seating options",
-      "Food and beverage facilities",
-      "Family-friendly environment"
-    ],
-    gallery: [
-      "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1624526267942-ab0ff8a3e972?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1593766787879-e8c78e09cec1?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1512719994953-eabf50895df7?w=800&h=600&fit=crop",
-      "https://images.unsplash.com/photo-1589487391730-58f20eb2c308?w=800&h=600&fit=crop"
-    ],
-    tickets: [
-      { id: "t1", name: "General Admission", price: 1500, available: 5000, description: "Standard seating with great views" },
-      { id: "t2", name: "Premium Stand", price: 3000, available: 2000, description: "Premium seating with better amenities" },
-      { id: "t3", name: "VIP Box", price: 8000, available: 200, description: "Exclusive VIP experience with hospitality" }
-    ],
-    organizer: {
-      name: "IPL Events & Management",
-      bio: "Official organizers of the Indian Premier League, bringing world-class cricket entertainment to millions of fans across India.",
-      email: "contact@iplevents.com",
-      phone: "+91 98765 43210",
-      website: "https://www.iplt20.com",
-      logo: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=200&h=200&fit=crop",
-      social: {
-        facebook: "iplt20",
-        twitter: "IPL",
-        instagram: "iplt20"
-      },
-      verified: true,
-      eventsOrganized: 150,
-      followers: 25000
-    },
-    tags: ["Cricket", "IPL", "Sports", "Mumbai", "Live Match"],
-    ageRestriction: "All ages welcome",
-    dresscode: "Casual",
-    parking: "Available",
-    accessibility: "Wheelchair accessible"
-  }
-};
+const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 
 const EventDetailNew = () => {
   const { id } = useParams();
@@ -89,12 +25,214 @@ const EventDetailNew = () => {
   const [ticketQuantities, setTicketQuantities] = useState({});
   const [showBookingModal, setShowBookingModal] = useState(false);
 
+  const normalizeEvent = (raw = {}) => {
+    const data = raw?.data ?? raw; // handle api shapes {data:{...}}
+    const startDate = data.startDate || data.date || data.start_time || data.start;
+    const endDate = data.endDate || data.end_time || data.end;
+    const venue = data.venue || (data.venues && data.venues[0]) || {};
+    const cityState = `${data.city || venue.city || ""}${
+      (data.city || venue.city) && (data.state || venue.state) ? ", " : ""
+    }${data.state || venue.state || ""}`.trim();
+
+    const galleryImages = Array.isArray(data.galleryImages)
+      ? data.galleryImages
+      : Array.isArray(data.images)
+      ? data.images
+          .filter((img) =>
+            typeof img === "object" ? (img.type || "").toUpperCase() === "EVENT_GALLERY" : true
+          )
+          .map((img) => (typeof img === "object" ? img.url : img))
+      : data.gallery || [];
+
+    const tickets = Array.isArray(data.tickets)
+      ? data.tickets.map((t) => ({
+          id: t.id || t._id,
+          name: t.name || t.title || "Ticket",
+          description: t.info || t.description || "",
+          price: Number(t.price) || 0,
+          available: Math.max(
+            0,
+            (Number(t.totalQty) || 0) -
+              (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
+          ),
+        }))
+      : [];
+
+    const reviewsCount = Array.isArray(data.reviews)
+      ? data.reviews.length
+      : data._count?.reviews || data.reviews || 0;
+
+    return {
+      id: data.id || data._id,
+      slug: data.slug || data.id,
+      title: data.title || data.eventTitle || "Untitled Event",
+      category: data.category || data.mainCategory || "EVENT",
+      image:
+        data.flyerImage ||
+        data.flyerImageUrl ||
+        data.coverImage ||
+        data.image ||
+        galleryImages[0] ||
+        FALLBACK_IMAGE,
+      startDate,
+      endDate,
+      location:
+        typeof data.location === "string"
+          ? data.location
+          : venue.name || cityState || "Location TBA",
+      venue:
+        typeof data.venue === "string"
+          ? data.venue
+          : venue.name || "Venue TBA",
+      address:
+        data.address ||
+        data.fullAddress ||
+        venue.fullAddress ||
+        venue.address ||
+        [data.address, venue.address, cityState, data.pincode || venue.pincode]
+          .filter(Boolean)
+          .join(", ") ||
+        "Address TBA",
+      coordinates: data.coordinates || venue.coordinates,
+      attendees:
+        data.attendees ||
+        data.analytics?.totalAttendees ||
+        data.analytics?.attendees ||
+        data._count?.bookings ||
+        data.stats?.confirmedBookings ||
+        0,
+      rating: data.rating || data.averageRating || 0,
+      description: data.description || data.summary || "No description available.",
+      about: data.description || data.summary || "No description available.",
+      highlights: data.highlights || [],
+      gallery: galleryImages.length > 0 ? galleryImages : [FALLBACK_IMAGE],
+      tickets,
+      organizer: data.organizer
+        ? {
+            name: data.organizer.name || "Organizer",
+            email: data.organizer.email || "",
+            phone: data.organizer.phone || "",
+            website: data.organizer.website || "",
+            logo:
+              data.organizer.logo ||
+              "https://via.placeholder.com/200x200?text=Organizer",
+            verified: !!data.organizer.isVerified,
+            bio: data.organizer.description || "",
+            eventsOrganized: data.organizer.eventsOrganized || 0,
+            followers: data.organizer.followers || 0,
+          }
+        : {
+            name: data.organizerName || "Organizer",
+            email: data.organizerEmail || "",
+            phone: data.organizerPhone || "",
+            website: data.organizerWebsite || "",
+            logo: "https://via.placeholder.com/200x200?text=Organizer",
+            verified: false,
+            bio: "",
+            eventsOrganized: 0,
+            followers: 0,
+          },
+      tags: data.tags || [],
+      ageRestriction: data.ageRestriction || data.age_limit || "Not specified",
+      dresscode: data.dresscode || "Not specified",
+      parking: data.parking || "Not specified",
+      accessibility: data.accessibility || "Not specified",
+      reviews: reviewsCount,
+      advisory: data.advisory || data.advisories || null,
+      terms: data.TC?.terms || data.terms || "",
+      stats: data.stats || data._count || {},
+      artists: data.artists || [],
+      type: data.type,
+      publishStatus: data.publishStatus,
+      eventStatus: data.eventStatus,
+      organizerNote: data.organizerNote,
+      subCategory: data.subCategory,
+      categorySlug: data.categorySlug,
+      questions: data.questions,
+      sponsors: data.sponsors || [],
+      flyerImage: data.flyerImage,
+      flyerPublicId: data.flyerPublicId,
+      isSponsored: data.isSponsored,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      statsCount: data._count,
+      revenue: data.stats?.totalRevenue,
+      ticketsSold: data.stats?.totalTicketsSold,
+      confirmedBookings: data.stats?.confirmedBookings,
+      capacity: venue.totalQty || tickets.reduce((sum, t) => sum + (t.available || 0), 0),
+      primaryVenue: venue,
+      raw: data,
+    };
+  };
+
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setEvent(DUMMY_EVENT_DATA[id] || DUMMY_EVENT_DATA.evt004);
-      setLoading(false);
-    }, 500);
+    const fetchEvent = async () => {
+      const tryFetch = async (path) => {
+        const response = await apiFetch(path, { method: "GET" });
+        return (
+          response?.data?.event ||
+          response?.data?.data ||
+          response?.data ||
+          response
+        );
+      };
+
+      try {
+        setLoading(true);
+        let raw = null;
+
+        // 1) Try by id/slug using main endpoint
+        try {
+          raw = await tryFetch(`/api/event/${encodeURIComponent(id)}`);
+        } catch (errMain) {
+          console.warn("Primary fetch failed, trying slug and list fallback", errMain);
+        }
+
+        // 2) Try explicit slug endpoint if available
+        if (!raw) {
+          try {
+            raw = await tryFetch(`/api/event/slug/${encodeURIComponent(id)}`);
+          } catch (errSlug) {
+            console.warn("Slug fetch failed", errSlug);
+          }
+        }
+
+        // 3) Try listing all events and match by slug/id
+        if (!raw) {
+          try {
+            const listRes = await tryFetch(`/api/event`);
+            const list = Array.isArray(listRes?.events) ? listRes.events : Array.isArray(listRes) ? listRes : listRes?.data || [];
+            raw = list.find(
+              (e) =>
+                e?.id === id ||
+                e?._id === id ||
+                e?.slug === id ||
+                e?.eventId === id
+            );
+          } catch (errList) {
+            console.warn("List fetch failed", errList);
+          }
+        }
+
+        if (raw) {
+          const normalized = normalizeEvent(raw);
+          setEvent(normalized);
+          // Do not auto-open lightbox; show hero directly
+          setSelectedImage(null);
+        } else {
+          setEvent(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch event", err);
+        setEvent(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchEvent();
+    }
   }, [id]);
 
   const formatDate = (dateString) => {
@@ -206,8 +344,17 @@ const EventDetailNew = () => {
         <div className="absolute top-6 right-6 flex gap-2">
           <Button
             variant="ghost"
+            onClick={() => navigate(`/events/${event.id}/overview`)}
+            className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
+            title="View Overview"
+          >
+            <BookOpen className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => setIsLiked(!isLiked)}
             className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
+            title={isLiked ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart className={`h-5 w-5 ${isLiked ? 'fill-[#D60024] text-[#D60024]' : ''}`} />
           </Button>
@@ -215,6 +362,7 @@ const EventDetailNew = () => {
             variant="ghost"
             onClick={handleShare}
             className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
+            title="Share event"
           >
             <Share2 className="h-5 w-5" />
           </Button>

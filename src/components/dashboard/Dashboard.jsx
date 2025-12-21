@@ -12,253 +12,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { apiFetch } from "@/config/api";
 
-const DUMMY_BOOKED_EVENTS = [
-  {
-    id: 1,
-    title: "Coldplay Live Concert 2024",
-    date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "7:00 PM",
-    location: "Mumbai, India",
-    price: 2500,
-    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=300&fit=crop",
-    category: "Music",
-    status: "confirmed",
-    ticketCount: 2
-  },
-  {
-    id: 2,
-    title: "Tech Summit 2024",
-    date: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "9:00 AM",
-    location: "Bangalore, India",
-    price: 1500,
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=300&fit=crop",
-    category: "Business",
-    status: "confirmed",
-    ticketCount: 1
-  },
-  {
-    id: 3,
-    title: "Food & Wine Festival",
-    date: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "6:00 PM",
-    location: "Delhi, India",
-    price: 1200,
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561404?w=500&h=300&fit=crop",
-    category: "Food",
-    status: "confirmed",
-    ticketCount: 3
-  },
-  {
-    id: 17,
-    title: "Jazz Night Live",
-    date: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "9:00 PM",
-    location: "Jaipur, India",
-    price: 1200,
-    image: "https://images.unsplash.com/photo-1511379938547-c1f69b13d835?w=500&h=300&fit=crop",
-    category: "Music",
-    status: "confirmed",
-    ticketCount: 2
-  },
-  {
-    id: 18,
-    title: "Yoga & Wellness Retreat",
-    date: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "6:00 AM",
-    location: "Rishikesh, India",
-    price: 2200,
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=300&fit=crop",
-    category: "Wellness",
-    status: "confirmed",
-    ticketCount: 1
-  },
-  {
-    id: 19,
-    title: "Bollywood Awards Night 2024",
-    date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "7:30 PM",
-    location: "Mumbai, India",
-    price: 2800,
-    image: "https://images.unsplash.com/photo-1514306688772-aadcb36c4bda?w=500&h=300&fit=crop",
-    category: "Entertainment",
-    status: "confirmed",
-    ticketCount: 4
-  }
-];
-
-const DUMMY_UPCOMING_EVENTS = [
-  {
-    id: 4,
-    title: "EDM Festival Night",
-    date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "10:00 PM",
-    location: "Goa, India",
-    price: 1800,
-    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&h=300&fit=crop",
-    category: "Music",
-    rating: 4.8,
-    attendees: 2450,
-    isFeatured: true
-  },
-  {
-    id: 5,
-    title: "Stand-up Comedy Night",
-    date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "8:00 PM",
-    location: "Pune, India",
-    price: 800,
-    image: "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?w=500&h=300&fit=crop",
-    category: "Entertainment",
-    rating: 4.6,
-    attendees: 1200,
-    isFeatured: false
-  },
-  {
-    id: 6,
-    title: "Marathon 2024",
-    date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "6:00 AM",
-    location: "Hyderabad, India",
-    price: 500,
-    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500&h=300&fit=crop",
-    category: "Sports",
-    rating: 4.9,
-    attendees: 3800,
-    isFeatured: true
-  },
-  {
-    id: 7,
-    title: "Art Exhibition: Modern Masters",
-    date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "10:00 AM",
-    location: "Chennai, India",
-    price: 600,
-    image: "https://images.unsplash.com/photo-1578301978162-7aae4d755744?w=500&h=300&fit=crop",
-    category: "Art",
-    rating: 4.7,
-    attendees: 890,
-    isFeatured: false
-  },
-  {
-    id: 8,
-    title: "Cricket World Cup Final",
-    date: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "3:00 PM",
-    location: "Kolkata, India",
-    price: 3500,
-    image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500&h=300&fit=crop",
-    category: "Sports",
-    rating: 4.9,
-    attendees: 5200,
-    isFeatured: true
-  },
-  {
-    id: 9,
-    title: "Jazz Night Live",
-    date: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "9:00 PM",
-    location: "Jaipur, India",
-    price: 1200,
-    image: "https://images.unsplash.com/photo-1511379938547-c1f69b13d835?w=500&h=300&fit=crop",
-    category: "Music",
-    rating: 4.8,
-    attendees: 1500,
-    isFeatured: false
-  },
-  {
-    id: 10,
-    title: "Startup Pitch Competition",
-    date: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "2:00 PM",
-    location: "Bangalore, India",
-    price: 1000,
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=300&fit=crop",
-    category: "Business",
-    rating: 4.7,
-    attendees: 980,
-    isFeatured: false
-  },
-  {
-    id: 11,
-    title: "Bollywood Awards Night 2024",
-    date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "7:30 PM",
-    location: "Mumbai, India",
-    price: 2800,
-    image: "https://images.unsplash.com/photo-1514306688772-aadcb36c4bda?w=500&h=300&fit=crop",
-    category: "Entertainment",
-    rating: 4.9,
-    attendees: 8500,
-    isFeatured: false
-  },
-  {
-    id: 12,
-    title: "Tech Innovation Summit",
-    date: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "9:00 AM",
-    location: "Bangalore, India",
-    price: 1500,
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=300&fit=crop",
-    category: "Business",
-    rating: 4.8,
-    attendees: 2100,
-    isFeatured: false
-  },
-  {
-    id: 13,
-    title: "Yoga & Wellness Retreat",
-    date: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "6:00 AM",
-    location: "Rishikesh, India",
-    price: 2200,
-    image: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=500&h=300&fit=crop",
-    category: "Wellness",
-    rating: 4.7,
-    attendees: 650,
-    isFeatured: false
-  },
-  {
-    id: 14,
-    title: "Food Festival Extravaganza",
-    date: new Date(Date.now() + 13 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "5:00 PM",
-    location: "Delhi, India",
-    price: 1100,
-    image: "https://images.unsplash.com/photo-1555939594-58d7cb561404?w=500&h=300&fit=crop",
-    category: "Food",
-    rating: 4.6,
-    attendees: 3200,
-    isFeatured: false
-  },
-  {
-    id: 15,
-    title: "Photography Workshop",
-    date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "10:00 AM",
-    location: "Pune, India",
-    price: 900,
-    image: "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=500&h=300&fit=crop",
-    category: "Workshop",
-    rating: 4.8,
-    attendees: 420,
-    isFeatured: false
-  },
-  {
-    id: 16,
-    title: "Fashion Week 2024",
-    date: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000).toISOString(),
-    time: "6:00 PM",
-    location: "Mumbai, India",
-    price: 2500,
-    image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=300&fit=crop",
-    category: "Fashion",
-    rating: 4.9,
-    attendees: 4100,
-    isFeatured: false
-  }
-];
-
 const Dashboard = () => {
   const [bookedEvents, setBookedEvents] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -267,47 +20,162 @@ const Dashboard = () => {
   const [errorBooked, setErrorBooked] = useState(null);
   const [errorUpcoming, setErrorUpcoming] = useState(null);
 
+  const normalizeUpcomingEvent = (event) => {
+    const startDate = event.startDate || event.date || event.start_time || event.start;
+    const endDate = event.endDate || event.end_time || event.end;
+    const parsedDate = startDate ? new Date(startDate) : null;
+    const venue = Array.isArray(event.venues) ? event.venues[0] : event.venue;
+    const location = venue
+      ? [venue.name, venue.city, venue.state].filter(Boolean).join(", ")
+      : event.location || "Venue TBA";
+
+    const prices = Array.isArray(event.tickets)
+      ? event.tickets
+          .map((t) => Number(t.price || t.amount))
+          .filter((n) => !isNaN(n) && n > 0)
+      : [];
+    const minPrice = prices.length > 0 ? Math.min(...prices) : Number(event.price) || 0;
+
+    const formatTime = (dateString) => {
+      if (!dateString) return "Time TBA";
+      const d = new Date(dateString);
+      if (isNaN(d)) return "Time TBA";
+      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    };
+
+    return {
+      id: event.id || event._id,
+      title: event.title || event.eventTitle || "Event",
+      date: startDate || endDate,
+      endDate,
+      time: formatTime(startDate),
+      location,
+      price: minPrice,
+      image:
+        event.flyerImage ||
+        event.image ||
+        event.coverImage ||
+        event.thumbnail ||
+        "https://via.placeholder.com/600x400?text=Event",
+      category: event.category || event.mainCategory || event.subCategory || "Event",
+      rating: event.rating || event.averageRating || 4.5,
+      attendees: event.attendees || event.analytics?.attendees || event.analytics?.totalAttendees || 0,
+    };
+  };
+
+  const normalizeBooking = (item) => {
+    const evt = item.event || {};
+    const amounts = item.analytics?.amounts || {};
+    const tickets = Array.isArray(item.tickets) ? item.tickets : [];
+    const totalTickets =
+      item.analytics?.totalTickets ?? tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
+    const startDate = evt.startDate || evt.date || item.eventDate;
+    const formatTime = (date) => {
+      if (!date) return "Time TBA";
+      const d = new Date(date);
+      if (isNaN(d)) return "Time TBA";
+      return d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    };
+    const venue = evt.venue || (Array.isArray(evt.venues) ? evt.venues[0] : null);
+    const location = venue
+      ? [venue.city, venue.state].filter(Boolean).join(", ")
+      : evt.location || "Venue TBA";
+    const fallbackTotal =
+      tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) ||
+      tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
+
+    return {
+      id: item.id || item._id,
+      title: evt.title || "Event",
+      date: startDate || evt.endDate,
+      bookingDate: item.createdAt || item.bookingDate || startDate || evt.createdAt,
+      time: formatTime(startDate),
+      location,
+      price: amounts.total || fallbackTotal || 0,
+      image:
+        evt.flyerImage ||
+        evt.image ||
+        evt.coverImage ||
+        evt.thumbnail ||
+        "https://via.placeholder.com/600x400?text=Event",
+      category: evt.category || evt.subCategory || "Event",
+      status: item.status || "confirmed",
+      ticketCount: totalTickets || 0,
+    };
+  };
+
   // Fetch booked events
   const fetchBookedEvents = useCallback(async () => {
     try {
       setLoadingBooked(true);
       setErrorBooked(null);
-      const response = await apiFetch("/api/bookings/my-bookings", {
+      const response = await apiFetch("/api/user/bookings", {
         method: "GET",
       });
 
-      if (response?.success && response?.data) {
-        setBookedEvents(Array.isArray(response.data) ? response.data : DUMMY_BOOKED_EVENTS);
-      } else {
-        setBookedEvents(DUMMY_BOOKED_EVENTS);
-      }
+      const items =
+        response?.data?.items ||
+        response?.data ||
+        response?.bookings ||
+        [];
+
+      const normalized = Array.isArray(items) ? items.map(normalizeBooking) : [];
+      const sorted = normalized.sort((a, b) => {
+        const da = new Date(a.bookingDate || a.date).getTime();
+        const db = new Date(b.bookingDate || b.date).getTime();
+        return isNaN(db) - isNaN(da) || db - da;
+      });
+      setBookedEvents(sorted.slice(0, 6));
     } catch (err) {
       console.error("❌ Error fetching booked events:", err);
       setErrorBooked(err?.message || "Failed to load booked events");
-      setBookedEvents(DUMMY_BOOKED_EVENTS);
+      setBookedEvents([]);
     } finally {
       setLoadingBooked(false);
     }
   }, []);
 
-  // Fetch upcoming events
+  // Fetch upcoming events (next 10 days)
   const fetchUpcomingEvents = useCallback(async () => {
     try {
       setLoadingUpcoming(true);
       setErrorUpcoming(null);
-      const response = await apiFetch("/api/events/upcoming", {
+      const response = await apiFetch("/api/event", {
         method: "GET",
       });
 
-      if (response?.success && response?.data) {
-        setUpcomingEvents(Array.isArray(response.data) ? response.data : DUMMY_UPCOMING_EVENTS);
-      } else {
-        setUpcomingEvents(DUMMY_UPCOMING_EVENTS);
-      }
+      const rawEvents = response?.data?.events || response?.data || response || [];
+      const nowTime = Date.now();
+      const isPublished = (evt) => {
+        const status =
+          evt.publishStatus ||
+          evt.publish_status ||
+          evt.publishstatus ||
+          evt.status;
+        return typeof status === "string" && status.toUpperCase() === "PUBLISHED";
+      };
+
+      const normalized = Array.isArray(rawEvents)
+        ? rawEvents
+            .filter(isPublished)
+            .map(normalizeUpcomingEvent)
+            .filter((evt) => {
+              if (!evt.date) return false;
+              const d = new Date(evt.date).getTime();
+              if (Number.isNaN(d)) return false;
+              return d - nowTime >= 0; // keep only future events, no upper limit
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
+        : [];
+
+      setUpcomingEvents(normalized);
     } catch (err) {
       console.error("❌ Error fetching upcoming events:", err);
       setErrorUpcoming(err?.message || "Failed to load upcoming events");
-      setUpcomingEvents(DUMMY_UPCOMING_EVENTS);
+      setUpcomingEvents([]);
     } finally {
       setLoadingUpcoming(false);
     }
@@ -380,7 +248,7 @@ const Dashboard = () => {
   return (
     <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-3 sm:py-4 md:py-6 lg:py-8 text-white bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Enhanced Hero Section - Compact & Interactive */}
-      <section className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[#1a0008] via-[#0a0a15] to-[#000510] p-4 sm:p-6 md:p-8 shadow-[0_20px_60px_-20px_rgba(100,180,255,0.15)]">
+      <section className="relative overflow-hidden mt-6 sm:mt-10 md:mt-10 rounded-xl sm:rounded-2xl border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[#1a0008] via-[#0a0a15] to-[#000510] p-4 sm:p-6 md:p-8 shadow-[0_20px_60px_-20px_rgba(100,180,255,0.15)]">
         <div className="absolute inset-0 opacity-30 pointer-events-none">
           <div className="absolute -left-16 -top-16 h-40 sm:h-48 w-40 sm:w-48 rounded-full bg-[#D60024] blur-[80px] sm:blur-[100px]" />
           <div className="absolute right-0 bottom-0 h-44 sm:h-52 w-44 sm:w-52 rounded-full bg-[#60a5fa]/20 blur-[100px] sm:blur-[120px]" />
@@ -391,7 +259,7 @@ const Dashboard = () => {
           <div className="space-y-3 sm:space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-[rgba(214,0,36,0.15)] to-[rgba(59,130,246,0.1)] border border-[#60a5fa]/30 text-xs text-[#93c5fd] font-medium hover:bg-gradient-to-r hover:from-[rgba(214,0,36,0.25)] hover:to-[rgba(59,130,246,0.15)] transition-all duration-300">
               <Zap className="h-3.5 w-3.5" />
-              <span>Your next adventure awaits</span>
+              <span>Your next adventure awaits</span> 
             </div>
             
             <div className="space-y-2">
@@ -408,11 +276,6 @@ const Dashboard = () => {
                 <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_12px_30px_-8px_rgba(214,0,36,0.5)] text-white px-4 sm:px-5 py-2 font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 text-xs sm:text-sm">
                   Explore Events
                   <ChevronRight className="ml-1.5 h-3.5 sm:h-4 w-3.5 sm:w-4" />
-                </Button>
-              </Link>
-              <Link to="/dashboard/profile">
-                <Button variant="outline" className="border-[rgba(255,255,255,0.2)] text-white hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.3)] font-medium transition-all duration-300 text-xs sm:text-sm">
-                  Personalize
                 </Button>
               </Link>
             </div>
@@ -525,96 +388,25 @@ const Dashboard = () => {
 
       {/* Main Content Grid */}
       <div className="space-y-8">
-        {/* Trending Events Section - Horizontal Scrollable Single Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                <Zap className="h-7 w-7 text-[#60a5fa]" />
-                🔥 Trending Now
-              </h2>
-              <p className="text-sm text-[rgba(255,255,255,0.65)] mt-2">Most popular events with highest ratings</p>
+        {/* Trending Events Section - temporarily disabled per request */}
+        {false && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                  <Zap className="h-7 w-7 text-[#60a5fa]" />
+                  🔥 Trending Now
+                </h2>
+                <p className="text-sm text-[rgba(255,255,255,0.65)] mt-2">Most popular events with highest ratings</p>
+              </div>
+              <Link to="/dashboard/browse-events">
+                <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all duration-300">
+                  See All <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
             </div>
-            <Link to="/dashboard/browse-events">
-              <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all duration-300">
-                See All <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
           </div>
-
-          {loadingUpcoming ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex-shrink-0 w-80 h-[440px] rounded-xl bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.08)] border border-[rgba(100,200,255,0.2)] animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
-              {upcomingEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="group flex-shrink-0 w-80">
-                  <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.05)] hover:border-[#60a5fa]/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(100,180,255,0.3)]">
-                    {/* Image Section */}
-                    <div className="relative h-52 overflow-hidden bg-[rgba(255,255,255,0.05)]">
-                      <img 
-                        src={event.image} 
-                        alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-125 transition-transform duration-700 will-change-transform"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                      
-                      {/* Attendees Count with Icon */}
-                      <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md rounded-lg px-3 py-1.5 border border-[rgba(100,200,255,0.3)] hover:bg-black/90 transition-all">
-                        <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 text-[#60a5fa]" />
-                          <span>{(event.attendees / 1000).toFixed(1)}K</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="p-5 space-y-3 flex flex-col flex-1 h-56">
-                      <div>
-                        <h3 className="font-bold text-white text-base line-clamp-2 group-hover:text-[#60a5fa] transition-colors duration-300">
-                          {event.title}
-                        </h3>
-                      </div>
-
-                      {/* Event Details */}
-                      <div className="space-y-2 text-xs flex-1">
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)]">
-                          <Clock className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="font-medium">{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)]">
-                          <Clock className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="font-medium">{event.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)]">
-                          <MapPin className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="font-medium line-clamp-1">{event.location}</span>
-                        </div>
-                      </div>
-
-                      {/* Rating and Price */}
-                      <div className="flex items-center justify-between pt-3 border-t border-[rgba(255,255,255,0.1)]">
-                        <div className="flex items-center gap-1.5 bg-gradient-to-r from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.1)] px-2.5 py-1 rounded-lg">
-                          <Star className="h-3.5 w-3.5 text-[#60a5fa] fill-[#60a5fa]" />
-                          <span className="text-xs font-bold text-white">{event.rating}</span>
-                        </div>
-                        <p className="text-base font-bold text-[#D60024]">₹{event.price.toLocaleString()}</p>
-                      </div>
-
-                      {/* Action Button */}
-                      <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_15px_40px_-10px_rgba(214,0,36,0.5)] text-white font-bold transition-all duration-300 text-sm">
-                        Book Now
-                      </Button>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* All Upcoming Events - Horizontal Scrollable Single Column */}
         <div className="space-y-4">
@@ -626,6 +418,11 @@ const Dashboard = () => {
               </h2>
               <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Discover all events happening near you</p>
             </div>
+            <Link to="/dashboard/browse-events">
+              <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all duration-300">
+                Browse Events <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
 
           {loadingUpcoming ? (
@@ -699,7 +496,7 @@ const Dashboard = () => {
                       <div className="pt-2 border-t border-[rgba(255,255,255,0.1)]">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-xs text-[rgba(255,255,255,0.65)] uppercase tracking-wide">Price</span>
-                          <p className="text-xl font-bold text-[#D60024]">₹{event.price.toLocaleString()}</p>
+                          <p className="text-xl font-bold text-[#D60024]">₹{(Number(event.price) || 0).toLocaleString()}</p>
                         </div>
                       </div>
 
@@ -1015,7 +812,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Progress Section - API Ready: GET /api/user/progress */}
-                <div className="p-5 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.35)] transition-all">
+                {/* <div className="p-5 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.35)] transition-all">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)]">
@@ -1029,7 +826,7 @@ const Dashboard = () => {
                   <p className="text-xs text-[rgba(255,255,255,0.5)] mt-2.5 leading-relaxed">
                     {totalBooked < 5 ? 'Almost there! Keep exploring!' : totalBooked < 10 ? 'Great progress! Keep going!' : 'Amazing! You\'re an event pro! 🎉'}
                   </p>
-                </div>
+                </div> */}
 
                 {/* User Preferences - API Ready: GET /api/user/preferences */}
                 <div className="space-y-3">
