@@ -55,6 +55,8 @@ import { isAuthenticated } from "@/utils/auth";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 
+const CREATE_PASSWORD_ENDPOINT = "/api/user/create-password"; // TODO: replace with provided API for first-time password creation
+
 const roleLabelMap = {
   organizer: "Organizer",
   promoter: "Promoter",
@@ -68,6 +70,7 @@ const sampleProfile = {
   email: "rachel@calme.io",
   phone: "+1 (231) 342-3245",
   passwordMasked: "********",
+  hasPassword: true,
   memberSince: "2023-06-12T00:00:00Z",
   avatarUrl: "https://api.dicebear.com/7.x/adventurer-neutral/png?seed=MapMyParty&backgroundColor=fff1d6",
   coverImage:
@@ -88,6 +91,8 @@ const getStoredProfile = () => {
     email: sessionStorage.getItem("userEmail") || "",
     phone: sessionStorage.getItem("userPhone") || "",
     role: sessionStorage.getItem("role") || sessionStorage.getItem("userType") || "USER",
+    authProvider: sessionStorage.getItem("authProvider") || "password",
+    hasPassword: sessionStorage.getItem("hasPassword") === "true",
   };
 
   const storedRaw = sessionStorage.getItem("userProfile");
@@ -161,6 +166,14 @@ const Profile = () => {
         sessionStorage.setItem("userName", response.data.name || "");
         sessionStorage.setItem("userEmail", response.data.email || "");
         sessionStorage.setItem("userPhone", response.data.phone || "");
+        sessionStorage.setItem("userAvatar", response.data.avatarUrl || "");
+        sessionStorage.setItem("userProfile", JSON.stringify(response.data));
+        if (response.data.authProvider) {
+          sessionStorage.setItem("authProvider", response.data.authProvider);
+        }
+        if (response.data.hasPassword !== undefined) {
+          sessionStorage.setItem("hasPassword", response.data.hasPassword ? "true" : "false");
+        }
 
         if (response.data.user_roles && response.data.user_roles.length > 0) {
           const roleName = response.data.user_roles[0]?.roles?.name || "USER";
@@ -194,10 +207,12 @@ const Profile = () => {
         email: profileData.email || sampleProfile.email,
         phone: profileData.phone || sampleProfile.phone,
         role: apiRole,
+        authProvider: profileData.authProvider || sampleProfile.authProvider || "password",
+        hasPassword: profileData.hasPassword ?? sampleProfile.hasPassword,
         memberSince: profileData.createdAt,
         isVerified: profileData.isVerified,
         whatsAppNotification: profileData.whatsAppNotification,
-        // Keep avatar from sample for now as requested
+        avatarUrl: profileData.avatarUrl || sampleProfile.avatarUrl,
       };
     }
     
@@ -209,25 +224,31 @@ const Profile = () => {
       email: storedProfile.email || sampleProfile.email,
       phone: storedProfile.phone || sampleProfile.phone,
       role: storedProfile.role || sampleProfile.role,
+      authProvider: storedProfile.authProvider || sampleProfile.authProvider || "password",
+      hasPassword: storedProfile.hasPassword ?? sampleProfile.hasPassword,
+      avatarUrl: storedProfile.avatarUrl || sessionStorage.getItem("userAvatar") || sampleProfile.avatarUrl,
     };
   }, [profileData, storedProfile]);
 
   const role = normalizeRole(profile.role);
   const memberSince = formatDate(profile.memberSince) || "March 2024";
+  const authProvider = profile.authProvider || "password";
+  const hasPassword = profile.hasPassword ?? (authProvider !== "google");
+  const isCreatePasswordFlow = authProvider === "google" && !hasPassword;
 
-  const handleEditClick = useCallback((field) => {
-    setEditField(field);
-    if (field === "email") {
-      setEditValue(profile.email || "");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    } else if (field === "phone") {
-      setEditValue(profile.phone || "");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    } else {
-      setEditValue("");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    }
-  }, [profile.email, profile.phone]);
+  const handleEditClick = useCallback(
+    (field) => {
+      setEditField(field);
+      if (field === "name") {
+        setEditValue(profile.name || "");
+        setPasswordValues({ current: "", new: "", confirm: "" });
+      } else if (field === "password") {
+        setEditValue("");
+        setPasswordValues({ current: "", new: "", confirm: "" });
+      }
+    },
+    [profile.name]
+  );
 
   const handleEditSubmit = async (event) => {
     event.preventDefault();
@@ -240,44 +261,31 @@ const Profile = () => {
 
     let payload = {};
     let endpoint = "/api/user/profile";
-    if (editField === "email") {
+    if (editField === "name") {
       const trimmedValue = editValue.trim();
       if (!trimmedValue) {
-        toast.error("Please enter a value before saving.");
+        toast.error("Please enter a valid name.");
         setIsSaving(false);
         return;
       }
-
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
-        toast.error("Please enter a valid email address.");
-        setIsSaving(false);
-        return;
-      }
-
-      payload = {
-        email: trimmedValue,
-      };
-    } else if (editField === "phone") {
-      const trimmedValue = editValue.trim();
-      if (!trimmedValue) {
-        toast.error("Please enter a value before saving.");
-        setIsSaving(false);
-        return;
-      }
-
-      const sanitizedPhone = trimmedValue.replace(/[^0-9+]/g, "");
-      payload = {
-        phone: sanitizedPhone,
-      };
+      payload = { name: trimmedValue };
     } else if (editField === "password") {
       const currentPassword = passwordValues.current.trim();
       const newPassword = passwordValues.new.trim();
       const confirmPassword = passwordValues.confirm.trim();
 
-      if (!currentPassword || !newPassword || !confirmPassword) {
-        toast.error("Please fill in all password fields.");
-        setIsSaving(false);
-        return;
+      if (isCreatePasswordFlow) {
+        if (!newPassword || !confirmPassword) {
+          toast.error("Please fill in all password fields.");
+          setIsSaving(false);
+          return;
+        }
+      } else {
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          toast.error("Please fill in all password fields.");
+          setIsSaving(false);
+          return;
+        }
       }
 
       if (newPassword !== confirmPassword) {
@@ -285,17 +293,26 @@ const Profile = () => {
         setIsSaving(false);
         return;
       }
-
-      payload = {
-        currentPassword,
-        newPassword,
-      };
-      endpoint = `${API_BASE_URL}/api/user/change-password`;
+      if (isCreatePasswordFlow) {
+        payload = { password: newPassword, confirmPassword };
+        endpoint = CREATE_PASSWORD_ENDPOINT;
+      } else {
+        if (!currentPassword) {
+          toast.error("Please fill in all password fields.");
+          setIsSaving(false);
+          return;
+        }
+        payload = { currentPassword, newPassword };
+        endpoint = "/api/user/change-password";
+      }
+    } else {
+      setIsSaving(false);
+      return;
     }
 
     try {
       const response = await apiFetch(endpoint, {
-        method: "PUT",
+        method: isCreatePasswordFlow ? "POST" : "PUT",
         body: JSON.stringify(payload),
       });
 
@@ -304,10 +321,21 @@ const Profile = () => {
         throw new Error(response?.message || response?.error || "Failed to update profile");
       }
 
-      // Update local state with fresh payload + any data returned by backend
-      // Optimistically update
       if (editField === "password") {
-        toast.success(response?.message || "Password updated successfully");
+        toast.success(
+          response?.message ||
+            (isCreatePasswordFlow ? "Password created successfully" : "Password updated successfully")
+        );
+        // persist hasPassword + authProvider hints for UI
+        sessionStorage.setItem("hasPassword", "true");
+        if (authProvider) {
+          sessionStorage.setItem("authProvider", authProvider);
+        }
+        setProfileData((prev) => ({
+          ...(prev || {}),
+          hasPassword: true,
+          authProvider: authProvider || "password",
+        }));
         setEditField(null);
         setEditValue("");
         setPasswordValues({ current: "", new: "", confirm: "" });
@@ -316,16 +344,12 @@ const Profile = () => {
 
       const optimisticData = {
         ...(profileData || {}),
-        email: payload.email ?? profile.email,
-        phone: payload.phone ?? profile.phone,
+        name: payload.name ?? profile.name,
       };
       setProfileData(optimisticData);
 
-      if (payload.email !== undefined) {
-        sessionStorage.setItem("userEmail", payload.email || "");
-      }
-      if (payload.phone !== undefined) {
-        sessionStorage.setItem("userPhone", payload.phone || "");
+      if (payload.name !== undefined) {
+        sessionStorage.setItem("userName", payload.name || "");
       }
 
       toast.success(response?.message || "Profile updated successfully");
@@ -341,43 +365,44 @@ const Profile = () => {
     }
   };
 
+  const passwordDisplay = hasPassword ? profile.passwordMasked || "********" : "Not set";
+
   const detailRows = useMemo(
     () => [
       {
-        label: "Email",
-        value: profile.email,
+        label: "Full Name",
+        value: profile.name,
         actions: [
           {
-            label: "Edit email",
+            label: "Edit name",
             type: "icon",
-            onClick: () => handleEditClick("email"),
+            onClick: () => handleEditClick("name"),
           },
         ],
+      },
+      {
+        label: "Email",
+        value: profile.email,
+        actions: [],
       },
       {
         label: "Phone",
         value: profile.phone,
-        actions: [
-          {
-            label: "Edit phone",
-            type: "icon",
-            onClick: () => handleEditClick("phone"),
-          },
-        ],
+        actions: [],
       },
       {
         label: "Password",
-        value: profile.passwordMasked,
+        value: passwordDisplay,
         actions: [
           {
-            label: "Edit password",
+            label: isCreatePasswordFlow ? "Create password" : "Edit password",
             type: "icon",
             onClick: () => handleEditClick("password"),
           },
         ],
       },
     ],
-    [handleEditClick, profile]
+    [handleEditClick, isCreatePasswordFlow, passwordDisplay, profile]
   );
 
   const isUserAuthenticated = isAuthenticated();
@@ -630,34 +655,40 @@ const Profile = () => {
           <form onSubmit={handleEditSubmit} className="space-y-5 py-2">
             <DialogHeader>
               <DialogTitle>
-                {editField === "email"
-                  ? "Update Email"
-                  : editField === "phone"
-                  ? "Update Phone"
-                  : "Update Password"}
+                {editField === "name"
+                  ? "Update Name"
+                  : isCreatePasswordFlow
+                    ? "Create Password"
+                    : "Update Password"}
               </DialogTitle>
             </DialogHeader>
 
             {editField === "password" ? (
               <>
+                {!isCreatePasswordFlow && (
+                  <div className="space-y-2">
+                    <Label htmlFor="current-password" className="text-sm font-medium text-foreground">
+                      Current Password
+                    </Label>
+                    <Input
+                      id="current-password"
+                      type="password"
+                      placeholder="Enter current password"
+                      value={passwordValues.current}
+                      onChange={(event) =>
+                        setPasswordValues((prev) => ({ ...prev, current: event.target.value }))
+                      }
+                      required={!isCreatePasswordFlow}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label htmlFor="profile-current-password">Current Password</Label>
+                  <Label htmlFor="new-password" className="text-sm font-medium text-foreground">
+                    New Password
+                  </Label>
                   <Input
-                    id="profile-current-password"
-                    type="password"
-                    placeholder="Enter current password"
-                    value={passwordValues.current}
-                    onChange={(event) =>
-                      setPasswordValues((prev) => ({ ...prev, current: event.target.value }))
-                    }
-                    required
-                    autoComplete="current-password"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="profile-new-password">New Password</Label>
-                  <Input
-                    id="profile-new-password"
+                    id="new-password"
                     type="password"
                     placeholder="Enter new password"
                     value={passwordValues.new}
@@ -669,9 +700,11 @@ const Profile = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-confirm-password">Confirm New Password</Label>
+                  <Label htmlFor="confirm-password" className="text-sm font-medium text-foreground">
+                    Confirm New Password
+                  </Label>
                   <Input
-                    id="profile-confirm-password"
+                    id="confirm-password"
                     type="password"
                     placeholder="Confirm new password"
                     value={passwordValues.confirm}
@@ -685,11 +718,13 @@ const Profile = () => {
               </>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="profile-edit-input">{editField === "email" ? "Email" : "Phone"}</Label>
+                <Label htmlFor="edit-input" className="text-sm font-medium text-foreground">
+                  Full Name
+                </Label>
                 <Input
-                  id="profile-edit-input"
-                  type={editField === "email" ? "email" : "tel"}
-                  placeholder={editField === "email" ? "Enter new email" : "Enter new phone"}
+                  id="edit-input"
+                  type="text"
+                  placeholder="Enter your full name"
                   value={editValue}
                   onChange={(event) => setEditValue(event.target.value)}
                   required

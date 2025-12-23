@@ -4,20 +4,42 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import TicketModal from "@/components/TicketModal";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
+import StarRating from "@/components/StarRating";
 
 const MyBookings = () => {
+  const feedbackSuggestions = [
+    "Loved every minute of the performances!",
+    "Great crowd energy and smooth entry experience.",
+    "Sound and lighting were on point, would attend again.",
+    "Felt the schedule ran late; could improve timing.",
+  ];
+
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -63,6 +85,7 @@ const MyBookings = () => {
             bookingDate: item.createdAt || evt.createdAt,
             status: statusNormalized,
             paymentStatus,
+            eventId: evt.id,
             eventTitle: evt.title || "Event",
             eventDate: startDate || endDate,
             eventEndDate: endDate,
@@ -79,6 +102,7 @@ const MyBookings = () => {
             tickets,
             analytics: item.analytics,
             payment: item.payment,
+            review: item.review || null,
             status1: evt.status1,
             status2: evt.status2,
           };
@@ -159,6 +183,107 @@ const MyBookings = () => {
     const upcoming = bookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length;
     return { total, totalSpent, upcoming };
   }, [bookings]);
+
+  const isEventPast = (booking) => {
+    const endDate = booking?.eventEndDate || booking?.eventDate;
+    if (!endDate) return false;
+    const end = new Date(endDate);
+    if (isNaN(end)) return false;
+    return end < new Date();
+  };
+
+  const fetchUserReview = useCallback(async (eventId) => {
+    try {
+      const response = await apiFetch(`/api/event/${eventId}/reviews/me`, {
+        method: "GET",
+      });
+
+      if (response?.success && response?.data) {
+        return response.data;
+      }
+      return null;
+    } catch (err) {
+      if (err?.status === 404) return null;
+      console.error("Failed to fetch review", err);
+      return null;
+    }
+  }, []);
+
+  const handleOpenReview = async (booking) => {
+    if (!booking?.eventId) {
+      toast.error("Event details missing for this booking.");
+      return;
+    }
+
+    setReviewRating(0);
+    setReviewComment("");
+    setSelectedBookingForReview(booking);
+    setReviewDialogOpen(true);
+  };
+
+  const handleCloseReview = () => {
+    setReviewDialogOpen(false);
+    setSelectedBookingForReview(null);
+    setReviewRating(0);
+    setReviewComment("");
+  };
+
+  const handleReviewDialogChange = (open) => {
+    if (!open) {
+      handleCloseReview();
+    } else {
+      // Fresh slate every open to avoid auto-filled stars/comments
+      setReviewRating(0);
+      setReviewComment("");
+      setReviewDialogOpen(true);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!selectedBookingForReview?.eventId) {
+      toast.error("Event details missing for this booking.");
+      return;
+    }
+
+    if (reviewRating === 0) {
+      toast.error("Please select a rating");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      const payload = {
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      };
+
+      const response = await apiFetch(`/api/event/${selectedBookingForReview.eventId}/reviews`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (response?.success || response?.code === 201) {
+        toast.success("Thanks for your feedback!");
+        const reviewData = await fetchUserReview(selectedBookingForReview.eventId);
+
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === selectedBookingForReview.id
+              ? { ...b, review: reviewData || payload }
+              : b
+          )
+        );
+        handleCloseReview();
+      } else {
+        throw new Error(response?.message || "Failed to submit review");
+      }
+    } catch (err) {
+      console.error("Failed to submit review", err);
+      toast.error(err?.message || "Could not submit review");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const hasBookings = bookings.length > 0;
   const hasFilteredBookings = filteredBookings.length > 0;
@@ -475,6 +600,17 @@ const MyBookings = () => {
                       <Ticket className="h-3.5 w-3.5 mr-1.5" />
                       Details
                     </Button>
+                    {isEventPast(booking) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-1 lg:flex-none border border-dashed border-[rgba(214,0,36,0.4)] text-[#ff6b81] hover:border-[#ff6b81] hover:bg-[rgba(214,0,36,0.08)] text-xs px-3 py-2"
+                        onClick={() => handleOpenReview(booking)}
+                      >
+                        <Star className="h-3.5 w-3.5 mr-1.5 fill-current text-[#ffb347]" />
+                        {booking.review ? "Edit Feedback" : "Leave Feedback"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -490,6 +626,82 @@ const MyBookings = () => {
           ticket={selectedTicket}
         />
       )}
+
+      {/* Feedback Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={handleReviewDialogChange}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-[#0f111a] text-white border border-[rgba(100,200,255,0.25)] shadow-[0_20px_60px_rgba(0,0,0,0.45)] rounded-2xl custom-scroll pr-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Star className="h-5 w-5 text-[#ffb347]" />
+              {selectedBookingForReview?.review ? "Edit your feedback" : "Share your experience"}
+            </DialogTitle>
+            <p className="text-sm text-[rgba(255,255,255,0.7)]">
+              Rate the event you attended and help others discover great experiences.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-5 pt-2">
+            <div className="space-y-2">
+              <Label className="text-[rgba(255,255,255,0.9)] text-sm">Rating *</Label>
+              <StarRating
+                rating={reviewRating}
+                onRatingChange={setReviewRating}
+                readonly={false}
+                size="lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="review-comment" className="text-[rgba(255,255,255,0.9)] text-sm">Your feedback (optional)</Label>
+              <div className="flex flex-wrap gap-2">
+                {feedbackSuggestions.map((tip) => (
+                  <button
+                    key={tip}
+                    type="button"
+                    onClick={() => setReviewComment(tip.slice(0, 1000))}
+                    className="text-xs px-3 py-1 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] hover:border-[#60a5fa] hover:text-white hover:bg-[rgba(96,165,250,0.08)] transition-colors"
+                  >
+                    {tip}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                id="review-comment"
+                placeholder="Share highlights, energy, organization, performances, crowd, or anything you'd like others to know (optional)."
+                value={reviewComment}
+                onChange={(e) => {
+                  const value = e.target.value.slice(0, 1000);
+                  setReviewComment(value);
+                }}
+                rows={5}
+                className="bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.2)] focus-visible:ring-[#60a5fa]"
+              />
+              <div className="flex justify-between text-xs text-[rgba(255,255,255,0.6)]">
+                <span>Minimally 1–2 lines appreciated</span>
+                <span>{reviewComment.length}/1000</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 gap-2">
+            <Button
+              variant="outline"
+              className="border-[rgba(100,200,255,0.3)] text-white"
+              onClick={handleCloseReview}
+              disabled={isSubmittingReview}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+              onClick={handleSubmitReview}
+              disabled={isSubmittingReview || reviewRating === 0}
+            >
+              {isSubmittingReview ? "Submitting..." : selectedBookingForReview?.review ? "Update Feedback" : "Submit Feedback"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

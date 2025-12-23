@@ -9,6 +9,7 @@ import { Calendar, Menu, X, ChevronDown, User, Ticket, Settings, LogOut } from "
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { isAuthenticated as checkAuth } from "@/utils/auth";
+import { apiFetch } from "@/config/api";
 
 const Header = ({ 
   isAuthenticated: isAuthenticatedProp = undefined, 
@@ -39,6 +40,41 @@ const Header = ({
   const isOrganizer = normalizedRole === "organizer";
   const isPromoter = normalizedRole === "promoter";
   const isAttendee = !isOrganizer && !isPromoter;
+
+  const fetchAndCacheProfile = async () => {
+    try {
+      const response = await apiFetch("/api/user/profile", { method: "GET" });
+      const data = response?.data;
+
+      if (response?.success && data) {
+        sessionStorage.setItem("userName", data.name || "");
+        sessionStorage.setItem("userEmail", data.email || "");
+        sessionStorage.setItem("userPhone", data.phone || "");
+        if (data.user_roles && data.user_roles.length > 0) {
+          const roleName = data.user_roles[0]?.roles?.name || "USER";
+          sessionStorage.setItem("role", roleName);
+          sessionStorage.setItem("userType", roleName);
+        }
+        sessionStorage.setItem("userProfile", JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn("⚠️ Failed to prefetch profile", err);
+    }
+  };
+
+  const handleProfileNav = async () => {
+    await fetchAndCacheProfile();
+    navigate("/dashboard/profile");
+  };
+
+  const handleBookingsNav = async () => {
+    await fetchAndCacheProfile();
+    navigate("/dashboard/bookings");
+  };
+
+  const handleDashboardNav = () => {
+    navigate("/dashboard");
+  };
 
   const handleAuthClick = () => {
     navigate("/auth");
@@ -119,31 +155,47 @@ const Header = ({
           {resolvedIsAuthenticated ? (
             <>
               {isAttendee ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-2 text-white hover:bg-[rgba(255,255,255,0.08)] hover:text-white border border-[rgba(255,255,255,0.18)] rounded-full px-4">
-                      <User className="h-4 w-4" />
-                      Profile
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52 rounded-xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.65)] backdrop-blur-xl">
-                    <DropdownMenuItem
-                      onClick={() => navigate("/profile")}
-                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
-                    >
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate("/my-bookings")}
-                      className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
-                    >
-                      <Ticket className="mr-2 h-4 w-4" />
-                      My Bookings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={handleDashboardNav}
+                    className="text-white border border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.08)] rounded-full px-4"
+                  >
+                    Dashboard
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="gap-2 text-white hover:bg-[rgba(255,255,255,0.08)] hover:text-white border border-[rgba(255,255,255,0.18)] rounded-full px-4">
+                        <User className="h-4 w-4" />
+                        Profile
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52 rounded-xl border border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.08)] text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.65)] backdrop-blur-xl">
+                      <DropdownMenuItem
+                        onClick={handleProfileNav}
+                        className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
+                      >
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleBookingsNav}
+                        className="cursor-pointer hover:bg-[rgba(255,255,255,0.08)] focus:bg-[rgba(255,255,255,0.08)]"
+                      >
+                        <Ticket className="mr-2 h-4 w-4" />
+                        My Bookings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleLogout}
+                        className="cursor-pointer text-[#FF5555] focus:text-[#FF5555] hover:bg-[rgba(255,255,255,0.08)]"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               ) : isPromoter ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -251,7 +303,7 @@ const Header = ({
                     <Button
                       variant="ghost"
                       onClick={() => {
-                        navigate("/profile");
+                        handleProfileNav();
                         setMobileMenuOpen(false);
                       }}
                       className="justify-start"
@@ -262,13 +314,35 @@ const Header = ({
                     <Button
                       variant="ghost"
                       onClick={() => {
-                        navigate("/my-bookings");
+                        handleBookingsNav();
                         setMobileMenuOpen(false);
                       }}
                       className="justify-start"
                     >
                       <Ticket className="mr-2 h-4 w-4" />
                       My Bookings
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleDashboardNav();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="justify-start"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleLogout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="justify-start text-[#FF5555]"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
                     </Button>
                   </>
                 ) : isPromoter ? (

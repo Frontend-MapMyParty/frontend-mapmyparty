@@ -118,12 +118,16 @@ const GoogleCallback = () => {
           id: userData?.id,
           role,
           type: userType,
+          authProvider: "google",
+          hasPassword: false,
         });
 
         // cache hint only; actual auth lives in HttpOnly cookies
         sessionStorage.setItem("userType", userType);
         sessionStorage.setItem("role", role);
         sessionStorage.setItem("isAuthenticated", "true");
+        sessionStorage.setItem("authProvider", "google");
+        sessionStorage.setItem("hasPassword", "false");
         resetSessionCache();
 
         toast.success("Google authentication successful!");

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,6 +25,7 @@ import {
   Check,
   X,
   Camera,
+  Upload,
   Ticket,
   TrendingUp,
   Heart,
@@ -33,6 +34,8 @@ import {
 import { isAuthenticated } from "@/utils/auth";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
+
+const CREATE_PASSWORD_ENDPOINT = "/api/user/create-password"; // TODO: replace with provided API for first-time password creation
 
 const roleLabelMap = {
   organizer: "Organizer",
@@ -70,7 +73,7 @@ const sampleProfile = {
   email: "rachel@calme.io",
   phone: "+1 (231) 342-3245",
   passwordMasked: "********",
-  dateOfBirth: "1995-06-15",
+  hasPassword: true,
   memberSince: "2023-06-12T00:00:00Z",
   avatarUrl: "https://api.dicebear.com/7.x/adventurer-neutral/png?seed=MapMyParty&backgroundColor=fff1d6",
 };
@@ -89,6 +92,8 @@ const getStoredProfile = () => {
     email: sessionStorage.getItem("userEmail") || "",
     phone: sessionStorage.getItem("userPhone") || "",
     role: sessionStorage.getItem("role") || sessionStorage.getItem("userType") || "USER",
+    authProvider: sessionStorage.getItem("authProvider") || "password",
+    hasPassword: sessionStorage.getItem("hasPassword") === "true",
   };
 
   const storedRaw = sessionStorage.getItem("userProfile");
@@ -145,6 +150,13 @@ export default function UserProfile() {
     new: "",
     confirm: "",
   });
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const storedProfile = useMemo(() => getStoredProfile(), []);
 
@@ -161,6 +173,14 @@ export default function UserProfile() {
         sessionStorage.setItem("userName", response.data.name || "");
         sessionStorage.setItem("userEmail", response.data.email || "");
         sessionStorage.setItem("userPhone", response.data.phone || "");
+        sessionStorage.setItem("userAvatar", response.data.avatarUrl || "");
+        sessionStorage.setItem("userProfile", JSON.stringify(response.data));
+        if (response.data.authProvider) {
+          sessionStorage.setItem("authProvider", response.data.authProvider);
+        }
+        if (response.data.hasPassword !== undefined) {
+          sessionStorage.setItem("hasPassword", response.data.hasPassword ? "true" : "false");
+        }
 
         if (response.data.user_roles && response.data.user_roles.length > 0) {
           const roleName = response.data.user_roles[0]?.roles?.name || "USER";
@@ -182,22 +202,43 @@ export default function UserProfile() {
     } else {
       setLoading(false);
     }
+
+    return () => {
+      stopCameraStream();
+    };
   }, [fetchProfile]);
 
   const profile = useMemo(() => {
     if (profileData) {
       const apiRole = profileData.user_roles?.[0]?.roles?.name || 'USER';
+      const provider = profileData.authProvider || sampleProfile.authProvider || "password";
+      const passwordState =
+        profileData.hasPassword !== undefined
+          ? profileData.hasPassword
+          : provider === "google"
+            ? false
+            : sampleProfile.hasPassword;
       return {
         ...sampleProfile,
         name: profileData.name || sampleProfile.name,
         email: profileData.email || sampleProfile.email,
         phone: profileData.phone || sampleProfile.phone,
         role: apiRole,
+        authProvider: provider,
+        hasPassword: passwordState,
         memberSince: profileData.createdAt,
         isVerified: profileData.isVerified,
+        avatarUrl: profileData.avatarUrl || sampleProfile.avatarUrl,
       };
     }
     
+    const provider = storedProfile.authProvider || sampleProfile.authProvider || "password";
+    const passwordState =
+      storedProfile.hasPassword !== undefined
+        ? storedProfile.hasPassword
+        : provider === "google"
+          ? false
+          : sampleProfile.hasPassword;
     return {
       ...sampleProfile,
       ...storedProfile,
@@ -205,31 +246,29 @@ export default function UserProfile() {
       email: storedProfile.email || sampleProfile.email,
       phone: storedProfile.phone || sampleProfile.phone,
       role: storedProfile.role || sampleProfile.role,
+      authProvider: provider,
+      hasPassword: passwordState,
+      avatarUrl: storedProfile.avatarUrl || sessionStorage.getItem("userAvatar") || sampleProfile.avatarUrl,
     };
   }, [profileData, storedProfile]);
 
   const role = normalizeRole(profile.role);
   const memberSince = formatDate(profile.memberSince) || "March 2024";
+  const authProvider = profile.authProvider || "password";
+  const hasPassword = profile.hasPassword ?? (authProvider !== "google");
+  const isCreatePasswordFlow = authProvider === "google" && !hasPassword;
 
   const handleEditClick = useCallback((field) => {
-    setEditField(field);
     if (field === "name") {
+      setEditField(field);
       setEditValue(profile.name || "");
       setPasswordValues({ current: "", new: "", confirm: "" });
-    } else if (field === "email") {
-      setEditValue(profile.email || "");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    } else if (field === "phone") {
-      setEditValue(profile.phone || "");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    } else if (field === "dateOfBirth") {
-      setEditValue(profile.dateOfBirth || "");
-      setPasswordValues({ current: "", new: "", confirm: "" });
-    } else {
+    } else if (field === "password") {
+      setEditField(field);
       setEditValue("");
       setPasswordValues({ current: "", new: "", confirm: "" });
     }
-  }, [profile.name, profile.email, profile.phone, profile.dateOfBirth]);
+  }, [profile.name]);
 
   const handleEditSubmit = async (event) => {
     event.preventDefault();
@@ -253,55 +292,23 @@ export default function UserProfile() {
       payload = {
         name: trimmedValue,
       };
-    } else if (editField === "dateOfBirth") {
-      const trimmedValue = editValue.trim();
-      if (!trimmedValue) {
-        toast.error("Please select a date of birth.");
-        setIsSaving(false);
-        return;
-      }
-
-      payload = {
-        dateOfBirth: trimmedValue,
-      };
-    } else if (editField === "email") {
-      const trimmedValue = editValue.trim();
-      if (!trimmedValue) {
-        toast.error("Please enter a value before saving.");
-        setIsSaving(false);
-        return;
-      }
-
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
-        toast.error("Please enter a valid email address.");
-        setIsSaving(false);
-        return;
-      }
-
-      payload = {
-        email: trimmedValue,
-      };
-    } else if (editField === "phone") {
-      const trimmedValue = editValue.trim();
-      if (!trimmedValue) {
-        toast.error("Please enter a value before saving.");
-        setIsSaving(false);
-        return;
-      }
-
-      const sanitizedPhone = trimmedValue.replace(/[^0-9+]/g, "");
-      payload = {
-        phone: sanitizedPhone,
-      };
     } else if (editField === "password") {
       const currentPassword = passwordValues.current.trim();
       const newPassword = passwordValues.new.trim();
       const confirmPassword = passwordValues.confirm.trim();
 
-      if (!currentPassword || !newPassword || !confirmPassword) {
-        toast.error("Please fill in all password fields.");
-        setIsSaving(false);
-        return;
+      if (isCreatePasswordFlow) {
+        if (!newPassword || !confirmPassword) {
+          toast.error("Please fill in all password fields.");
+          setIsSaving(false);
+          return;
+        }
+      } else {
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          toast.error("Please fill in all password fields.");
+          setIsSaving(false);
+          return;
+        }
       }
 
       if (newPassword !== confirmPassword) {
@@ -310,16 +317,27 @@ export default function UserProfile() {
         return;
       }
 
-      payload = {
-        currentPassword,
-        newPassword,
-      };
-      endpoint = "/api/user/change-password";
+      if (isCreatePasswordFlow) {
+        payload = {
+          password: newPassword,
+          confirmPassword,
+        };
+        endpoint = CREATE_PASSWORD_ENDPOINT;
+      } else {
+        payload = {
+          currentPassword,
+          newPassword,
+        };
+        endpoint = "/api/user/change-password";
+      }
+    } else {
+      setIsSaving(false);
+      return;
     }
 
     try {
       const response = await apiFetch(endpoint, {
-        method: "PUT",
+        method: isCreatePasswordFlow ? "POST" : "PUT",
         body: JSON.stringify(payload),
       });
 
@@ -329,7 +347,19 @@ export default function UserProfile() {
       }
 
       if (editField === "password") {
-        toast.success(response?.message || "Password updated successfully");
+        toast.success(
+          response?.message ||
+            (isCreatePasswordFlow ? "Password created successfully" : "Password updated successfully")
+        );
+        sessionStorage.setItem("hasPassword", "true");
+        if (authProvider) {
+          sessionStorage.setItem("authProvider", authProvider);
+        }
+        setProfileData((prev) => ({
+          ...(prev || {}),
+          hasPassword: true,
+          authProvider: authProvider || "password",
+        }));
         setEditField(null);
         setEditValue("");
         setPasswordValues({ current: "", new: "", confirm: "" });
@@ -339,20 +369,11 @@ export default function UserProfile() {
       const optimisticData = {
         ...(profileData || {}),
         name: payload.name ?? profile.name,
-        email: payload.email ?? profile.email,
-        phone: payload.phone ?? profile.phone,
-        dateOfBirth: payload.dateOfBirth ?? profile.dateOfBirth,
       };
       setProfileData(optimisticData);
 
       if (payload.name !== undefined) {
         sessionStorage.setItem("userName", payload.name || "");
-      }
-      if (payload.email !== undefined) {
-        sessionStorage.setItem("userEmail", payload.email || "");
-      }
-      if (payload.phone !== undefined) {
-        sessionStorage.setItem("userPhone", payload.phone || "");
       }
 
       toast.success(response?.message || "Profile updated successfully");
@@ -367,18 +388,97 @@ export default function UserProfile() {
     }
   };
 
-  const formatDateOfBirth = (dob) => {
-    if (!dob) return "Not set";
-    try {
-      const date = new Date(dob);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    } catch {
-      return "Not set";
+  const clearCameraStream = () => {
+    const video = videoRef.current;
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
     }
+  };
+
+  const stopCameraStream = () => {
+    clearCameraStream();
+    setShowCamera(false);
+    setCapturedPhoto(null);
+  };
+
+  const handleAvatarSelect = async (dataUrl) => {
+    if (!dataUrl) return;
+    setAvatarUploading(true);
+    try {
+      const response = await apiFetch("/api/user/profile", {
+        method: "PUT",
+        body: JSON.stringify({ avatarUrl: dataUrl }),
+      });
+
+      const isSuccess = response?.status === "success" || response?.success === true;
+      if (!isSuccess) {
+        throw new Error(response?.message || response?.error || "Failed to update avatar");
+      }
+
+      const optimisticData = {
+        ...(profileData || {}),
+        avatarUrl: dataUrl,
+      };
+      setProfileData(optimisticData);
+      sessionStorage.setItem("userAvatar", dataUrl);
+      sessionStorage.setItem("userProfile", JSON.stringify(optimisticData));
+      toast.success(response?.message || "Avatar updated");
+      setAvatarDialogOpen(false);
+      stopCameraStream();
+      setCapturedPhoto(null);
+    } catch (err) {
+      console.error("Failed to update avatar", err);
+      toast.error(err?.message || "Failed to update avatar");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === "string") {
+        handleAvatarSelect(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startCamera = async () => {
+    try {
+      setCapturedPhoto(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setShowCamera(true);
+      }
+    } catch (err) {
+      console.error("Camera access denied", err);
+      toast.error("Unable to access camera");
+    }
+  };
+
+  const openCamera = async () => {
+    setShowCamera(true);
+    await startCamera();
+  };
+
+  const captureFromCamera = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/png");
+    setCapturedPhoto(dataUrl);
+    clearCameraStream();
   };
 
   const detailRows = useMemo(
@@ -395,51 +495,28 @@ export default function UserProfile() {
         ],
       },
       {
-        label: "Date of Birth",
-        value: formatDateOfBirth(profile.dateOfBirth),
-        actions: [
-          {
-            label: "Edit date of birth",
-            type: "icon",
-            onClick: () => handleEditClick("dateOfBirth"),
-          },
-        ],
-      },
-      {
         label: "Email",
         value: profile.email,
-        actions: [
-          {
-            label: "Edit email",
-            type: "icon",
-            onClick: () => handleEditClick("email"),
-          },
-        ],
+        actions: [],
       },
       {
         label: "Phone",
         value: profile.phone,
-        actions: [
-          {
-            label: "Edit phone",
-            type: "icon",
-            onClick: () => handleEditClick("phone"),
-          },
-        ],
+        actions: [],
       },
       {
         label: "Password",
-        value: profile.passwordMasked,
+        value: hasPassword ? profile.passwordMasked || "********" : "Not set",
         actions: [
           {
-            label: "Edit password",
+            label: isCreatePasswordFlow ? "Create password" : "Edit password",
             type: "icon",
             onClick: () => handleEditClick("password"),
           },
         ],
       },
     ],
-    [handleEditClick, profile]
+    [handleEditClick, hasPassword, isCreatePasswordFlow, profile]
   );
 
   if (loading) {
@@ -489,9 +566,9 @@ export default function UserProfile() {
               {/* Left: Avatar Thumbnail */}
               <div className="flex-shrink-0">
                 <div className="relative group">
-                  <Dialog>
+                  <Dialog open={avatarDialogOpen} onOpenChange={(open) => { setAvatarDialogOpen(open); if (!open) stopCameraStream(); }}>
                     <DialogTrigger asChild>
-                      <button type="button" className="relative">
+                      <button type="button" className="relative" onClick={() => setAvatarDialogOpen(true)}>
                         <Avatar className="h-24 w-24 border-3 border-[rgba(100,200,255,0.3)] bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] shadow-lg transition-all hover:scale-105 hover:border-[rgba(100,200,255,0.5)]">
                           {profile.avatarUrl ? (
                             <AvatarImage src={profile.avatarUrl} alt={profile.name} />
@@ -506,26 +583,120 @@ export default function UserProfile() {
                         </div>
                       </button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg bg-[#0a0a0a] border-2 border-[rgba(100,200,255,0.3)] text-white">
+                    <DialogContent className="max-w-xl bg-[#0a0a0a] border-2 border-[rgba(100,200,255,0.3)] text-white">
                       <DialogHeader>
                         <DialogTitle className="text-white">Choose Your Avatar</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-2 gap-4">
-                        {avatarOptions.map((option) => (
-                          <button
-                            key={option.id}
+
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {avatarOptions.map((option) => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-[rgba(100,200,255,0.2)] bg-[rgba(255,255,255,0.05)] p-4 transition-all hover:border-[#D60024] hover:bg-[rgba(214,0,36,0.1)] hover:scale-105"
+                              onClick={() => handleAvatarSelect(option.url)}
+                              disabled={avatarUploading}
+                            >
+                              <Avatar className="h-20 w-20 border-2 border-[rgba(100,200,255,0.3)] shadow-lg">
+                                <AvatarImage src={option.url} alt={option.label} />
+                                <AvatarFallback>{option.label.slice(0, 2).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-semibold text-white group-hover:text-[#D60024]">
+                                {option.label}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <Button
+                            variant="outline"
+                            className="w-full border-[rgba(100,200,255,0.3)] text-white hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
                             type="button"
-                            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-[rgba(100,200,255,0.2)] bg-[rgba(255,255,255,0.05)] p-4 transition-all hover:border-[#D60024] hover:bg-[rgba(214,0,36,0.1)] hover:scale-105"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={avatarUploading}
                           >
-                            <Avatar className="h-20 w-20 border-2 border-[rgba(100,200,255,0.3)] shadow-lg">
-                              <AvatarImage src={option.url} alt={option.label} />
-                              <AvatarFallback>{option.label.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm font-semibold text-white group-hover:text-[#D60024]">
-                              {option.label}
-                            </span>
-                          </button>
-                        ))}
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload from device
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full border border-dashed border-[rgba(100,200,255,0.3)] text-white hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
+                            type="button"
+                            onClick={openCamera}
+                            disabled={avatarUploading}
+                          >
+                            <Camera className="h-4 w-4 mr-2" />
+                            Use camera
+                          </Button>
+                        </div>
+
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFileChange}
+                        />
+
+                        {(showCamera || capturedPhoto) && (
+                          <div className="space-y-3 border border-[rgba(100,200,255,0.2)] rounded-lg p-3 bg-[rgba(255,255,255,0.03)]">
+                            {!capturedPhoto ? (
+                              <>
+                                <div className="relative w-full">
+                                  <video ref={videoRef} className="w-full rounded-md border border-[rgba(100,200,255,0.15)]" autoPlay muted />
+                                </div>
+                                <canvas ref={canvasRef} className="hidden" />
+                                <div className="flex gap-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    type="button"
+                                    onClick={stopCameraStream}
+                                    className="border-[rgba(100,200,255,0.3)] text-white"
+                                  >
+                                    Stop
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={captureFromCamera}
+                                    className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+                                    disabled={avatarUploading}
+                                  >
+                                    Capture
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <img src={capturedPhoto} alt="Captured" className="w-full rounded-md border border-[rgba(100,200,255,0.15)] object-contain max-h-80" />
+                                <div className="flex flex-wrap gap-2 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    type="button"
+                                    onClick={openCamera}
+                                    className="border-[rgba(100,200,255,0.3)] text-white"
+                                    disabled={avatarUploading}
+                                  >
+                                    Retake
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={() => handleAvatarSelect(capturedPhoto)}
+                                    className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+                                    disabled={avatarUploading}
+                                  >
+                                    Save photo
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {avatarUploading && (
+                          <p className="text-sm text-muted-foreground">Uploading avatar...</p>
+                        )}
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -656,15 +827,7 @@ export default function UserProfile() {
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
                 <Edit2 className="h-5 w-5 text-[#D60024]" />
-                {editField === "name"
-                  ? "Update Name"
-                  : editField === "dateOfBirth"
-                  ? "Update Date of Birth"
-                  : editField === "email"
-                  ? "Update Email"
-                  : editField === "phone"
-                  ? "Update Phone"
-                  : "Update Password"}
+                {editField === "name" ? "Update Name" : "Update Password"}
               </DialogTitle>
             </DialogHeader>
 
@@ -719,26 +882,12 @@ export default function UserProfile() {
             ) : (
               <div className="space-y-2">
                 <Label htmlFor="profile-edit-input" className="text-white">
-                  {editField === "name"
-                    ? "Full Name"
-                    : editField === "dateOfBirth"
-                    ? "Date of Birth"
-                    : editField === "email"
-                    ? "Email"
-                    : "Phone"}
+                  Full Name
                 </Label>
                 <Input
                   id="profile-edit-input"
-                  type={editField === "name" ? "text" : editField === "dateOfBirth" ? "date" : editField === "email" ? "email" : "tel"}
-                  placeholder={
-                    editField === "name"
-                      ? "Enter your full name"
-                      : editField === "dateOfBirth"
-                      ? "Select date of birth"
-                      : editField === "email"
-                      ? "Enter new email"
-                      : "Enter new phone"
-                  }
+                  type="text"
+                  placeholder="Enter your full name"
                   value={editValue}
                   onChange={(event) => setEditValue(event.target.value)}
                   required
