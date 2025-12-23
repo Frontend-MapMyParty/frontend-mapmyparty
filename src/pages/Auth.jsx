@@ -40,14 +40,16 @@ const Auth = () => {
       console.warn("⚠️ Failed to persist user profile in sessionStorage", storageError);
     }
 
-    if (sanitized.name) {
-      sessionStorage.setItem("userName", sanitized.name);
-    }
-    if (sanitized.email) {
-      sessionStorage.setItem("userEmail", sanitized.email);
-    }
+    if (sanitized.name) sessionStorage.setItem("userName", sanitized.name);
+    if (sanitized.email) sessionStorage.setItem("userEmail", sanitized.email);
     if (sanitized.phone || sanitized.phoneNumber) {
       sessionStorage.setItem("userPhone", sanitized.phone || sanitized.phoneNumber);
+    }
+    if (sanitized.authProvider) {
+      sessionStorage.setItem("authProvider", sanitized.authProvider);
+    }
+    if (sanitized.hasPassword !== undefined) {
+      sessionStorage.setItem("hasPassword", sanitized.hasPassword ? "true" : "false");
     }
   };
 
@@ -103,11 +105,19 @@ const Auth = () => {
         const userDataCandidate = extractUserFromResponse(res);
         // Ensure role is included in user data
         const userDataWithRole = userDataCandidate ? { ...userDataCandidate, role } : { email, role };
-        persistUserProfile(userDataWithRole, { email, role, type });
+        persistUserProfile(userDataWithRole, {
+          email,
+          role,
+          type,
+          authProvider: "password",
+          hasPassword: true,
+        });
         resetSessionCache(); // ensure subsequent guards refetch session
         if (role) sessionStorage.setItem("role", role);
         sessionStorage.setItem("isAuthenticated", "true");
         if (type) sessionStorage.setItem("userType", type);
+        sessionStorage.setItem("authProvider", "password");
+        sessionStorage.setItem("hasPassword", "true");
         
         // Wait a bit for cookies to be set by the browser
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -209,11 +219,15 @@ const Auth = () => {
           phone: phoneDigits,
           role,
           type,
+          authProvider: "password",
+          hasPassword: true,
         });
         resetSessionCache();
         if (role) sessionStorage.setItem("role", role);
         sessionStorage.setItem("isAuthenticated", "true");
         if (type) sessionStorage.setItem("userType", type);
+        sessionStorage.setItem("authProvider", "password");
+        sessionStorage.setItem("hasPassword", "true");
         
         // Wait a bit for cookies to be set by the browser
         await new Promise(resolve => setTimeout(resolve, 200));

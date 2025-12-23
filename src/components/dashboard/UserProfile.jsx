@@ -209,15 +209,27 @@ export default function UserProfile() {
   }, [fetchProfile]);
 
   const profile = useMemo(() => {
+    const storedProvider = storedProfile.authProvider || sessionStorage.getItem("authProvider");
+    const storedHasPassword =
+      storedProfile.hasPassword !== undefined
+        ? storedProfile.hasPassword
+        : sessionStorage.getItem("hasPassword") === "true";
+
     if (profileData) {
       const apiRole = profileData.user_roles?.[0]?.roles?.name || 'USER';
-      const provider = profileData.authProvider || sampleProfile.authProvider || "password";
+      const provider =
+        profileData.authProvider ||
+        storedProvider ||
+        sampleProfile.authProvider ||
+        "password";
       const passwordState =
-        profileData.hasPassword !== undefined
-          ? profileData.hasPassword
-          : provider === "google"
-            ? false
-            : sampleProfile.hasPassword;
+        provider === "password"
+          ? (profileData.hasPassword !== undefined ? profileData.hasPassword : true)
+          : (profileData.hasPassword !== undefined
+            ? profileData.hasPassword
+            : storedHasPassword !== undefined
+              ? storedHasPassword
+              : false);
       return {
         ...sampleProfile,
         name: profileData.name || sampleProfile.name,
@@ -232,13 +244,16 @@ export default function UserProfile() {
       };
     }
     
-    const provider = storedProfile.authProvider || sampleProfile.authProvider || "password";
+    const provider =
+      storedProvider ||
+      sampleProfile.authProvider ||
+      "password";
     const passwordState =
-      storedProfile.hasPassword !== undefined
-        ? storedProfile.hasPassword
-        : provider === "google"
-          ? false
-          : sampleProfile.hasPassword;
+      provider === "password"
+        ? true
+        : (storedHasPassword !== undefined
+          ? storedHasPassword
+          : false);
     return {
       ...sampleProfile,
       ...storedProfile,
@@ -255,8 +270,8 @@ export default function UserProfile() {
   const role = normalizeRole(profile.role);
   const memberSince = formatDate(profile.memberSince) || "March 2024";
   const authProvider = profile.authProvider || "password";
-  const hasPassword = profile.hasPassword ?? (authProvider !== "google");
-  const isCreatePasswordFlow = authProvider === "google" && !hasPassword;
+  const hasPassword = profile.hasPassword !== undefined ? Boolean(profile.hasPassword) : authProvider !== "google";
+  const isCreatePasswordFlow = !hasPassword;
 
   const handleEditClick = useCallback((field) => {
     if (field === "name") {
@@ -827,33 +842,41 @@ export default function UserProfile() {
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2">
                 <Edit2 className="h-5 w-5 text-[#D60024]" />
-                {editField === "name" ? "Update Name" : "Update Password"}
+                {editField === "name"
+                  ? "Update Name"
+                  : isCreatePasswordFlow
+                    ? "Create Password"
+                    : "Update Password"}
               </DialogTitle>
             </DialogHeader>
 
             {editField === "password" ? (
               <>
+                {!isCreatePasswordFlow && (
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-current-password" className="text-white">Current Password</Label>
+                    <Input
+                      id="profile-current-password"
+                      type="password"
+                      placeholder="Enter current password"
+                      value={passwordValues.current}
+                      onChange={(event) =>
+                        setPasswordValues((prev) => ({ ...prev, current: event.target.value }))
+                      }
+                      required={!isCreatePasswordFlow}
+                      autoComplete="current-password"
+                      className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label htmlFor="profile-current-password" className="text-white">Current Password</Label>
-                  <Input
-                    id="profile-current-password"
-                    type="password"
-                    placeholder="Enter current password"
-                    value={passwordValues.current}
-                    onChange={(event) =>
-                      setPasswordValues((prev) => ({ ...prev, current: event.target.value }))
-                    }
-                    required
-                    autoComplete="current-password"
-                    className="bg-[rgba(255,255,255,0.08)] border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.5)]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="profile-new-password" className="text-white">New Password</Label>
+                  <Label htmlFor="profile-new-password" className="text-white">
+                    {isCreatePasswordFlow ? "Create Password" : "New Password"}
+                  </Label>
                   <Input
                     id="profile-new-password"
                     type="password"
-                    placeholder="Enter new password"
+                    placeholder={isCreatePasswordFlow ? "Enter password" : "Enter new password"}
                     value={passwordValues.new}
                     onChange={(event) =>
                       setPasswordValues((prev) => ({ ...prev, new: event.target.value }))
@@ -864,11 +887,13 @@ export default function UserProfile() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-confirm-password" className="text-white">Confirm New Password</Label>
+                  <Label htmlFor="profile-confirm-password" className="text-white">
+                    Confirm Password
+                  </Label>
                   <Input
                     id="profile-confirm-password"
                     type="password"
-                    placeholder="Confirm new password"
+                    placeholder={isCreatePasswordFlow ? "Confirm password" : "Confirm new password"}
                     value={passwordValues.confirm}
                     onChange={(event) =>
                       setPasswordValues((prev) => ({ ...prev, confirm: event.target.value }))

@@ -198,17 +198,35 @@ const Profile = () => {
   }, [fetchProfile]);
 
   const profile = useMemo(() => {
-    // If we have profileData from API, use it
+    const storedProvider = storedProfile.authProvider || sessionStorage.getItem("authProvider");
+    const storedHasPassword =
+      storedProfile.hasPassword !== undefined
+        ? storedProfile.hasPassword
+        : sessionStorage.getItem("hasPassword") === "true";
+
     if (profileData) {
       const apiRole = profileData.user_roles?.[0]?.roles?.name || 'USER';
+      const provider =
+        profileData.authProvider ||
+        storedProvider ||
+        sampleProfile.authProvider ||
+        "password";
+      const passwordState =
+        provider === "password"
+          ? (profileData.hasPassword !== undefined ? profileData.hasPassword : true)
+          : (profileData.hasPassword !== undefined
+            ? profileData.hasPassword
+            : storedHasPassword !== undefined
+              ? storedHasPassword
+              : false);
       return {
         ...sampleProfile,
         name: profileData.name || sampleProfile.name,
         email: profileData.email || sampleProfile.email,
         phone: profileData.phone || sampleProfile.phone,
         role: apiRole,
-        authProvider: profileData.authProvider || sampleProfile.authProvider || "password",
-        hasPassword: profileData.hasPassword ?? sampleProfile.hasPassword,
+        authProvider: provider,
+        hasPassword: passwordState,
         memberSince: profileData.createdAt,
         isVerified: profileData.isVerified,
         whatsAppNotification: profileData.whatsAppNotification,
@@ -216,6 +234,17 @@ const Profile = () => {
       };
     }
     
+    const provider =
+      storedProvider ||
+      sampleProfile.authProvider ||
+      "password";
+    const passwordState =
+      provider === "password"
+        ? true
+        : (storedHasPassword !== undefined
+          ? storedHasPassword
+          : false);
+
     // Fallback to stored profile or sample
     return {
       ...sampleProfile,
@@ -224,8 +253,8 @@ const Profile = () => {
       email: storedProfile.email || sampleProfile.email,
       phone: storedProfile.phone || sampleProfile.phone,
       role: storedProfile.role || sampleProfile.role,
-      authProvider: storedProfile.authProvider || sampleProfile.authProvider || "password",
-      hasPassword: storedProfile.hasPassword ?? sampleProfile.hasPassword,
+      authProvider: provider,
+      hasPassword: passwordState,
       avatarUrl: storedProfile.avatarUrl || sessionStorage.getItem("userAvatar") || sampleProfile.avatarUrl,
     };
   }, [profileData, storedProfile]);
@@ -233,8 +262,8 @@ const Profile = () => {
   const role = normalizeRole(profile.role);
   const memberSince = formatDate(profile.memberSince) || "March 2024";
   const authProvider = profile.authProvider || "password";
-  const hasPassword = profile.hasPassword ?? (authProvider !== "google");
-  const isCreatePasswordFlow = authProvider === "google" && !hasPassword;
+  const hasPassword = profile.hasPassword !== undefined ? Boolean(profile.hasPassword) : authProvider !== "google";
+  const isCreatePasswordFlow = !hasPassword;
 
   const handleEditClick = useCallback(
     (field) => {
@@ -297,11 +326,6 @@ const Profile = () => {
         payload = { password: newPassword, confirmPassword };
         endpoint = CREATE_PASSWORD_ENDPOINT;
       } else {
-        if (!currentPassword) {
-          toast.error("Please fill in all password fields.");
-          setIsSaving(false);
-          return;
-        }
         payload = { currentPassword, newPassword };
         endpoint = "/api/user/change-password";
       }
