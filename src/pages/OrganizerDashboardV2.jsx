@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import { buildUrl } from "@/config/api";
@@ -20,6 +20,8 @@ import {
   Users,
   BarChart2,
   Download,
+  ChevronDown,
+  LogOut,
 } from "lucide-react";
 import FinancialReporting from "./FinancialReporting";
 import TicketsAndReservations from "./TicketsAndReservations";
@@ -91,14 +93,18 @@ const OrganizerProfileContent = ({ user }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-white">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Organizer Profile</h2>
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.25em] text-white/50">Organizer Profile</p>
+          <h2 className="text-3xl font-extrabold">Profile & Payouts</h2>
+          <p className="text-sm text-white/60">Keep your contact and payment details current.</p>
+        </div>
         {!isEditing && (
           <button
             onClick={handleEdit}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-blue-500 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition"
           >
             <Edit2 className="w-4 h-4" />
             Edit Profile
@@ -107,72 +113,73 @@ const OrganizerProfileContent = ({ user }) => {
       </div>
 
       {/* Profile Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white/5 rounded-2xl border border-white/10 shadow-lg shadow-black/30 overflow-hidden backdrop-blur">
         {/* Profile Header Section */}
-        <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-12">
+        <div className="bg-gradient-to-r from-red-600 via-rose-500 to-blue-600 px-8 py-10 border-b border-white/10">
           <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center text-red-600 font-bold text-4xl shadow-lg">
+            <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-4xl shadow-lg border border-white/20">
               {(user.name || "U").charAt(0).toUpperCase()}
             </div>
             <div className="text-white">
               <h2 className="text-3xl font-bold">{user.name || "Organizer"}</h2>
-              <p className="text-red-100 mt-1">Event Organizer</p>
+              <p className="text-white/80 mt-1">Event Organizer</p>
+              <p className="text-xs text-white/60 mt-1">{user.email || "organizer@example.com"}</p>
             </div>
           </div>
         </div>
 
         {/* Profile Details */}
-        <div className="p-8">
+        <div className="p-8 space-y-6 bg-[#0b1220]/80">
           {!isEditing ? (
             // View Mode
             <div className="space-y-6">
               {/* Contact Information */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-5 h-5 text-red-600" />
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 border border-red-500/30">
+                      <Mail className="w-5 h-5 text-red-200" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Email Address</p>
-                      <p className="text-base font-medium text-gray-900 mt-1">
+                      <p className="text-xs uppercase tracking-wide text-white/50">Email Address</p>
+                      <p className="text-base font-semibold text-white mt-1">
                         {user.email || "organizer@example.com"}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
-                      <Phone className="w-5 h-5 text-red-600" />
+                  <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 border border-red-500/30">
+                      <Phone className="w-5 h-5 text-red-200" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Phone Number</p>
-                      <p className="text-base font-medium text-gray-900 mt-1">{editData.phone}</p>
+                      <p className="text-xs uppercase tracking-wide text-white/50">Phone Number</p>
+                      <p className="text-base font-semibold text-white mt-1">{editData.phone}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Location & Date */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-blue-600" />
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Additional Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 border border-blue-500/30">
+                      <MapPin className="w-5 h-5 text-blue-200" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Location</p>
-                      <p className="text-base font-medium text-gray-900 mt-1">{editData.location}</p>
+                      <p className="text-xs uppercase tracking-wide text-white/50">Location</p>
+                      <p className="text-base font-semibold text-white mt-1">{editData.location}</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 text-green-600" />
+                  <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0 border border-emerald-500/30">
+                      <Calendar className="w-5 h-5 text-emerald-200" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Member Since</p>
-                      <p className="text-base font-medium text-gray-900 mt-1">{editData.joinDate}</p>
+                      <p className="text-xs uppercase tracking-wide text-white/50">Member Since</p>
+                      <p className="text-base font-semibold text-white mt-1">{editData.joinDate}</p>
                     </div>
                   </div>
                 </div>
@@ -180,95 +187,86 @@ const OrganizerProfileContent = ({ user }) => {
 
               {/* Bio */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Bio</h3>
-                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Bio</h3>
+                <p className="text-white/80 leading-relaxed bg-white/5 border border-white/10 p-4 rounded-xl">
                   {editData.bio}
                 </p>
               </div>
 
               {/* Statistics */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Statistics</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Total Events</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">12</p>
+                  <div className="bg-gradient-to-br from-blue-600/60 to-indigo-600/60 p-4 rounded-xl border border-white/15 shadow-lg shadow-black/30">
+                    <p className="text-xs uppercase tracking-wide text-white/70">Total Events</p>
+                    <p className="text-3xl font-bold text-white mt-2">12</p>
                   </div>
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Total Attendees</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">2.5K</p>
+                  <div className="bg-gradient-to-br from-emerald-500/60 to-teal-500/60 p-4 rounded-xl border border-white/15 shadow-lg shadow-black/30">
+                    <p className="text-xs uppercase tracking-wide text-white/70">Total Attendees</p>
+                    <p className="text-3xl font-bold text-white mt-2">2.5K</p>
                   </div>
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600">Total Revenue</p>
-                    <p className="text-3xl font-bold text-purple-600 mt-2">₹5.2L</p>
+                  <div className="bg-gradient-to-br from-purple-500/60 to-pink-500/60 p-4 rounded-xl border border-white/15 shadow-lg shadow-black/30">
+                    <p className="text-xs uppercase tracking-wide text-white/70">Total Revenue</p>
+                    <p className="text-3xl font-bold text-white mt-2">₹5.2L</p>
                   </div>
                 </div>
               </div>
 
               {/* Payment Details */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h3>
-                
+              <div className="pt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Payment Details</h3>
+                </div>
+
                 {/* Payment Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-green-600" />
-                      <p className="text-sm text-gray-600">Total Ticket Sales</p>
+                      <DollarSign className="w-4 h-4 text-emerald-200" />
+                      <p className="text-sm text-white/70">Total Ticket Sales</p>
                     </div>
-                    <p className="text-2xl font-bold text-green-600">{editData.paymentDetails.totalTicketSales}</p>
+                    <p className="text-2xl font-bold text-white">{editData.paymentDetails.totalTicketSales}</p>
                   </div>
-                  <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
                     <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-yellow-600" />
-                      <p className="text-sm text-gray-600">Pending Payment</p>
+                      <DollarSign className="w-4 h-4 text-amber-200" />
+                      <p className="text-sm text-white/70">Pending Payment</p>
                     </div>
-                    <p className="text-2xl font-bold text-yellow-600">{editData.paymentDetails.pendingPayment}</p>
+                    <p className="text-2xl font-bold text-white">{editData.paymentDetails.pendingPayment}</p>
                   </div>
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
                     <div className="flex items-center gap-2 mb-2">
-                      <Calendar className="w-4 h-4 text-blue-600" />
-                      <p className="text-sm text-gray-600">Last Payment</p>
+                      <Calendar className="w-4 h-4 text-blue-200" />
+                      <p className="text-sm text-white/70">Last Payment</p>
                     </div>
-                    <p className="text-sm font-bold text-blue-600">{editData.paymentDetails.lastPaymentDate}</p>
+                    <p className="text-2xl font-bold text-white">{editData.paymentDetails.lastPaymentDate}</p>
                   </div>
                 </div>
 
-                {/* Bank Details */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-red-600" />
-                      Bank Account Details
-                    </h4>
-                    <button
-                      onClick={handleEditPayment}
-                      className="flex items-center gap-2 px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit
-                    </button>
+                {/* Payment Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-2">
+                    <h4 className="text-sm font-semibold text-white">Bank Details</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-white/80">
+                      <span className="font-medium text-white/70">Account Holder</span>
+                      <span>{editData.paymentDetails.bankAccountHolder}</span>
+                      <span className="font-medium text-white/70">Bank Name</span>
+                      <span>{editData.paymentDetails.bankName}</span>
+                      <span className="font-medium text-white/70">Account Number</span>
+                      <span>{editData.paymentDetails.accountNumber}</span>
+                      <span className="font-medium text-white/70">IFSC Code</span>
+                      <span>{editData.paymentDetails.ifscCode}</span>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-medium">Account Holder Name</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{editData.paymentDetails.bankAccountHolder}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-medium">Bank Name</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{editData.paymentDetails.bankName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-medium">Account Number</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{editData.paymentDetails.accountNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase font-medium">IFSC Code</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{editData.paymentDetails.ifscCode}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-xs text-gray-500 uppercase font-medium">UPI ID</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{editData.paymentDetails.upiId}</p>
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-2">
+                    <h4 className="text-sm font-semibold text-white">UPI & Summary</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-white/80">
+                      <span className="font-medium text-white/70">UPI ID</span>
+                      <span>{editData.paymentDetails.upiId}</span>
+                      <span className="font-medium text-white/70">Total Ticket Sales</span>
+                      <span>{editData.paymentDetails.totalTicketSales}</span>
+                      <span className="font-medium text-white/70">Pending Payment</span>
+                      <span>{editData.paymentDetails.pendingPayment}</span>
                     </div>
                   </div>
                 </div>
@@ -277,145 +275,144 @@ const OrganizerProfileContent = ({ user }) => {
           ) : (
             // Edit Mode
             <div className="space-y-6">
+              {/* Contact Information */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  value={editData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                <input
-                  type="email"
-                  value={editData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  value={editData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <input
-                  type="text"
-                  value={editData.location}
-                  onChange={(e) => handleInputChange("location", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
-                <textarea
-                  value={editData.bio}
-                  onChange={(e) => handleInputChange("bio", e.target.value)}
-                  rows="4"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"
-                />
-              </div>
-
-              {/* Payment Details Section */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-red-600" />
-                  Payment Details
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
+                <h3 className="text-lg font-semibold">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Full Name</label>
                     <input
                       type="text"
-                      value={editData.paymentDetails?.bankAccountHolder || ""}
-                      onChange={(e) => setEditData((prev) => ({
-                        ...prev,
-                        paymentDetails: { ...prev.paymentDetails, bankAccountHolder: e.target.value }
-                      }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                      value={editData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Email Address</label>
                     <input
-                      type="text"
-                      value={editData.paymentDetails?.bankName || ""}
-                      onChange={(e) => setEditData((prev) => ({
-                        ...prev,
-                        paymentDetails: { ...prev.paymentDetails, bankName: e.target.value }
-                      }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                      type="email"
+                      value={editData.email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Phone Number</label>
                     <input
                       type="text"
-                      value={editData.paymentDetails?.accountNumber || ""}
-                      onChange={(e) => setEditData((prev) => ({
-                        ...prev,
-                        paymentDetails: { ...prev.paymentDetails, accountNumber: e.target.value }
-                      }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                      value={editData.phone}
+                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">IFSC Code</label>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Location</label>
                     <input
                       type="text"
-                      value={editData.paymentDetails?.ifscCode || ""}
-                      onChange={(e) => setEditData((prev) => ({
-                        ...prev,
-                        paymentDetails: { ...prev.paymentDetails, ifscCode: e.target.value }
-                      }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">UPI ID</label>
-                    <input
-                      type="text"
-                      value={editData.paymentDetails?.upiId || ""}
-                      onChange={(e) => setEditData((prev) => ({
-                        ...prev,
-                        paymentDetails: { ...prev.paymentDetails, upiId: e.target.value }
-                      }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                      value={editData.location}
+                      onChange={(e) => handleInputChange("location", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Edit Mode Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              {/* Additional Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-white/80">Member Since</label>
+                  <input
+                    type="text"
+                    value={editData.joinDate}
+                    onChange={(e) => handleInputChange("joinDate", e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-white/80">Bio</label>
+                  <textarea
+                    value={editData.bio}
+                    onChange={(e) => handleInputChange("bio", e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none min-h-[100px]"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Payment Details</h3>
+                  <button
+                    onClick={handleEditPayment}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit Bank Details
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Account Holder</label>
+                    <input
+                      type="text"
+                      value={editData.paymentDetails.bankAccountHolder}
+                      onChange={(e) => handlePaymentInputChange("bankAccountHolder", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Bank Name</label>
+                    <input
+                      type="text"
+                      value={editData.paymentDetails.bankName}
+                      onChange={(e) => handlePaymentInputChange("bankName", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">Account Number</label>
+                    <input
+                      type="text"
+                      value={editData.paymentDetails.accountNumber}
+                      onChange={(e) => handlePaymentInputChange("accountNumber", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">IFSC Code</label>
+                    <input
+                      type="text"
+                      value={editData.paymentDetails.ifscCode}
+                      onChange={(e) => handlePaymentInputChange("ifscCode", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-white/80">UPI ID</label>
+                    <input
+                      type="text"
+                      value={editData.paymentDetails.upiId}
+                      onChange={(e) => handlePaymentInputChange("upiId", e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
                 <button
                   onClick={handleSave}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-blue-500 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition"
                 >
                   <Save className="w-4 h-4" />
                   Save Changes
                 </button>
                 <button
                   onClick={handleCancel}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
                 >
-                  <X className="w-4 h-4" />
                   Cancel
                 </button>
               </div>
@@ -424,19 +421,18 @@ const OrganizerProfileContent = ({ user }) => {
         </div>
       </div>
 
-      {/* Payment Details Modal */}
       {isPaymentModalOpen && paymentEditData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-[#0d1324] rounded-2xl shadow-2xl border border-white/10 max-w-md w-full overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-red-600" />
+            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-red-300" />
                 Edit Bank Details
               </h2>
               <button
                 onClick={handleCancelPayment}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-white/60 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -445,68 +441,68 @@ const OrganizerProfileContent = ({ user }) => {
             {/* Modal Body */}
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Holder Name</label>
+                <label className="block text-sm font-medium text-white/70 mb-2">Account Holder Name</label>
                 <input
                   type="text"
                   value={paymentEditData.bankAccountHolder || ""}
                   onChange={(e) => handlePaymentInputChange("bankAccountHolder", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:border-transparent outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+                <label className="block text-sm font-medium text-white/70 mb-2">Bank Name</label>
                 <input
                   type="text"
                   value={paymentEditData.bankName || ""}
                   onChange={(e) => handlePaymentInputChange("bankName", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:border-transparent outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                <label className="block text-sm font-medium text-white/70 mb-2">Account Number</label>
                 <input
                   type="text"
                   value={paymentEditData.accountNumber || ""}
                   onChange={(e) => handlePaymentInputChange("accountNumber", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:border-transparent outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">IFSC Code</label>
+                <label className="block text-sm font-medium text-white/70 mb-2">IFSC Code</label>
                 <input
                   type="text"
                   value={paymentEditData.ifscCode || ""}
                   onChange={(e) => handlePaymentInputChange("ifscCode", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:border-transparent outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">UPI ID</label>
+                <label className="block text-sm font-medium text-white/70 mb-2">UPI ID</label>
                 <input
                   type="text"
                   value={paymentEditData.upiId || ""}
                   onChange={(e) => handlePaymentInputChange("upiId", e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-red-500/60 focus:border-transparent outline-none"
                 />
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex gap-3 p-6 border-t border-gray-200">
+            <div className="flex gap-3 p-6 border-t border-white/10 bg-white/5">
               <button
                 onClick={handleSavePayment}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-blue-500 text-white shadow-md shadow-red-500/20 hover:shadow-red-500/30 transition"
               >
                 <Save className="w-4 h-4" />
                 Save
               </button>
               <button
                 onClick={handleCancelPayment}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -523,6 +519,8 @@ const OrganizerDashboardV2 = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [footerMenuOpen, setFooterMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   // Note: Authentication is handled by ProtectedRoute wrapper
@@ -565,6 +563,8 @@ const OrganizerDashboardV2 = () => {
   }, []);
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     // Call logout API to clear cookies on backend (if available)
     try {
       await fetch(buildUrl("auth/logout"), {
@@ -582,6 +582,7 @@ const OrganizerDashboardV2 = () => {
     
     // Redirect to home
     navigate("/");
+    setIsLoggingOut(false);
   };
 
 
@@ -592,66 +593,104 @@ const OrganizerDashboardV2 = () => {
     { id: "analytics", name: "Audience Analytics", icon: <Users className="w-6 h-6 mr-3" /> },
     { id: "ticketing", name: "Tickets and Reservation", icon: <BarChart2 className="w-6 h-6 mr-3" /> },
     { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
-    { id: "profile", name: "My Profile", icon: <User className="w-6 h-6 mr-3" /> },
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
       {/* Sidebar */}
       <aside
-        className={`${sidebarOpen ? "w-64" : "w-24"} bg-white border-r border-gray-200 flex flex-col transition-all duration-300`}
+        className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
       >
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <h1
             className={`text-2xl font-extrabold tracking-tight ${sidebarOpen ? "block" : "hidden"}`}
           >
-            <span className="text-red-600">Map</span>MyParty
+            <span className="text-red-500">Map</span><span className="text-white">MyParty</span>
           </h1>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
+            className="p-2 rounded-lg hover:bg-white/5 text-white/80"
           >
             {sidebarOpen ? <ChevronLeft className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4">
-          <div className="px-4 space-y-1">
+          <div className="px-3 space-y-1">
             {navItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-lg ${
+                className={`flex items-center w-full px-3 py-3 text-sm font-medium rounded-xl transition ${
                   activeTab === item.id
-                    ? "text-white bg-gray-900"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "text-white bg-white/10 border border-white/10 shadow-lg shadow-black/20"
+                    : "text-white/70 hover:bg-white/5"
                 }`}
               >
-                {item.icon}
+                <span className="mr-3 text-white/80">{item.icon}</span>
                 {sidebarOpen && item.name}
               </button>
             ))}
           </div>
         </nav>
 
-        <div className="mt-auto p-4 border-t border-gray-200">
-          <button
-            onClick={() => setActiveTab("profile")}
-            className="flex items-center gap-3 w-full hover:bg-gray-50 p-2 rounded-lg transition-colors"
+        {/* Sidebar Footer with profile + logout */}
+        <div className="mt-auto p-4 border-t border-white/10">
+          <div
+            className="relative bg-gradient-to-br from-white/5 via-white/0 to-blue-500/5 border border-white/10 rounded-xl p-3 shadow-lg shadow-black/20"
+            onMouseEnter={() => setFooterMenuOpen(true)}
+            onMouseLeave={() => setFooterMenuOpen(false)}
           >
-            <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-semibold flex-shrink-0">
-              {(user.name || "U").charAt(0).toUpperCase()}
-            </div>
-            {sidebarOpen && (
-              <div className="min-w-0 flex-1 text-left">
-                <div className="text-sm font-medium truncate">{user.name || "Organizer"}</div>
-                <div className="text-xs text-gray-500 truncate">{user.email || "organizer@example.com"}</div>
+            <button
+              onClick={() => setFooterMenuOpen((v) => !v)}
+              className="flex items-center gap-3 w-full text-left hover:bg-white/5 transition rounded-lg px-2 py-1"
+            >
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500/30 via-blue-500/30 to-red-500/30 flex items-center justify-center text-red-100 font-semibold border border-white/10">
+                {(user.name || "U").charAt(0).toUpperCase()}
+              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{user.name || "Organizer"}</p>
+                </div>
+              )}
+              {sidebarOpen && (
+                <ChevronDown
+                  className={`w-4 h-4 text-white/70 transition-transform ${
+                    footerMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              )}
+            </button>
+
+            {footerMenuOpen && (
+              <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 z-20">
+                <div className="rounded-xl border border-white/10 bg-[#0f1628]/95 backdrop-blur-md shadow-xl shadow-black/30 p-2 space-y-2">
+                  <button
+                    onClick={() => {
+                      setActiveTab("profile");
+                      setFooterMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                  >
+                    <User className="w-4 h-4" />
+                    {sidebarOpen && <span>My Profile</span>}
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-200 hover:bg-red-500/20 transition disabled:opacity-60"
+                  >
+                    {isLoggingOut ? (
+                      <span className="h-4 w-4 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <LogOut className="w-4 h-4" />
+                    )}
+                    {sidebarOpen && <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>}
+                  </button>
+                </div>
               </div>
             )}
-            {sidebarOpen && (
-              <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            )}
-          </button>
+          </div>
         </div>
       </aside>
 
@@ -660,35 +699,26 @@ const OrganizerDashboardV2 = () => {
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           {/* Tab Content */}
-          <div className="p-6 space-y-6">
+          <div className="p-4 lg:p-5 space-y-5">
             {activeTab === "dashboard" && (
-              <OrganizerDash user={user} handleLogout={handleLogout} setActiveTab={setActiveTab} activeTab={activeTab} />
+              <OrganizerDash
+                user={user}
+                handleLogout={handleLogout}
+                setActiveTab={setActiveTab}
+                activeTab={activeTab}
+              />
             )}
 
-            {activeTab === "myevents" && (
-              <MyEvents />
-            )}
-
-            {activeTab === "analytics" && (
-              <AudienceAnalytics />
-            )}
-            
-            {activeTab === 'ticketing' && (
-              <TicketsAndReservations />
-            )}
-            
-            {activeTab === 'financial' && (
-              <FinancialReporting />
-            )}
-
-            {activeTab === 'profile' && (
-              <OrganizerProfileContent user={user} />
-            )}
+            {activeTab === "myevents" && <MyEvents />}
+            {activeTab === "analytics" && <AudienceAnalytics />}
+            {activeTab === "ticketing" && <TicketsAndReservations />}
+            {activeTab === "financial" && <FinancialReporting />}
+            {activeTab === "profile" && <OrganizerProfileContent user={user} />}
           </div>
         </main>
       </div>
     </div>
   );
-};
+}
 
 export default OrganizerDashboardV2;

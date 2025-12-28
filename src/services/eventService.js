@@ -16,6 +16,56 @@ async function getCloudinarySignature(folder) {
   return res.json();
 }
 
+/**
+ * Upload a temp image to Cloudinary before an event exists.
+ * Returns { url, publicId, raw } without persisting to backend.
+ */
+export async function uploadTempImage(file, folderSuffix = "drafts") {
+  if (!file || !(file instanceof File)) {
+    throw new Error("Valid image file is required");
+  }
+
+  const folder = `mapmyparty/${folderSuffix}`;
+  const sig = await getCloudinarySignature(folder);
+  const uploadJson = await uploadToCloudinary(file, sig);
+
+  const url = uploadJson.secure_url || uploadJson.url;
+  const publicId = uploadJson.public_id || uploadJson.publicId;
+
+  return { url, publicId, raw: uploadJson };
+}
+
+/**
+ * Persist an already-uploaded flyer URL to backend (no Cloudinary upload).
+ */
+export async function persistFlyerUrl(eventId, flyer) {
+  if (!eventId) throw new Error("Event ID is required");
+  if (!flyer) throw new Error("Flyer data is required");
+
+  const imageUrl = flyer.imageUrl || flyer.url;
+  const publicId = flyer.publicId;
+
+  if (!imageUrl) throw new Error("Flyer imageUrl is required");
+
+  const url = buildUrl(`/api/event/update-flyer/${eventId}`);
+  const payload = {
+    imageUrl,
+    publicId,
+    flyerImage: imageUrl,
+    url: imageUrl,
+  };
+
+  console.log("🔗 Persisting existing flyer URL to backend:", payload);
+
+  const res = await apiFetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  return res;
+}
+
 async function uploadToCloudinary(file, signaturePayload) {
   const {
     cloudName,
@@ -74,6 +124,27 @@ export async function uploadArtistImage(eventId, file) {
 }
 
 /**
+ * Persist already-uploaded gallery URLs to backend (no Cloudinary upload).
+ */
+export async function persistGalleryUrls(eventId, imageUrls) {
+  if (!eventId) throw new Error("Event ID is required");
+  if (!imageUrls || imageUrls.length === 0) throw new Error("At least one gallery image URL is required");
+
+  const url = buildUrl(`/api/event/${eventId}/images`);
+  const payload = { imageUrls };
+
+  console.log("🔗 Persisting existing gallery URLs to backend:", payload);
+
+  const res = await apiFetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  return res;
+}
+
+/**
  * Create event - Step 1: Basic Details
  * 
  * API Endpoint: POST /api/event/create-event
@@ -102,73 +173,27 @@ export async function uploadArtistImage(eventId, file) {
  */
 export async function createEventStep1(eventData) {
   const url = buildUrl("/api/event/create-event");
-  // Check if backend expects FormData (with images) or JSON
-  const hasImages = eventData.flyerImage || (eventData.galleryImages && eventData.galleryImages.length > 0);
-  
-  if (hasImages) {
-    // Send as FormData if images are included
-    const formData = new FormData();
-    
-    // Map frontend field names to backend expected names
-    formData.append("title", eventData.eventTitle);
-    formData.append("description", eventData.description || "");
-    formData.append("category", eventData.mainCategory);
-    formData.append("subCategory", eventData.subcategory);
-    
-    // Add temporary/placeholder values for required backend fields
-    // These will be updated in later steps
-    formData.append("venue", eventData.venue || "TBD");
-    formData.append("location", eventData.location || "TBD");
-    formData.append("startDate", eventData.startDate || new Date().toISOString());
-    formData.append("endDate", eventData.endDate || new Date().toISOString());
-    formData.append("totalTickets", eventData.totalTickets || "0");
-    formData.append("ticketPrice", eventData.ticketPrice || "0");
-    
-    // Add flyer image (cover image)
-    if (eventData.flyerImage) {
-      formData.append("flyerImage", eventData.flyerImage);
-    }
-    
-    // Add gallery images
-    if (eventData.galleryImages && eventData.galleryImages.length > 0) {
-      eventData.galleryImages.forEach((image) => {
-        formData.append("galleryImages", image);
-      });
-    }
-    
-    console.log("📤 Sending as FormData with images");
-    
-    const response = await apiFetch(url, {
-      method: "POST",
-      body: formData,
-      // Don't set Content-Type header - browser will set it automatically with boundary for FormData
-    });
-    
-    return response;
-  } else {
-    // Send as JSON if no images
-    const jsonData = {
-      title: eventData.eventTitle,
-      description: eventData.description || "",
-      category: eventData.mainCategory,
-      subCategory: eventData.subcategory,
-      venue: eventData.venue || "TBD",
-      location: eventData.location || "TBD",
-      startDate: eventData.startDate || new Date().toISOString(),
-      endDate: eventData.endDate || new Date().toISOString(),
-      totalTickets: eventData.totalTickets || 0,
-      ticketPrice: eventData.ticketPrice || 0,
-    };
-    
-    console.log("📤 Sending as JSON:", jsonData);
-    
-    const response = await apiFetch(url, {
-      method: "POST",
-      body: JSON.stringify(jsonData),
-    });
-    
-    return response;
+
+  // Backend only allows core fields: title, description, category, subCategory, type (optional)
+  const jsonData = {
+    title: eventData.eventTitle,
+    description: eventData.description || "",
+    category: eventData.mainCategory,
+    subCategory: eventData.subcategory,
+  };
+
+  if (eventData.eventType) {
+    jsonData.type = eventData.eventType;
   }
+
+  console.log("📤 Sending as JSON:", jsonData);
+
+  const response = await apiFetch(url, {
+    method: "POST",
+    body: JSON.stringify(jsonData),
+  });
+
+  return response;
 }
 
 /**
@@ -398,25 +423,6 @@ export async function uploadGalleryImages(eventId, galleryImages) {
   // Preserve folder naming: mapmyparty/events/<eventId>/gallery
   const folder = `mapmyparty/events/${eventId}/gallery`;
 
-  // Persist gallery images to backend DB (creates gallery records)
-  const persistGalleryToBackend = async (imageUrls) => {
-    const url = buildUrl(`/api/event/${eventId}/images`);
-    // Spec allows imageUrls (array). Keep legacy compat by also sending images if backend accepts.
-    const payload = {
-      imageUrls,
-    };
-
-    console.log("🔗 Persisting gallery URLs to backend:", payload);
-
-    const res = await apiFetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    return res;
-  };
-
   try {
     const sig = await getCloudinarySignature(folder);
 
@@ -441,7 +447,7 @@ export async function uploadGalleryImages(eventId, galleryImages) {
     // Persist to backend DB
     try {
       const imageUrls = uploads.map((u) => u.url);
-      const persistRes = await persistGalleryToBackend(imageUrls);
+      const persistRes = await persistGalleryUrls(eventId, imageUrls);
       // Expect response: { data: { images: [ { id, url, ... } ] } }
       backendImages =
         persistRes?.data?.images ||
@@ -814,10 +820,6 @@ export async function updateEventStep6(eventId, updateData) {
   console.log("🔗 Request URL:", url);
   console.log("📋 Update Data received:", updateData);
   
-  if (!token) {
-    throw new Error("Authentication required. Please login again.");
-  }
-  
   // Validate eventId
   if (!eventId) {
     throw new Error("Event ID is required");
@@ -846,15 +848,10 @@ export async function updateEventStep6(eventId, updateData) {
     payload.organizerNote = updateData.organizerNote.trim();
   }
   
-  // Add template if provided (template ID: template1, template2, template3)
-  if (updateData.template) {
-    payload.template = updateData.template;
-    console.log("🎨 Including template in update:", updateData.template);
-  }
-  
   // Check if there's anything to update
   if (Object.keys(payload).length === 0) {
-    throw new Error("No valid data to update. Please provide at least one field.");
+    console.log("No valid data to update. Please provide at least one field.");
+    return;
   }
   
   console.log("📤 Sending update payload:", JSON.stringify(payload, null, 2));
@@ -887,15 +884,13 @@ export async function publishEvent(eventId) {
   console.log("🚀 Publishing Event");
   console.log("📋 Event ID:", eventId);
   
-  const payload = {
-    status2: "PUBLISHED", // Change status from DRAFT to PUBLISHED
-  };
-  
-  console.log("📤 Sending publish update:", payload);
-  
+  // Backend no longer accepts status fields here; publish handled server-side or elsewhere.
   const response = await apiFetch(url, {
     method: "PATCH",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({}),
+    headers: {
+      "Content-Type": "application/json",
+    },
   });
   
   return response;

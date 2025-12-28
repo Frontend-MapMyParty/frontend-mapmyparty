@@ -161,22 +161,29 @@ const Profile = () => {
       });
 
       if (response?.success && response?.data) {
-        setProfileData(response.data);
+        const avatar = response.data.avatar || response.data.avatarUrl || "";
+        const normalizedProfile = {
+          ...response.data,
+          avatar,
+          avatarUrl: response.data.avatarUrl || avatar,
+        };
 
-        sessionStorage.setItem("userName", response.data.name || "");
-        sessionStorage.setItem("userEmail", response.data.email || "");
-        sessionStorage.setItem("userPhone", response.data.phone || "");
-        sessionStorage.setItem("userAvatar", response.data.avatarUrl || "");
-        sessionStorage.setItem("userProfile", JSON.stringify(response.data));
-        if (response.data.authProvider) {
-          sessionStorage.setItem("authProvider", response.data.authProvider);
+        setProfileData(normalizedProfile);
+
+        sessionStorage.setItem("userName", normalizedProfile.name || "");
+        sessionStorage.setItem("userEmail", normalizedProfile.email || "");
+        sessionStorage.setItem("userPhone", normalizedProfile.phone || "");
+        sessionStorage.setItem("userAvatar", normalizedProfile.avatarUrl || "");
+        sessionStorage.setItem("userProfile", JSON.stringify(normalizedProfile));
+        if (normalizedProfile.authProvider) {
+          sessionStorage.setItem("authProvider", normalizedProfile.authProvider);
         }
-        if (response.data.hasPassword !== undefined) {
-          sessionStorage.setItem("hasPassword", response.data.hasPassword ? "true" : "false");
+        if (normalizedProfile.hasPassword !== undefined) {
+          sessionStorage.setItem("hasPassword", normalizedProfile.hasPassword ? "true" : "false");
         }
 
-        if (response.data.user_roles && response.data.user_roles.length > 0) {
-          const roleName = response.data.user_roles[0]?.roles?.name || "USER";
+        if (normalizedProfile.user_roles && normalizedProfile.user_roles.length > 0) {
+          const roleName = normalizedProfile.user_roles[0]?.roles?.name || "USER";
           sessionStorage.setItem("role", roleName);
           sessionStorage.setItem("userType", roleName);
         }
@@ -230,7 +237,7 @@ const Profile = () => {
         memberSince: profileData.createdAt,
         isVerified: profileData.isVerified,
         whatsAppNotification: profileData.whatsAppNotification,
-        avatarUrl: profileData.avatarUrl || sampleProfile.avatarUrl,
+        avatarUrl: profileData.avatarUrl || profileData.avatar || sampleProfile.avatarUrl,
       };
     }
     
@@ -255,7 +262,11 @@ const Profile = () => {
       role: storedProfile.role || sampleProfile.role,
       authProvider: provider,
       hasPassword: passwordState,
-      avatarUrl: storedProfile.avatarUrl || sessionStorage.getItem("userAvatar") || sampleProfile.avatarUrl,
+      avatarUrl:
+        storedProfile.avatar ||
+        storedProfile.avatarUrl ||
+        sessionStorage.getItem("userAvatar") ||
+        sampleProfile.avatarUrl,
     };
   }, [profileData, storedProfile]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
 // Authentication handled by ProtectedRoute wrapper via UserDashboard
 import { 
@@ -20,7 +20,8 @@ import {
   BarChart2,
   MessageSquare,
   HelpCircle,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +35,41 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { apiFetch } from "@/config/api";
+import { toast } from "sonner";
 import UserDashboardHeader from "@/components/UserDashboardHeader";
 import Footer from "@/components/Footer";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { fetchSession } from "@/utils/auth";
 import logoSvg from '@/assets/MMP logo.svg';
+
+const INDIAN_STATES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
+  "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry",
+  "Chandigarh","Andaman and Nicobar Islands","Dadra and Nagar Haveli and Daman and Diu",
+  "Lakshadweep"
+];
+
+const POPULAR_CITIES = [
+  { name: "Mumbai", icon: "🏙️", landmark: "Gateway of India" },
+  { name: "Delhi", icon: "🏛️", landmark: "India Gate" },
+  { name: "Bengaluru", icon: "🌿", landmark: "Cubbon Park" },
+  { name: "Hyderabad", icon: "🕌", landmark: "Charminar" },
+  { name: "Chandigarh", icon: "🌸", landmark: "Rose Garden" },
+  { name: "Ahmedabad", icon: "🧵", landmark: "Sabarmati" },
+  { name: "Pune", icon: "🏰", landmark: "Shaniwar Wada" },
+  { name: "Chennai", icon: "🌊", landmark: "Marina Beach" },
+  { name: "Kolkata", icon: "🎡", landmark: "Howrah" },
+  { name: "Kochi", icon: "🌴", landmark: "Backwaters" },
+];
 
 const getInitials = (name, email) => {
   if (name) {
@@ -79,6 +110,15 @@ const NewUserDashboard = () => {
   const [userInfo, setUserInfo] = useState(() => getStoredUserInfo());
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
+  const [stateInput, setStateInput] = useState("");
+  const [selectedState, setSelectedState] = useState(null);
+  const [pendingState, setPendingState] = useState(null);
+  const [locationEvents, setLocationEvents] = useState([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState(null);
+  const [geocodeResult, setGeocodeResult] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -135,6 +175,93 @@ const NewUserDashboard = () => {
     setIsLoading(false);
   }, []);
 
+  const filteredStates = useMemo(() => {
+    const term = stateInput.trim().toLowerCase();
+    if (!term) return INDIAN_STATES;
+    return INDIAN_STATES.filter((s) => s.toLowerCase().includes(term));
+  }, [stateInput]);
+
+  const extractStateFromEvent = (event = {}) => {
+    const candidates = [
+      event.state,
+      event.location,
+      event.venue,
+      event.venue?.state,
+      event.venues?.[0]?.state,
+      event.venues?.[0]?.city,
+      event.city,
+    ];
+    return candidates.find((c) => typeof c === "string" && c.trim().length > 0) || "";
+  };
+
+  const isEventInState = (event, state) => {
+    if (!state) return false;
+    const target = state.toLowerCase();
+    const candidate = extractStateFromEvent(event).toLowerCase();
+    return candidate.includes(target);
+  };
+
+  const fetchEventsByState = async (state) => {
+    if (!state) return;
+    setLocationLoading(true);
+    setLocationError(null);
+    try {
+      const apiKey = import.meta?.env?.VITE_GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        const geoRes = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+            `${state}, India`
+          )}&key=${apiKey}`
+        );
+        const geoJson = await geoRes.json();
+        const loc = geoJson?.results?.[0]?.geometry?.location || null;
+        setGeocodeResult(loc);
+      } else {
+        setGeocodeResult(null);
+      }
+
+      const response = await apiFetch("/api/event", {
+        method: "GET",
+      });
+      const eventsData = response.data?.events || response.data || response;
+      const list = Array.isArray(eventsData) ? eventsData : [];
+      const filtered = list.filter((evt) => isEventInState(evt, state));
+      setLocationEvents(filtered);
+      setSelectedState(state);
+      return filtered;
+    } catch (err) {
+      console.error("Failed to fetch events for state", err);
+      setLocationError(err.message || "Failed to load events for this location");
+      setLocationEvents([]);
+      return [];
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+  const handleConfirmState = async () => {
+    const state = pendingState || stateInput || selectedState;
+    if (!state) return;
+    const events = await fetchEventsByState(state);
+    setSelectedState(state);
+    setLocationPopoverOpen(false);
+    const count = events?.length || 0;
+    count === 0
+      ? toast.info(`No events in ${state} yet.`)
+      : toast.success(`${count} event${count === 1 ? "" : "s"} in ${state}`);
+  };
+
+  const getEventTitle = (event = {}) =>
+    event.title || event.eventTitle || event.name || "Event";
+
+  const getEventVenue = (event = {}) =>
+    event.venue?.name ||
+    event.venue ||
+    event.location ||
+    event.city ||
+    event.venues?.[0]?.name ||
+    "Venue TBA";
+
   // Scroll behavior for header
   useEffect(() => {
     const handleScroll = () => {
@@ -174,25 +301,31 @@ const NewUserDashboard = () => {
   };
 
   const handleLogout = async () => {
-    // Call logout API to clear cookies on backend (if available)
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     try {
-      const { buildUrl } = await import("@/config/api");
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
+      await apiFetch("auth/logout", { method: "POST" });
+      toast.success("Logged out");
     } catch (err) {
-      // Continue even if logout API fails
-      console.warn("Logout API call failed:", err);
+      if (err?.status === 401) {
+        // treat as already logged out
+        console.warn("Logout 401: session already invalid/expired");
+        toast("Session expired, logging out");
+      } else {
+        console.warn("Logout API call failed:", err);
+        toast.error(err?.message || "Logout failed, clearing session");
+      }
+    } finally {
+      try {
+        const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
+        clearSessionData();
+        resetSessionCache();
+      } catch (e) {
+        console.warn("Failed to clear session cache", e);
+      }
+      setIsLoggingOut(false);
+      navigate("/");
     }
-    
-    // Clear all session data using centralized function
-    const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
-    clearSessionData();
-    resetSessionCache();
-    
-    // Redirect to home
-    navigate("/");
   };
 
   const navItems = [
@@ -276,11 +409,12 @@ const NewUserDashboard = () => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-red-700" />
                 <DropdownMenuItem 
-                  onClick={handleLogout} 
-                  className="text-red-600 focus:text-red-600 hover:bg-red-900 transition-all cursor-pointer"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="text-red-600 focus:text-red-600 hover:bg-red-900 transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  {isLoggingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                  <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -336,6 +470,132 @@ const NewUserDashboard = () => {
                 </div>
                 <span>MapMyParty</span>
               </Link>
+
+              {/* Location Selector */}
+              <Dialog open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-11 px-4 rounded-full border border-[rgba(100,200,255,0.25)] bg-[rgba(59,130,246,0.08)] hover:bg-[rgba(59,130,246,0.16)] text-white flex items-center gap-2 shadow-sm hover:shadow-[0_10px_30px_-12px_rgba(96,165,250,0.6)]"
+                  >
+                    <MapPin className="h-4 w-4 text-[#60a5fa]" />
+                    <span className="text-sm font-medium">
+                      {selectedState || "Select location"}
+                    </span>
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.7)]">
+                      India
+                    </span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[900px] w-[92vw] md:w-[90vw] bg-[#0b0e16] border border-[rgba(100,200,255,0.2)] text-white shadow-[0_18px_48px_-22px_rgba(0,0,0,0.65)] rounded-2xl p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-semibold text-white">Pick your spot</p>
+                      <p className="text-sm text-[rgba(255,255,255,0.7)]">
+                        India-only. Choose a city/state; we’ll set your location.
+                      </p>
+                    </div>
+                    {locationLoading && <Loader2 className="h-5 w-5 animate-spin text-[#60a5fa]" />}
+                  </div>
+
+                  <Input
+                    value={stateInput}
+                    onChange={(e) => {
+                      setStateInput(e.target.value);
+                      setPendingState(null);
+                    }}
+                    placeholder="Search Indian states..."
+                    className="bg-[rgba(255,255,255,0.06)] border-[rgba(100,200,255,0.18)] text-white placeholder:text-[rgba(255,255,255,0.5)] focus:ring-2 focus:ring-[#60a5fa] focus:border-[#60a5fa]"
+                  />
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-[rgba(255,255,255,0.78)]">Popular cities</p>
+                    </div>
+                    <div className="grid grid-cols-5 gap-3">
+                      {POPULAR_CITIES.map((city) => {
+                        const active = (pendingState || selectedState) === city.name;
+                        return (
+                          <button
+                            key={city.name}
+                            type="button"
+                            onClick={() => {
+                              setPendingState(city.name);
+                              setStateInput(city.name);
+                            }}
+                            className={`flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all text-sm ${
+                              active
+                                ? "border border-[#D60024] bg-[rgba(214,0,36,0.14)] text-white shadow-[0_10px_28px_-12px_rgba(214,0,36,0.45)]"
+                                : "border border-[rgba(100,200,255,0.15)] bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.9)] hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
+                            }`}
+                          >
+                            <span className="text-xl leading-none">{city.icon}</span>
+                            <span className="text-sm font-semibold">{city.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-[rgba(255,255,255,0.78)]">All states</p>
+                    <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {filteredStates.map((state) => {
+                        const active = (pendingState || selectedState) === state;
+                        return (
+                          <button
+                            key={state}
+                            type="button"
+                            onClick={() => {
+                              setPendingState(state);
+                              setStateInput(state);
+                            }}
+                            className={`flex items-center gap-2 rounded-full px-3.5 py-2.5 border transition-all text-xs ${
+                              active
+                                ? "border-[#D60024] bg-[rgba(214,0,36,0.14)] text-white"
+                                : "border-[rgba(100,200,255,0.12)] bg-[rgba(255,255,255,0.03)] text-[rgba(255,255,255,0.9)] hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
+                            }`}
+                          >
+                            <MapPin className="h-3.5 w-3.5 text-[#60a5fa]" />
+                            <span className="truncate">{state}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      variant="outline"
+                      className="border-[rgba(100,200,255,0.2)] text-white hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
+                      type="button"
+                      onClick={() => {
+                        setPendingState(null);
+                        setStateInput("");
+                        setSelectedState(null);
+                        setLocationEvents([]);
+                        setGeocodeResult(null);
+                        setLocationError(null);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleConfirmState}
+                      disabled={locationLoading || (!pendingState && !stateInput && !selectedState)}
+                      className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white hover:shadow-[0_12px_32px_-12px_rgba(214,0,36,0.6)] disabled:opacity-60"
+                    >
+                      {locationLoading ? "Loading..." : "Confirm location"}
+                    </Button>
+                  </div>
+
+                  {locationError && (
+                    <p className="text-xs text-[#fca5a5]">⚠️ {locationError}</p>
+                  )}
+
+                </DialogContent>
+              </Dialog>
 
               {/* Navigation Items */}
               <nav className="hidden lg:flex items-center gap-1">
@@ -438,11 +698,12 @@ const NewUserDashboard = () => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
                   <DropdownMenuItem 
-                    onClick={handleLogout} 
-                    className="text-[#FF5555] focus:text-[#FF5555] hover:bg-[rgba(255,0,0,0.1)] transition-all duration-300 cursor-pointer"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="text-[#FF5555] focus:text-[#FF5555] hover:bg-[rgba(255,0,0,0.1)] transition-all duration-300 cursor-pointer disabled:opacity-60"
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    {isLoggingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                    <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

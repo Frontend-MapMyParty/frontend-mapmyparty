@@ -110,8 +110,11 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   if (state.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div>Checking your session...</div>
+      <div className="min-h-screen bg-gradient-to-b from-[#0b1220] via-[#0c1426] to-[#0a0f1a] flex items-center justify-center text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full border-2 border-red-500/60 border-t-transparent animate-spin" />
+          <div className="text-sm text-white/70">Checking your session...</div>
+        </div>
       </div>
     );
   }

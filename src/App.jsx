@@ -59,14 +59,10 @@ const App = () => {
             {/* Protected Organizer Routes */}
             <Route path="/organizer/dashboard" element={
               <ProtectedRoute requiredRole="organizer">
-                <OrganizerDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/organizer/dashboard-v2" element={
-              <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
+            <Route path="/organizer/dashboard-v2" element={<Navigate to="/organizer/dashboard" replace />} />
             <Route path="/organizer/select-event-type" element={
               <ProtectedRoute requiredRole="organizer">
                 <EventTypeSelection />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Check, Calendar, Clock, Globe, Upload, X, ChevronLeft, Plus, MapPin, Ticket, Users, Table2, UsersRound, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar as CalendarIcon, Clock, Globe, Upload, X, ChevronLeft, Plus, MapPin, Ticket, Users, Table2, UsersRound, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { toast } from "sonner";
@@ -24,13 +24,17 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, publishEvent, uploadArtistImage } from "@/services/eventService";
+import { updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, uploadTempImage, createEventStep1, persistFlyerUrl, persistGalleryUrls } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 
 const CreateEvent = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { addEvent, events, updateEvent } = useEvents();
   const [currentStep, setCurrentStep] = useState(1);
   const [eventType, setEventType] = useState("one-time");
@@ -39,6 +43,8 @@ const CreateEvent = () => {
   const [existingGalleryUrls, setExistingGalleryUrls] = useState([]); // Existing images from backend (URLs)
   const [galleryImages, setGalleryImages] = useState([]); // All images (existing URLs + new previews)
   const [galleryImageFiles, setGalleryImageFiles] = useState([]); // Only NEW files to upload
+  const [tempCoverUpload, setTempCoverUpload] = useState(null); // Cloudinary temp result before event creation
+  const [tempGalleryUploads, setTempGalleryUploads] = useState([]); // Temp Cloudinary uploads before event creation
   const [galleryImageIds, setGalleryImageIds] = useState([]); // Map of URL -> ID for deletion
   const [deletedImageIds, setDeletedImageIds] = useState(new Set()); // Track deleted image IDs to filter them out
   const [imagesChanged, setImagesChanged] = useState(false);
@@ -62,11 +68,118 @@ const CreateEvent = () => {
   const [currentEventType, setCurrentEventType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("Classic"); // Default template (using name)
+  const today = new Date();
+  const [startCalendarOpen, setStartCalendarOpen] = useState(false);
+  const [endCalendarOpen, setEndCalendarOpen] = useState(false);
+  const [startTimeOpen, setStartTimeOpen] = useState(false);
+  const [endTimeOpen, setEndTimeOpen] = useState(false);
+  const [originalDateTime, setOriginalDateTime] = useState({ start: null, end: null }); // Track original start/end for change detection
+  const [sponsors, setSponsors] = useState([{ name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+  const [originalSponsors, setOriginalSponsors] = useState([]);
+  const [sponsorUploadIndex, setSponsorUploadIndex] = useState(null);
+  const [sponsorSaving, setSponsorSaving] = useState(false);
+  const [publishState, setPublishState] = useState("DRAFT");
+
+  const hourOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const minuteOptions = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+  const formatDateValue = (value) => {
+    if (!value) return "";
+    try {
+      return format(new Date(`${value}T00:00:00`), "dd MMM yyyy");
+    } catch {
+      return value;
+    }
+  };
+
+  const parseTime = (value) => {
+    if (!value) return { hour: "", minute: "00", ampm: "AM" };
+    const [h, m = "00"] = value.split(":");
+    const hourNum = Number(h) || 0;
+    const ampm = hourNum >= 12 ? "PM" : "AM";
+    const hour12 = hourNum % 12 === 0 ? 12 : hourNum % 12;
+    return { hour: String(hour12).padStart(2, "0"), minute: String(m).padStart(2, "0"), ampm };
+  };
+
+  const buildTime = (hour12, minute, ampm) => {
+    if (!hour12) return "";
+    const base = Number(hour12) % 12;
+    const h24 = (ampm === "PM" ? base + 12 : base === 12 ? 0 : base).toString().padStart(2, "0");
+    return `${h24}:${minute || "00"}`;
+  };
+
+  const formatTimeDisplay = (value) => {
+    if (!value) return "Pick a time";
+    const { hour, minute, ampm } = parseTime(value);
+    return `${hour}:${minute} ${ampm}`;
+  };
+
+  const TimePicker = ({ value, onChange, onClose }) => {
+    const { hour, minute, ampm } = parseTime(value);
+    const setPart = (h = hour, m = minute, ap = ampm, close = false) => {
+      onChange(buildTime(h, m, ap));
+      if (close) onClose?.();
+    };
+
+    const itemBase =
+      "w-full text-left px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition";
+    const itemActive = "bg-gradient-to-r from-[#2563eb]/70 to-[#e11d48]/70 text-white border-white/30 shadow";
+
+    return (
+      <div className="grid grid-cols-3 gap-3 p-3 bg-[#0b1224]/90 rounded-2xl border border-white/10 shadow-[0_15px_50px_rgba(0,0,0,0.55)] w-[320px]">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.08em] text-white/60">Hour</p>
+          <div className="max-h-48 overflow-y-auto pr-1 space-y-2">
+            {hourOptions.map((h) => (
+              <button
+                key={h}
+                type="button"
+                className={`${itemBase} ${h === hour ? itemActive : ""}`}
+                onClick={() => setPart(h, minute, ampm, false)}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.08em] text-white/60">Minute</p>
+          <div className="max-h-48 overflow-y-auto pr-1 space-y-2">
+            {minuteOptions.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`${itemBase} ${m === minute ? itemActive : ""}`}
+                onClick={() => setPart(hour, m, ampm, true)}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.08em] text-white/60">AM/PM</p>
+          <div className="space-y-2">
+            {["AM", "PM"].map((ap) => (
+              <button
+                key={ap}
+                type="button"
+                className={`${itemBase} ${ap === ampm ? itemActive : ""}`}
+                onClick={() => setPart(hour, minute, ap, true)}
+              >
+                {ap}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
   
   const editId = searchParams.get('edit');
   const eventTypeParam = searchParams.get('type');
   const isEditMode = !!editId;
-  
+
   // Form data
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
@@ -118,6 +231,81 @@ const CreateEvent = () => {
   const venueInputRef = useRef(null);
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+
+  // Ensure backendEventId is set when editing (even if session flags are missing)
+  useEffect(() => {
+    if (isEditMode && editId && !backendEventId) {
+      setBackendEventId(editId);
+      sessionStorage.setItem('draftEventId', editId);
+      sessionStorage.setItem('draftStarted', 'true');
+    }
+  }, [isEditMode, editId, backendEventId]);
+
+  // Neon event theme colors (toned-down)
+  const pageTheme = {
+    background:
+      "radial-gradient(circle at 18% 20%, rgba(37,99,235,0.12), transparent 25%), radial-gradient(circle at 85% 0%, rgba(225,29,72,0.1), transparent 22%), #0b0f18",
+    card: "rgba(255,255,255,0.04)",
+    border: "rgba(255,255,255,0.08)",
+    red: "#e11d48",
+    blue: "#2563eb",
+    glow: "0 20px 70px rgba(0,0,0,0.45)",
+  };
+
+  const fieldClass =
+    "bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0 focus-visible:border-[#2563eb]/60 transition-all duration-200";
+  const cardBase =
+    "border-white/10 bg-[#0f172a]/85 backdrop-blur-sm shadow-lg";
+  const selectMenuClass =
+    "bg-[#0f1624] text-white border border-white/10 shadow-xl rounded-lg";
+
+  const ensureBackendEventId = async () => {
+    if (backendEventId) return backendEventId;
+
+    if (!eventTitle.trim() || !mainCategory || selectedCategories.length === 0) {
+      toast.error("Add title, category, and subcategory before uploading images.");
+      return null;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setLoadingMessage("Creating draft event...");
+      setShowLoading(true);
+
+      const payload = {
+        title: eventTitle,
+        description: eventDescription,
+        category: mainCategory,
+        subCategory: selectedCategories[0] || "",
+      };
+      if (currentEventType) {
+        payload.type = currentEventType;
+      }
+
+      const resp = await apiFetch('api/event/create-event', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      const backendId = resp.data?.id || resp.data?._id || resp.id || resp._id;
+      if (!backendId) {
+        toast.error("Could not create draft event. Please try again.");
+        return null;
+      }
+      setBackendEventId(backendId);
+      sessionStorage.setItem('draftStarted', 'true');
+      sessionStorage.setItem('draftEventId', backendId);
+      toast.success("Draft created. You can upload images now.");
+      return backendId;
+    } catch (err) {
+      console.error("Failed to create draft before upload:", err);
+      toast.error(err.message || "Failed to create draft event.");
+      return null;
+    } finally {
+      setIsSubmitting(false);
+      setShowLoading(false);
+    }
+  };
 
   const categoryHierarchy = {
     Music: ["Bollywood", "Hip Hop", "Electronic", "Melodic", "Live Music", "Metal", "Rap", "Music House", "Techno", "K-pop", "Hollywood", "POP", "Punjabi", "Disco", "Rock", "Afrobeat", "Dance Hall", "Thumri", "Bolly Tech"],
@@ -196,36 +384,102 @@ const CreateEvent = () => {
 
   // Load event data if editing
   useEffect(() => {
-    if (editId) {
-      const eventToEdit = events.find(e => e.id === editId);
-      if (eventToEdit) {
-        setEventTitle(eventToEdit.title);
-        setMainCategory(eventToEdit.category || '');
-        setSelectedCategories([eventToEdit.subcategory || '']);
-        setCoverImage(eventToEdit.image);
-        
-        // Load template if available (map old IDs to new names)
-        if (eventToEdit.template) {
-          const templateName = mapTemplateId(eventToEdit.template);
-          setSelectedTemplate(templateName);
-        }
-        
-        // Parse location
-        const locationParts = eventToEdit.location.split(', ');
-        if (locationParts.length > 0) setVenueName(locationParts[0]);
-        if (locationParts.length > 1) setCity(locationParts[1]);
-        if (locationParts.length > 2) setState(locationParts[2]);
-        
-        // Parse price
-        if (eventToEdit.price && eventToEdit.price.includes('₹')) {
-          const price = eventToEdit.price.replace(/[^0-9]/g, '');
-          setTicketPrice(price);
-        }
+    if (!editId) return;
+    const stateEvent = location.state?.event;
+    const eventToEdit = stateEvent || events.find((e) => e.id === editId);
+    if (!eventToEdit) return;
 
-        setArtists(eventToEdit.artists || [{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]);
-      }
+    const start = eventToEdit.startDate ? new Date(eventToEdit.startDate) : null;
+    const end = eventToEdit.endDate ? new Date(eventToEdit.endDate) : null;
+    const toDateStr = (d) => (d ? d.toISOString().slice(0, 10) : "");
+    const toTimeStr = (d) => {
+      if (!d) return "";
+      const iso = d.toISOString();
+      return iso.slice(11, 16);
+    };
+
+    setBackendEventId(eventToEdit.id || eventToEdit._id || backendEventId);
+    setEventTitle(eventToEdit.title || "");
+    setEventDescription(eventToEdit.description || "");
+    setMainCategory(eventToEdit.category || "");
+    setSelectedCategories([eventToEdit.subCategory || eventToEdit.subcategory || ""]);
+    setCoverImage(eventToEdit.flyerImage || eventToEdit.image || eventToEdit.flyer);
+    setStartDate(toDateStr(start));
+    setStartTime(toTimeStr(start));
+    setEndDate(toDateStr(end));
+    setEndTime(toTimeStr(end));
+    const normalizedStatus = (eventToEdit.publishStatus || eventToEdit.status || "").toUpperCase();
+    setPublishState(normalizedStatus === "PUBLISHED" || normalizedStatus === "ACTIVE" ? "PUBLISHED" : "DRAFT");
+    // Track originals for change detection in Step 2
+    setOriginalDateTime({
+      start: start ? start.toISOString() : null,
+      end: end ? end.toISOString() : null,
+    });
+    // Sponsors (Step 5)
+    if (Array.isArray(eventToEdit.sponsors) && eventToEdit.sponsors.length > 0) {
+      const normalizedSponsors = eventToEdit.sponsors.map((s) => ({
+        name: s.name || "",
+        company: s.company || s.organization || "",
+        website: s.website || s.link || "",
+        tier: s.tier || "",
+        logo: s.logo || s.logoUrl || "",
+        note: s.note || s.description || "",
+      }));
+      setSponsors(normalizedSponsors);
+      setOriginalSponsors(normalizedSponsors);
+    } else {
+      setSponsors([{ name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+      setOriginalSponsors([]);
     }
-  }, [editId, events]);
+    setTicketPrice(
+      eventToEdit.price
+        ? String(eventToEdit.price).replace(/[^0-9.]/g, "")
+        : ticketPrice
+    );
+
+    // Load template if available (map old IDs to new names)
+    if (eventToEdit.template) {
+      const templateName = mapTemplateId(eventToEdit.template);
+      setSelectedTemplate(templateName);
+    }
+
+    // Parse location from venues
+    const firstVenue = Array.isArray(eventToEdit.venues) && eventToEdit.venues.length > 0
+      ? eventToEdit.venues[0]
+      : null;
+    if (firstVenue) {
+      setVenueId(firstVenue.id || firstVenue._id || venueId);
+      setVenueName(firstVenue.name || firstVenue.venueName || "");
+      setCity(firstVenue.city || "");
+      setState(firstVenue.state || "");
+      setCountry(eventToEdit.country || "India");
+      setPostalCode(eventToEdit.postalCode || "");
+      setVenueContact(eventToEdit.venueContact || "");
+      setVenueEmail(eventToEdit.venueEmail || "");
+      setOrganizerNote(eventToEdit.organizerNote || "");
+      setFullAddress(firstVenue.fullAddress || firstVenue.address || "");
+      if (firstVenue.latitude && firstVenue.longitude) {
+        setSelectedLocation({
+          lat: firstVenue.latitude,
+          lng: firstVenue.longitude,
+        });
+      }
+    } else if (eventToEdit.location) {
+      const locationParts = eventToEdit.location.split(", ");
+      if (locationParts.length > 0) setVenueName(locationParts[0]);
+      if (locationParts.length > 1) setCity(locationParts[1]);
+      if (locationParts.length > 2) setState(locationParts[2]);
+    }
+
+    if (eventToEdit.type) {
+      setSelectedEventTypeCategory(eventToEdit.type);
+      setCurrentEventType(eventToEdit.type);
+    }
+
+    setArtists(
+      eventToEdit.artists || [{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]
+    );
+  }, [editId, events, location.state, backendEventId, ticketPrice]);
 
   // Map URL params to backend enum values
   const eventTypeMapping = {
@@ -643,16 +897,17 @@ const CreateEvent = () => {
 
   const steps = [
     { number: 1, title: "Event Details" },
-    { number: 2, title: "Images" },
-    { number: 3, title: "Date & Time" },
-    { number: 4, title: "Tickets" },
-    { number: 5, title: "Venue & Location" },
+    { number: 2, title: "Date & Time" },
+    { number: 3, title: "Tickets" },
+    { number: 4, title: "Venue & Location" },
+    { number: 5, title: "Sponsor" },
     { number: 6, title: "Add Artist" },
     { number: 7, title: "Additional Info" },
-    { number: 8, title: "Select Template" },
+    { number: 8, title: "Review & Publish" },
   ];
 
-  const progress = (currentStep / 8) * 100;
+  const progress = (currentStep / steps.length) * 100;
+  const basicDetailsFilled = Boolean(eventTitle.trim() && mainCategory && selectedCategories.length > 0);
 
   const nextStep = async () => {
     // Validate required fields for each step
@@ -670,6 +925,11 @@ const CreateEvent = () => {
         return;
       }
 
+      if (!coverImage && !coverImageFile) {
+        toast.error("Cover image is required");
+        return;
+      }
+
       // Call API for Step 1 - Create or Update Event with basic details
       try {
         setIsSubmitting(true);
@@ -678,8 +938,10 @@ const CreateEvent = () => {
         
         let response;
         
-        // Check if event already exists (going back to step 1 in same session)
-        const hasExistingDraft = backendEventId && sessionStorage.getItem('draftStarted');
+        // Treat edit mode as existing draft even if session flags are missing
+        const hasExistingDraft =
+          backendEventId &&
+          (sessionStorage.getItem('draftStarted') || isEditMode);
         
         if (hasExistingDraft) {
           // UPDATE existing event (user went back to step 1)
@@ -687,9 +949,7 @@ const CreateEvent = () => {
           console.log("📝 Text fields changed?", textFieldsChanged);
           
           try {
-            // Strategy: Only update text fields via PATCH /api/event/update-event/:id
-            // Images are handled separately in Step 2 and uploaded/deleted immediately
-            
+            // Only update text fields; images already handled via direct uploads
             if (textFieldsChanged) {
               console.log("📝 Text fields changed - using PATCH /api/event/update-event/:id");
               
@@ -730,42 +990,155 @@ const CreateEvent = () => {
             return;
           }
         } else {
-          // CREATE new event (first time)
-          console.log("✨ Creating new event (first time)");
+          // CREATE new event (first time) — send only allowed fields, then persist images to backend
+          console.log("✨ Creating new event (first time) with temp uploads");
           
           const eventData = {
-            title: eventTitle,
+            eventTitle,
             description: eventDescription,
-            category: mainCategory,
-            subCategory: selectedCategories[0] || "",
-            status1: "UPCOMING", // EventStatus enum: UPCOMING, ONGOING, COMPLETED, CANCELLED
-            status2: "DRAFT", // PublishStatus enum: DRAFT, PUBLISHED, PENDING
-            type: currentEventType || "PAID", // Use backend enum value (GUESTLIST, EXCLUSIVE, NON_EXCLUSIVE) or default to PAID
-            template: mapTemplateNameToId(selectedTemplate), // Convert template name to ID for backend
-            // These fields will be updated in later steps
-            startDate: null,
-            endDate: null,
-            TC: null,
-            advisory: null,
-            organizerNote: null,
-            questions: []
+            mainCategory,
+            subcategory: selectedCategories[0] || "",
+            eventType: currentEventType || "",
           };
-          
-          response = await apiFetch('api/event/create-event', {
-            method: 'POST',
-            body: JSON.stringify(eventData),
-          });
+
+          response = await createEventStep1(eventData);
           
           toast.success("Event details saved successfully!");
           
           // Store the backend event ID for future updates
-          if (response.data?.id || response.data?._id || response.id || response._id) {
-            const backendId = response.data?.id || response.data?._id || response.id || response._id;
+          let backendId = response.data?.id || response.data?._id || response.id || response._id;
+          if (backendId) {
             setBackendEventId(backendId);
             console.log("💾 Backend Event ID stored:", backendId);
           }
           
-          // Images will be uploaded in Step 2, so no need to load them here
+          // After event exists, persist cover image using the already-uploaded temp URL (no re-upload)
+          if (backendId && tempCoverUpload?.url) {
+            try {
+              setShowLoading(true);
+              setLoadingMessage("Saving cover image...");
+              const coverResp = await persistFlyerUrl(backendId, {
+                imageUrl: tempCoverUpload.url,
+                publicId: tempCoverUpload.publicId,
+              });
+              const coverData = coverResp.data || coverResp;
+              const imageUrl = coverData.flyerImage || coverData.url || tempCoverUpload.url;
+              if (imageUrl) {
+                setCoverImage(imageUrl);
+                toast.success("Cover image saved to event.");
+              }
+            } catch (err) {
+              console.error("Failed to persist cover image after create:", err);
+              toast.error(err?.message || "Cover image upload failed after create.");
+            } finally {
+              setShowLoading(false);
+              setLoadingMessage("");
+            }
+          } else if (backendId && coverImageFile) {
+            // Fallback: if no temp upload exists, upload directly
+            try {
+              setShowLoading(true);
+              setLoadingMessage("Saving cover image...");
+              const coverResp = await uploadFlyerImage(backendId, coverImageFile);
+              const coverData = coverResp.data || coverResp;
+              const imageUrl = coverData.flyerImage || coverData.url;
+              if (imageUrl) {
+                setCoverImage(imageUrl);
+                toast.success("Cover image saved to event.");
+              }
+            } catch (err) {
+              console.error("Failed to persist cover image after create:", err);
+              toast.error(err?.message || "Cover image upload failed after create.");
+            } finally {
+              setShowLoading(false);
+              setLoadingMessage("");
+            }
+          }
+          
+          // After event exists, persist gallery images using already-uploaded temp URLs (no re-upload)
+          const tempGalleryUrls = tempGalleryUploads.map((g) => g.url).filter(Boolean);
+          if (backendId && tempGalleryUrls.length > 0) {
+            try {
+              setShowLoading(true);
+              setLoadingMessage("Saving gallery images...");
+              const galleryResp = await persistGalleryUrls(backendId, tempGalleryUrls);
+              const respData = galleryResp.data || galleryResp;
+              
+              const galleryImagesData =
+                (respData.images && Array.isArray(respData.images) && respData.images) ||
+                (respData.galleryImages && Array.isArray(respData.galleryImages) && respData.galleryImages) ||
+                [];
+              
+              const newImageUrls = galleryImagesData.map(img => img.url || img);
+              const newImageIdMap = {};
+              galleryImagesData.forEach(img => { if (img.id && (img.url || img)) newImageIdMap[img.url || img] = img.id; });
+              
+              const updatedGalleryImages = [...galleryImages, ...newImageUrls];
+              const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
+              
+              setExistingGalleryUrls(updatedGalleryImages);
+              setGalleryImages(updatedGalleryImages);
+              setGalleryImageIds(updatedImageIdMap);
+              setGalleryImageFiles([]); // clear pending files
+              
+              toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
+            } catch (err) {
+              console.error("Failed to persist gallery images after create:", err);
+              toast.error(err?.message || "Gallery upload failed after create.");
+            } finally {
+              setShowLoading(false);
+              setLoadingMessage("");
+            }
+          } else if (backendId && galleryImageFiles.length > 0) {
+            // Fallback: upload if no temp uploads are available
+            try {
+              setShowLoading(true);
+              setLoadingMessage("Saving gallery images...");
+              const galleryResp = await uploadGalleryImages(backendId, galleryImageFiles);
+              const respData = galleryResp.data || galleryResp;
+              
+              if (respData.images && Array.isArray(respData.images)) {
+                const galleryImagesData = respData.images.filter(img => img.type === 'EVENT_GALLERY');
+                const newImageUrls = galleryImagesData.map(img => img.url);
+                const newImageIdMap = {};
+                galleryImagesData.forEach(img => { newImageIdMap[img.url] = img.id; });
+                
+                const updatedGalleryImages = [...galleryImages, ...newImageUrls];
+                const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
+                
+                setExistingGalleryUrls(updatedGalleryImages);
+                setGalleryImages(updatedGalleryImages);
+                setGalleryImageIds(updatedImageIdMap);
+                setGalleryImageFiles([]); // clear pending files
+                
+                toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
+              } else if (respData.galleryImages && Array.isArray(respData.galleryImages)) {
+                const newImageUrls = respData.galleryImages.map(img => img.url || img);
+                const newImageIdMap = {};
+                respData.galleryImages.forEach(img => { if (img.id && img.url) newImageIdMap[img.url] = img.id; });
+                
+                const updatedGalleryImages = [...galleryImages, ...newImageUrls];
+                const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
+                
+                setExistingGalleryUrls(updatedGalleryImages);
+                setGalleryImages(updatedGalleryImages);
+                setGalleryImageIds(updatedImageIdMap);
+                setGalleryImageFiles([]);
+                
+                toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
+              }
+            } catch (err) {
+              console.error("Failed to persist gallery images after create:", err);
+              toast.error(err?.message || "Gallery upload failed after create.");
+            } finally {
+              setShowLoading(false);
+              setLoadingMessage("");
+            }
+          }
+          
+          // Reset temp uploads after creation
+          setTempCoverUpload(null);
+          setTempGalleryUploads([]);
           setImagesChanged(false); // Reset flag after creation
         }
         
@@ -793,31 +1166,6 @@ const CreateEvent = () => {
     }
 
     if (currentStep === 2) {
-      // Step 2: Images (images uploaded immediately on selection)
-      if (!coverImage) {
-        toast.error("Cover image is required. Please upload a cover image.");
-        return;
-      }
-
-      // Check if cover image is still uploading
-      if (uploadingCover) {
-        toast.error("Cover image is still uploading. Please wait...");
-        return;
-      }
-
-      // Check if gallery images are still uploading
-      if (uploadingGallery) {
-        toast.error("Gallery images are still uploading. Please wait...");
-        return;
-      }
-
-      // All images are already uploaded, just move to next step
-      console.log("✅ Images already uploaded, proceeding to next step");
-      setCurrentStep(currentStep + 1);
-      return;
-    }
-
-    if (currentStep === 3) {
       if (!startDate) {
         toast.error("Starting date is required");
         return;
@@ -839,6 +1187,22 @@ const CreateEvent = () => {
         return;
       }
 
+      // Combine date and time into ISO format for comparison and update
+      const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      const endDateTime = new Date(`${endDate}T${endTime}`).toISOString();
+
+      const hasDateChanges =
+        !originalDateTime.start ||
+        !originalDateTime.end ||
+        originalDateTime.start !== startDateTime ||
+        originalDateTime.end !== endDateTime;
+
+      if (isEditMode && backendEventId && !hasDateChanges) {
+        toast.info("No changes to update");
+        setCurrentStep(currentStep + 1);
+        return;
+      }
+
       // Call API for Step 3 - Update Date & Time
       try {
         setIsSubmitting(true);
@@ -853,10 +1217,6 @@ const CreateEvent = () => {
           return;
         }
         
-        // Combine date and time into ISO format
-        const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
-        const endDateTime = new Date(`${endDate}T${endTime}`).toISOString();
-        
         const updateData = {
           startDate: startDateTime,
           endDate: endDateTime,
@@ -866,6 +1226,7 @@ const CreateEvent = () => {
         
         toast.success("Date & time updated successfully!");
         console.log("Step 3 API Response:", response);
+        setOriginalDateTime({ start: startDateTime, end: endDateTime });
         
         // Move to next step after successful API call
         setCurrentStep(currentStep + 1);
@@ -888,7 +1249,7 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       // Just validate that at least one ticket exists
       if (savedTickets.length === 0) {
         toast.error("Please add at least one ticket type");
@@ -906,7 +1267,7 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 5) {
+    if (currentStep === 4) {
       if (!venueName.trim()) {
         toast.error("Venue name is required");
         return;
@@ -1099,6 +1460,54 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
+    if (currentStep === 5) {
+      const cleanedSponsors = normalizeSponsors(sponsors);
+      const hasChanges = sponsorsChanged();
+
+      // If nothing entered and nothing to update, just move on
+      if (cleanedSponsors.length === 0 && !originalSponsors.length) {
+        setCurrentStep(currentStep + 1);
+        return;
+      }
+
+      if (!hasChanges) {
+        toast.info("No changes to update");
+        setCurrentStep(currentStep + 1);
+        return;
+      }
+
+      try {
+        setSponsorSaving(true);
+        setLoadingMessage("Saving sponsor details...");
+        setShowLoading(true);
+
+        if (!backendEventId) {
+          toast.error("Event ID not found. Please go back to Step 1.");
+          return;
+        }
+
+        const payload = {
+          sponsors: cleanedSponsors,
+          isSponsored: cleanedSponsors.length > 0,
+        };
+
+        const response = await updateEventStep6(backendEventId, payload);
+        console.log("Step 5 (Sponsor) API Response:", response);
+        setOriginalSponsors(cleanedSponsors);
+        toast.success("Sponsor details saved");
+        setCurrentStep(currentStep + 1);
+      } catch (error) {
+        console.error("Error saving sponsors:", error);
+        toast.error(error.message || "Failed to save sponsor details. Please try again.");
+        return;
+      } finally {
+        setSponsorSaving(false);
+        setShowLoading(false);
+        setLoadingMessage("");
+      }
+      return;
+    }
+
     if (currentStep === 6) {
       // Validate that all artists with names have Instagram
       for (let i = 0; i < artists.length; i++) {
@@ -1125,8 +1534,11 @@ const CreateEvent = () => {
         
         // Filter out empty artists
         const validArtists = artists
-          .map((artist, index) => ({ ...artist, originalIndex: index }))
-          .filter(artist => artist.name.trim() !== "");
+          .filter(artist => artist.name.trim() !== "")
+          .map(artist => ({
+            ...artist,
+            eventId: backendEventId,
+          }));
         
         if (validArtists.length === 0) {
           // No artists to create, just move to next step
@@ -1136,40 +1548,28 @@ const CreateEvent = () => {
           return;
         }
         
-        // Filter out artists that have already been created
-        const newArtists = validArtists.filter(artist => 
-          !createdArtistIndices.includes(artist.originalIndex)
-        );
+        const artistResponses = [];
         
-        if (newArtists.length === 0) {
-          console.log("✅ No new artists to create, all artists already exist");
-          toast.success("Artists already added!");
-          setIsSubmitting(false);
-          setShowLoading(false);
-          setCurrentStep(currentStep + 1);
-          return;
+        for (let i = 0; i < validArtists.length; i++) {
+          const artist = validArtists[i];
+          
+          // Only create artists that haven't been created before
+          if (!createdArtistIndices.includes(i)) {
+            console.log(`🎤 Creating artist ${i + 1}:`, artist);
+            
+            const response = await createArtist({
+              ...artist,
+              eventId: backendEventId,
+            });
+            
+            artistResponses.push(response);
+            
+            // Mark this artist as created
+            setCreatedArtistIndices(prev => [...prev, i]);
+          } else {
+            console.log(`⏭️ Skipping artist ${i + 1} (already created)`);
+          }
         }
-        
-        console.log(`🎤 Creating ${newArtists.length} new artist(s)`);
-        
-        // Create only new artists
-        const artistPromises = newArtists.map(async (artist) => {
-          const artistData = {
-            name: artist.name,
-            eventId: backendEventId, // Use backend event ID
-            gender: artist.gender || "PREFER_NOT_TO_SAY",
-            instagramLink: artist.instagram || "",
-            spotifyLink: artist.spotify || "",
-            image: artist.photo || "", // Base64 or URL
-          };
-          return createArtist(artistData);
-        });
-        
-        const artistResponses = await Promise.all(artistPromises);
-        
-        // Store the indices of newly created artists
-        const newlyCreatedIndices = newArtists.map(artist => artist.originalIndex);
-        setCreatedArtistIndices([...createdArtistIndices, ...newlyCreatedIndices]);
         
         toast.success(`${artistResponses.length} artist(s) added successfully!`);
         console.log("Step 6 API Response:", artistResponses);
@@ -1187,7 +1587,6 @@ const CreateEvent = () => {
             navigate("/auth");
           }, 2000);
         }
-        return;
       } finally {
         setIsSubmitting(false);
         setShowLoading(false);
@@ -1196,12 +1595,12 @@ const CreateEvent = () => {
     }
 
     if (currentStep === 7) {
-      // Step 7: Additional Info - move to Step 8 (Template Selection)
+      // Additional info collected; move to review
       setCurrentStep(currentStep + 1);
       return;
     }
 
-    if (currentStep < 8) {
+    if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -1216,48 +1615,23 @@ const CreateEvent = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check if we have backend event ID
-    if (!backendEventId) {
-      toast.error("Please complete Step 1 first to create the event");
-      return;
-    }
-
+    setUploadingCover(true);
     try {
-      setUploadingCover(true);
-      setLoadingMessage("Uploading cover image...");
-      setShowLoading(true);
-      
-      console.log("📸 Uploading flyer image immediately...");
-      
-      // Upload to backend using new uploadFlyerImage API
-      const response = await uploadFlyerImage(backendEventId, file);
-      
-      console.log("📦 Flyer upload response:", JSON.stringify(response, null, 2));
-      
-      // Update with backend URL
-      const responseData = response.data || response;
-      if (responseData.flyerImage || responseData.url) {
-        const imageUrl = responseData.flyerImage || responseData.url;
-        setCoverImage(imageUrl);
-        setCoverImageFile(null); // Clear file object
-        console.log("✅ Flyer image uploaded:", imageUrl);
-        toast.success("Cover image uploaded successfully!");
-      } else {
-        console.error("❌ No flyerImage in response!");
-        console.error("   Response structure:", Object.keys(responseData));
-        toast.error("Image uploaded but couldn't load URL. Please refresh.");
-      }
-      
+      // Immediate Cloudinary upload (no event needed) to speed up UX
+      const temp = await uploadTempImage(file, "events/drafts/flyer");
+      setTempCoverUpload(temp);
+      setCoverImage(temp.url);
+      setCoverImageFile(file); // keep original file to send in create call if needed
       setImagesChanged(true);
       setRemoveFlyerImage(false);
-      
+      toast.success("Cover image uploaded to cloud.");
     } catch (error) {
-      console.error("Failed to upload flyer image:", error);
-      toast.error("Failed to upload cover image. Please try again.");
-      setCoverImage(null); // Clear preview on error
+      console.error("Failed to upload cover image:", error);
+      toast.error(error.message || "Failed to upload cover image.");
+      setCoverImage(null);
+      setTempCoverUpload(null);
     } finally {
       setUploadingCover(false);
-      setShowLoading(false);
     }
   };
 
@@ -1332,82 +1706,32 @@ const CreateEvent = () => {
 
     try {
       setUploadingGallery(true);
-      setShowLoading(true);
-      
-      console.log(`📸 Uploading ${validFiles.length} gallery image(s) immediately...`);
-      console.log(`📋 Current state: ${galleryImages.length} existing in backend`);
-      
-      // Upload to backend using new uploadGalleryImages API
-      const response = await uploadGalleryImages(backendEventId, validFiles);
-      
-      console.log("📦 Gallery upload response:", JSON.stringify(response, null, 2));
-      
-      const responseData = response.data || response;
-      
-      // Backend returns images in 'images' array with id and url
-      if (responseData.images && Array.isArray(responseData.images)) {
-        const galleryImagesData = responseData.images.filter(img => img.type === 'EVENT_GALLERY');
-        const newImageUrls = galleryImagesData.map(img => img.url);
-        const newImageIdMap = {};
-        
-        galleryImagesData.forEach(img => {
-          newImageIdMap[img.url] = img.id; // Map URL to ID for deletion
-        });
-        
-        // Combine existing images with new ones
-        const updatedGalleryImages = [...galleryImages, ...newImageUrls];
-        const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
-        
-        // Update state with the combined arrays
-        setExistingGalleryUrls(updatedGalleryImages);
-        setGalleryImages(updatedGalleryImages);
-        setGalleryImageIds(updatedImageIdMap);
-        setGalleryImageFiles([]);
-        
-        console.log(`✅ Added ${newImageUrls.length} new gallery images`);
-        console.log(`📋 Total: ${updatedGalleryImages.length} gallery images`);
-        console.log("📋 Updated Image ID map:", updatedImageIdMap);
-        toast.success(`${validFiles.length} gallery image(s) uploaded successfully!`);
+
+      // Upload all gallery files to Cloudinary drafts folder
+      const uploads = [];
+      for (const file of validFiles) {
+        const temp = await uploadTempImage(file, "events/drafts/gallery");
+        uploads.push({ ...temp, file });
       }
-      // Fallback: backend might return galleryImages array directly with URLs
-      else if (responseData.galleryImages && Array.isArray(responseData.galleryImages)) {
-        const newImageUrls = responseData.galleryImages.map(img => img.url || img);
-        const newImageIdMap = {};
-        
-        responseData.galleryImages.forEach(img => {
-          if (img.id && img.url) {
-            newImageIdMap[img.url] = img.id;
-          }
-        });
-        
-        // Combine existing images with new ones
-        const updatedGalleryImages = [...galleryImages, ...newImageUrls];
-        const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
-        
-        // Update state with the combined arrays
-        setExistingGalleryUrls(updatedGalleryImages);
-        setGalleryImages(updatedGalleryImages);
-        setGalleryImageIds(updatedImageIdMap);
-        setGalleryImageFiles([]);
-        
-        console.log(`✅ Added ${newImageUrls.length} new gallery images (fallback)`);
-        console.log(`📋 Total: ${updatedGalleryImages.length} gallery images in UI`);
-        toast.success(`${validFiles.length} gallery image(s) uploaded successfully!`);
-      } else {
-        console.warn("Unexpected response format from server:", responseData);
-        toast.error("Unexpected response from server. Please try again.");
-      }
+
+      const newUrls = uploads.map(u => u.url);
+      const updatedGalleryImages = [...galleryImages, ...newUrls];
+
+      setTempGalleryUploads(prev => [...prev, ...uploads]);
+      setGalleryImages(updatedGalleryImages);
+      setGalleryImageFiles(prev => [...prev, ...validFiles]);
+      setImagesChanged(true);
+
+      toast.success(`${validFiles.length} gallery image(s) uploaded to cloud.`);
     } catch (error) {
       console.error("Failed to upload gallery images:", error);
-      toast.error("Failed to upload gallery images. Please try again.");
-      // Don't modify the existing gallery on error
+      toast.error(error.message || "Failed to upload gallery images.");
     } finally {
       // Reset the file input to allow re-uploading the same file
       if (e.target) {
         e.target.value = '';
       }
       setUploadingGallery(false);
-      setShowLoading(false);
     }
   };
 
@@ -1594,6 +1918,62 @@ const CreateEvent = () => {
     setTicketModalOpen(true);
   };
 
+  const normalizeSponsors = (list) =>
+    list
+      .map((s) => ({
+        name: (s.name || "").trim(),
+        company: (s.company || "").trim(),
+        website: (s.website || "").trim(),
+        tier: (s.tier || "").trim(),
+        logo: (s.logo || "").trim(),
+        note: (s.note || "").trim(),
+      }))
+      .filter((s) => s.name || s.company || s.website || s.tier || s.logo || s.note);
+
+  const sponsorsChanged = () => {
+    const filtered = normalizeSponsors(sponsors);
+    return JSON.stringify(filtered) !== JSON.stringify(originalSponsors);
+  };
+
+  const handleSponsorChange = (index, key, value) => {
+    setSponsors((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  };
+
+  const addSponsorRow = () => {
+    setSponsors((prev) => [...prev, { name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+  };
+
+  const removeSponsorRow = (index) => {
+    setSponsors((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const handleSponsorLogoChange = async (index, file) => {
+    if (!file) return;
+    try {
+      setSponsorUploadIndex(index);
+      setShowLoading(true);
+      setLoadingMessage("Uploading sponsor logo...");
+      const upload = await uploadTempImage(file, "events/drafts/sponsors");
+      setSponsors((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], logo: upload.url || upload.secure_url || "" };
+        return next;
+      });
+      toast.success("Logo uploaded");
+    } catch (err) {
+      console.error("Failed to upload sponsor logo:", err);
+      toast.error(err?.message || "Failed to upload sponsor logo");
+    } finally {
+      setSponsorUploadIndex(null);
+      setShowLoading(false);
+      setLoadingMessage("");
+    }
+  };
+
   const handleSaveTicket = async (ticketData) => {
     try {
       setLoadingMessage("Creating ticket...");
@@ -1672,7 +2052,10 @@ const CreateEvent = () => {
     }
   };
 
-  const handleSubmit = async (isDraft) => {
+  const handleSubmit = async (targetState) => {
+    const effectiveState = targetState || publishState;
+    const isDraft = effectiveState !== "PUBLISHED";
+    setPublishState(effectiveState);
     // Validation
     if (!eventTitle || !mainCategory || selectedCategories.length === 0) {
       toast.error("Please fill in all required fields");
@@ -1720,34 +2103,15 @@ const CreateEvent = () => {
         advisory: advisoryJson,
         questions: questionsJson,
         organizerNote: organizerNote,
-        template: mapTemplateNameToId(selectedTemplate), // Convert template name to ID for backend
+        publishStatus: isDraft ? "DRAFT" : "PUBLISHED",
       };
 
       const response = await updateEventStep6(backendEventId, updateData);
       
       console.log("Step 7 API Response:", response);
       
-      // If publishing (not draft), update status to PUBLISHED
-      if (!isDraft) {
-        console.log("🚀 Publishing event...");
-        await publishEvent(backendEventId);
-        toast.success("Event published successfully!");
-        
-        // Clear draft from session storage after publishing
-        sessionStorage.removeItem('draftEventId');
-        sessionStorage.removeItem('draftStarted');
-        sessionStorage.removeItem('deletedImageIds'); // Clear deleted images list
-        
-        // Reset all tracking states
-        setCreatedTicketIds([]);
-        setVenueCreated(false);
-        setCreatedArtistIndices([]);
-        setDeletedImageIds(new Set()); // Clear deleted images
-        
-        console.log("🗑️ Cleared draft event ID and tracking data from session");
-      } else {
-        toast.success("Event saved as draft!");
-      }
+      // Success handling (no explicit status payloads)
+      toast.success(isDraft ? "Event saved as draft!" : "Event updated successfully!");
       
       // Save complete event to localStorage as fallback (until backend my-events endpoint is ready)
       try {
@@ -1766,7 +2130,7 @@ const CreateEvent = () => {
           category: mainCategory, // Alias for compatibility
           subcategory: selectedCategories[0] || "",
           description: eventDescription,
-          status: isDraft ? "DRAFT" : "PUBLISHED",
+          publishStatus: isDraft ? "DRAFT" : "PUBLISHED",
           startDate: startDate,
           endDate: endDate,
           date: startDate, // Alias for compatibility
@@ -1819,26 +2183,37 @@ const CreateEvent = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
+    <div
+      className="min-h-screen flex flex-col relative text-white"
+      style={{ background: pageTheme.background }}
+    >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute inset-x-0 top-20 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      </div>
+
       <LoadingOverlay show={showLoading} message={loadingMessage} />
       <Header isAuthenticated userRole="organizer" />
 
-      <main className="flex-1 py-8">
-        <div className="container max-w-4xl">
+      <main className="flex-1 py-12 relative">
+        <div className="container max-w-6xl relative space-y-6">
           {/* Back Button and Clear Draft */}
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate(-1)}
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+          <div className="flex items-center justify-between mb-6">
+            <div className="absolute -left-4 -top-4 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-white/10 px-2"
+                onClick={() => navigate(-1)}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              <span className="text-sm text-gray-300">Back</span>
+            </div>
             
             {backendEventId && !isEditMode && currentStep === 1 && (
               <Button
                 variant="outline"
                 size="sm"
+                className="border-white/20 bg-white/5 text-white hover:bg-white/10"
                 onClick={() => {
                   if (confirm("Are you sure you want to start a new event? This will discard the current draft.")) {
                     sessionStorage.removeItem('draftEventId');
@@ -1861,328 +2236,591 @@ const CreateEvent = () => {
           </div>
 
           {/* Progress Header */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="mb-4">
-                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                  <h1 className="text-2xl font-bold">
-                    {isEditMode ? "Update Event" : "Create New Event"}
-                  </h1>
-                  {selectedEventTypeCategory && (
-                    <Badge variant="secondary" className="text-sm">
-                      {selectedEventTypeCategory}
-                    </Badge>
-                  )}
-                  {eventId && !isEditMode && (
-                    <Badge variant="outline" className="text-xs font-mono">
-                      ID: {eventId}
-                    </Badge>
-                  )}
-                  {backendEventId && !isEditMode && (
-                    <Badge variant="secondary" className="text-xs">
-                      📝 Draft
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-muted-foreground">
-                  Step {currentStep} of 8: {steps[currentStep - 1].title}
-                </p>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between mt-4">
-                {steps.map((step) => (
-                  <div
-                    key={step.number}
-                    className={`flex items-center gap-2 text-sm ${
-                      step.number === currentStep
-                        ? "text-primary font-semibold"
-                        : step.number < currentStep
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                        step.number < currentStep
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : step.number === currentStep
-                          ? "border-primary"
-                          : "border-muted-foreground"
-                      }`}
-                    >
-                      {step.number < currentStep ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        step.number
-                      )}
-                    </div>
-                    <span className="hidden md:inline">{step.title}</span>
+          <Card
+            className={`mb-6 -mt-2 border ${cardBase}`}
+            style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
+          >
+            <CardContent className="p-6 space-y-5 rounded-xl">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-blue-200/80">
+                    Event Builder
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-3xl font-bold text-white drop-shadow-sm">
+                      {isEditMode ? "Update Event" : "Create New Event"}
+                    </h1>
+                    {selectedEventTypeCategory && (
+                      <Badge className="bg-white/8 text-white border-white/15">
+                        {selectedEventTypeCategory}
+                      </Badge>
+                    )}
+                    {eventId && !isEditMode && (
+                      <Badge variant="outline" className="text-xs font-mono border-white/20 text-white">
+                        ID: {eventId}
+                      </Badge>
+                    )}
+                    {backendEventId && !isEditMode && (
+                      <Badge className="bg-[#e11d48]/15 text-white border-[#e11d48]/30">
+                        📝 Draft
+                      </Badge>
+                    )}
                   </div>
-                ))}
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10">
+                  <div className="w-2 h-2 rounded-full bg-[#e11d48] animate-pulse" />
+                  <span className="text-xs text-gray-200">
+                    Step {currentStep} of {steps.length} • {steps[currentStep - 1].title}
+                  </span>
+                </div>
+              </div>
+
+              {/* Circle+bar tracker */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  {steps.map((step, idx) => {
+                    const isCurrent = step.number === currentStep;
+                    const isDone = step.number < currentStep;
+                    const barActive =
+                      idx < currentStep - 1
+                        ? "bg-gradient-to-r from-[#2563eb] to-[#e11d48]"
+                        : idx === currentStep - 1
+                        ? "bg-[#2563eb]/60"
+                        : "bg-white/12";
+
+                    return (
+                      <div key={step.number} className="flex-1 min-w-[110px] flex items-center gap-2">
+                        <div className="flex flex-col items-center gap-2 w-full">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                              isDone
+                                ? "bg-[#16a34a] border-[#16a34a] text-white shadow-lg shadow-[#16a34a]/30"
+                                : isCurrent
+                                ? "border-[#2563eb] bg-[#2563eb]/15 text-white"
+                                : "border-white/15 bg-white/5 text-gray-300"
+                            }`}
+                          >
+                            {isDone ? <Check className="w-4 h-4" /> : step.number}
+                          </div>
+                          <p className="text-xs font-semibold text-white/85 text-center leading-tight">
+                            {step.title}
+                          </p>
+                        </div>
+                        {idx !== steps.length - 1 && (
+                          <div className={`flex-1 h-1 rounded-full ${barActive}`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Step Content */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{steps[currentStep - 1].title}</CardTitle>
+          <Card
+            className={`border ${cardBase}`}
+            style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
+          >
+            <CardHeader
+              className="border-b border-white/10 bg-transparent"
+              style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
+            >
+              <CardTitle className="text-xl text-white flex items-center gap-2">
+                <span className="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+                  {currentStep}
+                </span>
+                {steps[currentStep - 1].title}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Step 1: Event Details */}
+            <CardContent className="space-y-6 text-gray-100">
+              {/* Step 1: Event Details + Images */}
               {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="eventTitle">Event Title *</Label>
-                    <Input
-                      id="eventTitle"
-                      placeholder="Enter event title"
-                      value={eventTitle}
-                      onChange={(e) => {
-                        setEventTitle(e.target.value);
-                        if (backendEventId) setTextFieldsChanged(true);
-                      }}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Main Category *</Label>
-                    <Select value={mainCategory} onValueChange={(value) => {
-                      setMainCategory(value);
-                      setSelectedCategories([]);
-                      if (backendEventId) setTextFieldsChanged(true);
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select main category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Music">Music</SelectItem>
-                        <SelectItem value="Workshop">Workshop</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {mainCategory && (
+                <div className="space-y-8">
+                  <div className="space-y-4">
                     <div>
-                      <Label>Subcategory *</Label>
-                      <Select value={selectedCategories[0] || ""} onValueChange={(value) => {
-                        setSelectedCategories([value]);
-                        if (backendEventId) setTextFieldsChanged(true);
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select subcategory" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categoryHierarchy[mainCategory]?.map((subcat) => (
-                            <SelectItem key={subcat} value={subcat}>
-                              {subcat}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label htmlFor="description">Event Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Describe your event..."
-                      rows={4}
-                      value={eventDescription}
-                      onChange={(e) => {
-                        setEventDescription(e.target.value);
-                        if (backendEventId) setTextFieldsChanged(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Images */}
-              {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground mb-4">
-                    Upload cover image and gallery images for your event. Images will be uploaded immediately.
-                  </div>
-
-                  {/* Cover Image Section */}
-                  <div className="space-y-2">
-                    <Label htmlFor="cover-image">Cover Image *</Label>
-                    <div className="space-y-3">
-                      <Input 
-                        id="cover-image" 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleCoverImageChange}
-                        className="cursor-pointer"
-                        disabled={uploadingCover || !backendEventId}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Recommended size: 1920x1080px.
-                      </p>
-                      
-                      {/* Loading indicator for cover upload */}
-                      {uploadingCover && (
-                        <div className="flex items-center gap-2 text-sm text-primary">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading cover image to cloud...</span>
-                        </div>
-                      )}
-                      
-                      {coverImage && !uploadingCover && (
-                        <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
-                          <img 
-                            src={coverImage} 
-                            alt="Cover preview" 
-                            className="w-full h-full object-cover"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-2 right-2"
-                            onClick={handleRemoveCoverImage}
-                            title="Delete from cloud"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Gallery Images Section */}
-                  <div className="space-y-2">
-                    <Label htmlFor="gallery">Gallery Images (optional)</Label>
-                    <div className="space-y-3">
-                      <Input 
-                        id="gallery" 
-                        type="file" 
-                        accept="image/*" 
-                        multiple 
-                        onChange={handleGalleryImagesChange}
-                        className="cursor-pointer"
-                        disabled={uploadingGallery || !backendEventId}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Add up to 10 images. Max file size: 10MB each. Images upload immediately after selection.
-                      </p>
-                      
-                      {/* Loading indicator for gallery upload */}
-                      {uploadingGallery && (
-                        <div className="flex items-center gap-2 text-sm text-primary">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Uploading gallery images to cloud...</span>
-                        </div>
-                      )}
-                      
-                      {galleryImages.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          {galleryImages.map((img, index) => (
-                            <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
-                              <img 
-                                src={img} 
-                                alt={`Gallery preview ${index + 1}`} 
-                                className="w-full h-full object-cover"
-                              />
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="icon"
-                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => removeGalleryImage(index)}
-                                title="Delete from cloud"
-                                disabled={uploadingGallery}
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {galleryImages.length > 0 && !uploadingGallery && (
-                        <p className="text-xs text-success">
-                          ✅ {galleryImages.length} image{galleryImages.length !== 1 ? 's' : ''} uploaded to cloud
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Date & Time */}
-              {currentStep === 3 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="startDate">Starting Date *</Label>
+                      <Label htmlFor="eventTitle">Event Title *</Label>
                       <Input
-                        id="startDate"
-                        type="date"
-                        value={startDate}
-                        min={new Date().toISOString().split('T')[0]}
+                        id="eventTitle"
+                        placeholder="Enter event title"
+                        value={eventTitle}
+                        className={fieldClass}
                         onChange={(e) => {
-                          setStartDate(e.target.value);
-                          // Auto-adjust end date if it's before start date
-                          if (endDate && e.target.value > endDate) {
-                            setEndDate(e.target.value);
-                          }
+                          setEventTitle(e.target.value);
+                          if (backendEventId) setTextFieldsChanged(true);
                         }}
                       />
                     </div>
+
                     <div>
-                      <Label htmlFor="startTime">Starting Time *</Label>
-                      <Input
-                        id="startTime"
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
+                      <Label>Main Category *</Label>
+                      <Select value={mainCategory} onValueChange={(value) => {
+                        setMainCategory(value);
+                        setSelectedCategories([]);
+                        if (backendEventId) setTextFieldsChanged(true);
+                      }}>
+                        <SelectTrigger className={`${fieldClass} h-12`}>
+                          <SelectValue placeholder="Select main category" />
+                        </SelectTrigger>
+                        <SelectContent className={selectMenuClass}>
+                          <SelectItem value="Music">Music</SelectItem>
+                          <SelectItem value="Workshop">Workshop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {mainCategory && (
+                      <div>
+                        <Label>Subcategory *</Label>
+                        <Select value={selectedCategories[0] || ""} onValueChange={(value) => {
+                          setSelectedCategories([value]);
+                          if (backendEventId) setTextFieldsChanged(true);
+                        }}>
+                          <SelectTrigger className={`${fieldClass} h-12`}>
+                            <SelectValue placeholder="Select subcategory" />
+                          </SelectTrigger>
+                          <SelectContent className={selectMenuClass}>
+                            {categoryHierarchy[mainCategory]?.map((subcat) => (
+                              <SelectItem key={subcat} value={subcat}>
+                                {subcat}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div>
+                      <Label htmlFor="description">Event Description</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="Describe your event..."
+                        rows={4}
+                        value={eventDescription}
+                        className={`${fieldClass} min-h-[130px]`}
+                        onChange={(e) => {
+                          setEventDescription(e.target.value);
+                          if (backendEventId) setTextFieldsChanged(true);
+                        }}
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="endDate">Ending Date *</Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={endDate}
-                        min={startDate || new Date().toISOString().split('T')[0]}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Add a striking cover and gallery to make your event pop.
                     </div>
-                    <div>
-                      <Label htmlFor="endTime">Ending Time *</Label>
-                      <Input
-                        id="endTime"
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                      />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cover-image">Cover Image *</Label>
+                      <div className="space-y-3">
+                        <Input 
+                          id="cover-image" 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleCoverImageChange}
+                          className={`${fieldClass} cursor-pointer`}
+                          disabled={uploadingCover || !basicDetailsFilled}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Recommended size: 1920x1080px.
+                        </p>
+                        {!basicDetailsFilled && (
+                          <p className="text-xs text-amber-400">
+                            Fill title, category, and subcategory to enable image uploads.
+                          </p>
+                        )}
+                        
+                        {/* Loading indicator for cover upload */}
+                        {uploadingCover && (
+                          <div className="flex items-center gap-2 text-sm text-primary">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Uploading cover image to cloud...</span>
+                          </div>
+                        )}
+                        
+                        {coverImage && !uploadingCover && (
+                          <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
+                            <img 
+                              src={coverImage} 
+                              alt="Cover preview" 
+                              className="w-full h-full object-cover"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2"
+                              onClick={handleRemoveCoverImage}
+                              title="Delete from cloud"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="gallery">Gallery Images (optional)</Label>
+                      <div className="space-y-3">
+                        <Input 
+                          id="gallery" 
+                          type="file" 
+                          accept="image/*" 
+                          multiple 
+                          onChange={handleGalleryImagesChange}
+                          className={`${fieldClass} cursor-pointer`}
+                          disabled={uploadingGallery || !basicDetailsFilled}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Add up to 10 images. Max file size: 10MB each. Images upload immediately after selection.
+                        </p>
+                        
+                        {/* Loading indicator for gallery upload */}
+                        {uploadingGallery && (
+                          <div className="flex items-center gap-2 text-sm text-primary">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Uploading gallery images to cloud...</span>
+                          </div>
+                        )}
+                        
+                        {galleryImages.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {galleryImages.map((img, index) => (
+                              <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
+                                <img 
+                                  src={img} 
+                                  alt={`Gallery preview ${index + 1}`} 
+                                  className="w-full h-full object-cover"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => removeGalleryImage(index)}
+                                  title="Delete from cloud"
+                                  disabled={uploadingGallery}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {galleryImages.length > 0 && !uploadingGallery && (
+                          <p className="text-xs text-success">
+                            ✅ {galleryImages.length} image{galleryImages.length !== 1 ? 's' : ''} uploaded to cloud
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Step 4: Tickets */}
-              {currentStep === 4 && (
+              {/* Step 5: Sponsor */}
+              {currentStep === 5 && (
+                <div className="space-y-5">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Add sponsor details to highlight partners on your event page.
+                      </p>
+                      <p className="text-xs text-white/60">
+                        Include logo, company URL, and tier (Title, Gold, Silver, Bronze, Community).
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addSponsorRow}
+                      className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Sponsor
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {sponsors.map((sponsor, index) => (
+                      <Card key={index} className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                        <CardContent className="p-5 space-y-4">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Sponsor {index + 1}</p>
+                              <h3 className="font-semibold text-white">Brand details</h3>
+                            </div>
+                            {sponsors.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeSponsorRow(index)}
+                                className="text-white hover:text-white"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Sponsor Name *</Label>
+                              <Input
+                                placeholder="Acme Corp"
+                                value={sponsor.name}
+                                onChange={(e) => handleSponsorChange(index, "name", e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Company / Brand</Label>
+                              <Input
+                                placeholder="Acme Entertainment Pvt Ltd"
+                                value={sponsor.company}
+                                onChange={(e) => handleSponsorChange(index, "company", e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Company Link / Website</Label>
+                              <Input
+                                type="url"
+                                placeholder="https://example.com"
+                                value={sponsor.website}
+                                onChange={(e) => handleSponsorChange(index, "website", e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Tier</Label>
+                              <Select
+                                value={sponsor.tier || ""}
+                                onValueChange={(val) => handleSponsorChange(index, "tier", val)}
+                              >
+                                <SelectTrigger className={`${fieldClass} h-12`}>
+                                  <SelectValue placeholder="Select tier" />
+                                </SelectTrigger>
+                                <SelectContent className={selectMenuClass}>
+                                  <SelectItem value="TITLE">Title Sponsor</SelectItem>
+                                  <SelectItem value="GOLD">Gold</SelectItem>
+                                  <SelectItem value="SILVER">Silver</SelectItem>
+                                  <SelectItem value="BRONZE">Bronze</SelectItem>
+                                  <SelectItem value="COMMUNITY">Community / Partner</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Logo</Label>
+                              <div className="space-y-2">
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleSponsorLogoChange(index, e.target.files?.[0])}
+                                  className="cursor-pointer"
+                                />
+                                <p className="text-xs text-muted-foreground">PNG / SVG with transparent background preferred</p>
+                                {sponsorUploadIndex === index && (
+                                  <div className="flex items-center gap-2 text-sm text-primary">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Uploading logo...</span>
+                                  </div>
+                                )}
+                                {sponsor.logo && (
+                                  <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-border bg-white/5 flex items-center justify-center">
+                                    <img
+                                      src={sponsor.logo}
+                                      alt={`${sponsor.name || "Sponsor"} logo`}
+                                      className="w-full h-full object-contain p-2"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Notes (optional)</Label>
+                              <Textarea
+                                rows={4}
+                                placeholder="Activation details, booth info, deliverables..."
+                                value={sponsor.note}
+                                onChange={(e) => handleSponsorChange(index, "note", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {sponsors.length === 0 && (
+                    <div className="border border-dashed border-white/15 rounded-xl p-6 text-sm text-muted-foreground text-center">
+                      No sponsors added yet. Click “Add Sponsor” to include partners.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 2: Date & Time */}
+              {currentStep === 2 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label>Starting Date *</Label>
+                      <Popover open={startCalendarOpen} onOpenChange={setStartCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                          >
+                            <span className="flex items-center gap-2 text-white">
+                              <CalendarIcon className="w-4 h-4 text-white/70" />
+                              {startDate ? formatDateValue(startDate) : "Pick a start date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-auto p-0 border-white/15 bg-transparent">
+                          <Calendar
+                            mode="single"
+                            selected={startDate ? new Date(`${startDate}T00:00:00`) : undefined}
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const iso = format(date, "yyyy-MM-dd");
+                              setStartDate(iso);
+                              if (endDate && iso > endDate) {
+                                setEndDate(iso);
+                              }
+                              setStartCalendarOpen(false);
+                            }}
+                            disabled={{ before: today }}
+                            defaultMonth={startDate ? new Date(`${startDate}T00:00:00`) : today}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Ending Time *</Label>
+                      <Popover open={endTimeOpen} onOpenChange={setEndTimeOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                          >
+                            <span className="flex items-center gap-2 text-white">
+                              <Clock className="w-4 h-4 text-white/70" />
+                              {formatTimeDisplay(startTime)}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          sideOffset={8}
+                          className="w-auto p-0 border-white/15 bg-transparent"
+                        >
+                          <TimePicker
+                            value={startTime}
+                            onChange={(val) => {
+                              setStartTime(val);
+                            }}
+                            onClose={() => setStartTimeOpen(false)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label>Ending Date *</Label>
+                      <Popover open={endCalendarOpen} onOpenChange={setEndCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                          >
+                            <span className="flex items-center gap-2 text-white">
+                              <CalendarIcon className="w-4 h-4 text-white/70" />
+                              {endDate ? formatDateValue(endDate) : "Pick an end date"}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-auto p-0 border-white/15 bg-transparent">
+                          <Calendar
+                            mode="single"
+                            selected={endDate ? new Date(`${endDate}T00:00:00`) : undefined}
+                            onSelect={(date) => {
+                              if (!date) return;
+                              const iso = format(date, "yyyy-MM-dd");
+                              setEndDate(iso);
+                              setEndCalendarOpen(false);
+                            }}
+                            disabled={{
+                              before: startDate ? new Date(`${startDate}T00:00:00`) : today,
+                            }}
+                            defaultMonth={endDate ? new Date(`${endDate}T00:00:00`) : startDate ? new Date(`${startDate}T00:00:00`) : today}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Ending Time *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                          >
+                            <span className="flex items-center gap-2 text-white">
+                              <Clock className="w-4 h-4 text-white/70" />
+                              {formatTimeDisplay(endTime)}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          sideOffset={8}
+                          className="w-auto p-0 border-white/15 bg-transparent"
+                        >
+                          <TimePicker
+                            value={endTime}
+                            onChange={(val) => {
+                              setEndTime(val);
+                            }}
+                            onClose={() => setEndTimeOpen(false)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Tickets */}
+              {currentStep === 3 && (
                 <div className="space-y-6">
                   <div className="text-sm text-muted-foreground">
                     Select ticket types to add for your event
                   </div>
 
+                  <div className="p-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 text-xs md:text-sm text-muted-foreground">
+                    Need a custom ticket? Pick <span className="font-semibold text-white/90">Add Standard Ticket</span>, name it (e.g., <span className="font-semibold text-white/90">Silver</span>) and set any price (₹150, ₹499, etc.). You can add multiple categories.
+                  </div>
+
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* VIP Guest List Card */}
                     <Card 
-                      className="group hover:shadow-lg transition-all cursor-pointer border-2 hover:border-primary"
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
+                      style={{ borderColor: pageTheme.border }}
                       onClick={() => openTicketModal("vip-guest")}
                     >
                       <CardContent className="p-6 space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
-                            <Users className="w-6 h-6 text-primary" />
+                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
+                            <Users className="w-6 h-6 text-white" />
                           </div>
                           <h3 className="text-lg font-semibold">Add VIP Guest List</h3>
                         </div>
@@ -2194,13 +2832,14 @@ const CreateEvent = () => {
 
                     {/* Standard Ticket Card */}
                     <Card 
-                      className="group hover:shadow-lg transition-all cursor-pointer border-2 hover:border-primary"
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
+                      style={{ borderColor: pageTheme.border }}
                       onClick={() => openTicketModal("standard")}
                     >
                       <CardContent className="p-6 space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
-                            <Ticket className="w-6 h-6 text-primary" />
+                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
+                            <Ticket className="w-6 h-6 text-white" />
                           </div>
                           <h3 className="text-lg font-semibold">Add Standard Ticket</h3>
                         </div>
@@ -2212,13 +2851,14 @@ const CreateEvent = () => {
 
                     {/* Table Ticket Card */}
                     <Card 
-                      className="group hover:shadow-lg transition-all cursor-pointer border-2 hover:border-primary"
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
+                      style={{ borderColor: pageTheme.border }}
                       onClick={() => openTicketModal("table")}
                     >
                       <CardContent className="p-6 space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
-                            <Table2 className="w-6 h-6 text-primary" />
+                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
+                            <Table2 className="w-6 h-6 text-white" />
                           </div>
                           <h3 className="text-lg font-semibold">Add Table Ticket</h3>
                         </div>
@@ -2230,13 +2870,14 @@ const CreateEvent = () => {
 
                     {/* Group Pass Card */}
                     <Card 
-                      className="group hover:shadow-lg transition-all cursor-pointer border-2 hover:border-primary"
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
+                      style={{ borderColor: pageTheme.border }}
                       onClick={() => openTicketModal("group-pass")}
                     >
                       <CardContent className="p-6 space-y-4">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
-                            <UsersRound className="w-6 h-6 text-primary" />
+                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
+                            <UsersRound className="w-6 h-6 text-white" />
                           </div>
                           <h3 className="text-lg font-semibold">Add Group Pass</h3>
                         </div>
@@ -2296,8 +2937,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 5: Venue & Location */}
-              {currentStep === 5 && (
+              {/* Step 4: Venue & Location */}
+              {currentStep === 4 && (
                 <div className="space-y-4">
                   <div className="relative">
                     <Label htmlFor="venueName">Venue Name *</Label>
@@ -2607,11 +3248,11 @@ const CreateEvent = () => {
                         modules={{
                           toolbar: [
                             ['bold', 'italic', 'underline'],
-                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                            [{ 'color': [] }, { 'background': [] }],
-                            [{ 'size': ['small', false, 'large', 'huge'] }],
-                            ['clean']
-                          ]
+                            [{ list: 'ordered' }, { list: 'bullet' }],
+                            [{ color: [] }, { background: [] }],
+                            [{ size: ['small', false, 'large', 'huge'] }],
+                            ['clean'],
+                          ],
                         }}
                       />
                     </div>
@@ -2620,149 +3261,35 @@ const CreateEvent = () => {
                   <div className="space-y-4">
                     <Label>Advisory</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="smokingAllowed"
-                          checked={advisory.smokingAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, smokingAllowed: !!checked })}
-                        />
-                        <Label htmlFor="smokingAllowed" className="cursor-pointer font-normal text-sm">
-                          🚬 Smoking allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="drinkingAllowed"
-                          checked={advisory.drinkingAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, drinkingAllowed: !!checked })}
-                        />
-                        <Label htmlFor="drinkingAllowed" className="cursor-pointer font-normal text-sm">
-                          🍺 Drinking allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="petsAllowed"
-                          checked={advisory.petsAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, petsAllowed: !!checked })}
-                        />
-                        <Label htmlFor="petsAllowed" className="cursor-pointer font-normal text-sm">
-                          🐾 Pets allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="ageRestricted"
-                          checked={advisory.ageRestricted}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, ageRestricted: !!checked })}
-                        />
-                        <Label htmlFor="ageRestricted" className="cursor-pointer font-normal text-sm">
-                          🔞 Show is 18+
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="camerasAllowed"
-                          checked={advisory.camerasAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, camerasAllowed: !!checked })}
-                        />
-                        <Label htmlFor="camerasAllowed" className="cursor-pointer font-normal text-sm">
-                          📸 Cameras and photos allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="outsideFoodAllowed"
-                          checked={advisory.outsideFoodAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, outsideFoodAllowed: !!checked })}
-                        />
-                        <Label htmlFor="outsideFoodAllowed" className="cursor-pointer font-normal text-sm">
-                          🍔 Outside food & drinks allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="seatingProvided"
-                          checked={advisory.seatingProvided}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, seatingProvided: !!checked })}
-                        />
-                        <Label htmlFor="seatingProvided" className="cursor-pointer font-normal text-sm">
-                          🪑 Seating provided
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="wheelchairAccessible"
-                          checked={advisory.wheelchairAccessible}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, wheelchairAccessible: !!checked })}
-                        />
-                        <Label htmlFor="wheelchairAccessible" className="cursor-pointer font-normal text-sm">
-                          ♿ Wheelchair accessible venue
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="liveMusic"
-                          checked={advisory.liveMusic}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, liveMusic: !!checked })}
-                        />
-                        <Label htmlFor="liveMusic" className="cursor-pointer font-normal text-sm">
-                          🎵 Live music
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="parkingAvailable"
-                          checked={advisory.parkingAvailable}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, parkingAvailable: !!checked })}
-                        />
-                        <Label htmlFor="parkingAvailable" className="cursor-pointer font-normal text-sm">
-                          🚗 Parking available
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="reentryAllowed"
-                          checked={advisory.reentryAllowed}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, reentryAllowed: !!checked })}
-                        />
-                        <Label htmlFor="reentryAllowed" className="cursor-pointer font-normal text-sm">
-                          🔁 Re-entry allowed
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="onsitePayments"
-                          checked={advisory.onsitePayments}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, onsitePayments: !!checked })}
-                        />
-                        <Label htmlFor="onsitePayments" className="cursor-pointer font-normal text-sm">
-                          💳 On-site payments available
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="securityCheck"
-                          checked={advisory.securityCheck}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, securityCheck: !!checked })}
-                        />
-                        <Label htmlFor="securityCheck" className="cursor-pointer font-normal text-sm">
-                          👮 Security check at entry
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="cloakroom"
-                          checked={advisory.cloakroom}
-                          onCheckedChange={(checked) => setAdvisory({ ...advisory, cloakroom: !!checked })}
-                        />
-                        <Label htmlFor="cloakroom" className="cursor-pointer font-normal text-sm">
-                          🧥 Cloakroom available
-                        </Label>
-                      </div>
+                      {[
+                        { id: 'smokingAllowed', label: '🚬 Smoking allowed' },
+                        { id: 'drinkingAllowed', label: '🍺 Drinking allowed' },
+                        { id: 'petsAllowed', label: '🐾 Pets allowed' },
+                        { id: 'ageRestricted', label: '🔞 Show is 18+' },
+                        { id: 'camerasAllowed', label: '📸 Cameras and photos allowed' },
+                        { id: 'outsideFoodAllowed', label: '🍔 Outside food & drinks allowed' },
+                        { id: 'seatingProvided', label: '🪑 Seating provided' },
+                        { id: 'wheelchairAccessible', label: '♿ Wheelchair accessible venue' },
+                        { id: 'liveMusic', label: '🎵 Live music' },
+                        { id: 'parkingAvailable', label: '🚗 Parking available' },
+                        { id: 'reentryAllowed', label: '🔁 Re-entry allowed' },
+                        { id: 'onsitePayments', label: '💳 On-site payments available' },
+                        { id: 'securityCheck', label: '👮 Security check at entry' },
+                        { id: 'cloakroom', label: '🧥 Cloakroom available' },
+                      ].map((item) => (
+                        <div className="flex items-center space-x-2" key={item.id}>
+                          <Checkbox
+                            id={item.id}
+                            checked={advisory[item.id]}
+                            onCheckedChange={(checked) => setAdvisory({ ...advisory, [item.id]: !!checked })}
+                          />
+                          <Label htmlFor={item.id} className="cursor-pointer font-normal text-sm">
+                            {item.label}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
-                    
-                    {/* Custom Advisories Section */}
+
                     <div className="mt-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-sm font-medium">Custom Advisory</Label>
@@ -2770,24 +3297,24 @@ const CreateEvent = () => {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setCustomAdvisories([...customAdvisories, ""])}
+                          onClick={() => setCustomAdvisories([...customAdvisories, ''])}
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Add Custom Advisory
                         </Button>
                       </div>
-                      
+
                       {customAdvisories.length > 0 && (
                         <div className="space-y-2">
-                          {customAdvisories.map((advisory, index) => (
+                          {customAdvisories.map((advisoryItem, index) => (
                             <div key={index} className="flex items-center gap-2">
                               <Input
                                 placeholder="Enter custom advisory..."
-                                value={advisory}
+                                value={advisoryItem}
                                 onChange={(e) => {
-                                  const newAdvisories = [...customAdvisories];
-                                  newAdvisories[index] = e.target.value;
-                                  setCustomAdvisories(newAdvisories);
+                                  const next = [...customAdvisories];
+                                  next[index] = e.target.value;
+                                  setCustomAdvisories(next);
                                 }}
                                 className="flex-1"
                               />
@@ -2795,9 +3322,7 @@ const CreateEvent = () => {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  setCustomAdvisories(customAdvisories.filter((_, i) => i !== index));
-                                }}
+                                onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== index))}
                               >
                                 <X className="w-4 h-4" />
                               </Button>
@@ -2812,8 +3337,8 @@ const CreateEvent = () => {
                     <Label>Custom Questions for Attendees</Label>
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <Input 
-                          placeholder="Question (e.g., Dietary requirements?)" 
+                        <Input
+                          placeholder="Question (e.g., Dietary requirements?)"
                           value={newQuestion}
                           onChange={(e) => setNewQuestion(e.target.value)}
                         />
@@ -2823,17 +3348,17 @@ const CreateEvent = () => {
                           onChange={(e) => setNewAnswer(e.target.value)}
                           rows={2}
                         />
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             if (newQuestion.trim()) {
                               setCustomQuestions([...customQuestions, { question: newQuestion, answer: newAnswer }]);
-                              setNewQuestion("");
-                              setNewAnswer("");
-                              toast.success("Question added");
+                              setNewQuestion('');
+                              setNewAnswer('');
+                              toast.success('Question added');
                             } else {
-                              toast.error("Please enter a question");
+                              toast.error('Please enter a question');
                             }
                           }}
                         >
@@ -2841,7 +3366,7 @@ const CreateEvent = () => {
                           Add Question
                         </Button>
                       </div>
-                      
+
                       {customQuestions.length > 0 && (
                         <div className="space-y-3 mt-4">
                           {customQuestions.map((q, index) => (
@@ -2850,16 +3375,14 @@ const CreateEvent = () => {
                                 <div className="flex justify-between items-start gap-2">
                                   <div className="flex-1 space-y-1">
                                     <p className="font-medium text-sm">Q: {q.question}</p>
-                                    {q.answer && (
-                                      <p className="text-sm text-muted-foreground">A: {q.answer}</p>
-                                    )}
+                                    {q.answer && <p className="text-sm text-muted-foreground">A: {q.answer}</p>}
                                   </div>
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
                                       setCustomQuestions(customQuestions.filter((_, i) => i !== index));
-                                      toast.success("Question removed");
+                                      toast.success('Question removed');
                                     }}
                                   >
                                     <X className="w-4 h-4" />
@@ -2886,342 +3409,174 @@ const CreateEvent = () => {
                 </>
               )}
 
-              {/* Step 8: Template Selection */}
+              {/* Step 8: Review & Publish */}
               {currentStep === 8 && (() => {
-                const listingTemplates = Object.values(TEMPLATE_CONFIGS);
-                const detailTemplates = Object.values(DETAIL_TEMPLATE_CONFIGS);
-                const selectedListingConfig = getTemplateConfig(selectedTemplate, "listing");
-                const selectedDetailConfig = getTemplateConfig(selectedTemplate, "detail");
-                
+                const statusBadge = (filled) => (
+                  <Badge className={filled ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30' : 'bg-white/10 text-white/70 border-white/15'}>
+                    {filled ? 'Filled' : 'Missing'}
+                  </Badge>
+                );
+
+                const summaryItems = [
+                  { label: 'Event Title', value: eventTitle },
+                  { label: 'Category', value: mainCategory },
+                  { label: 'Subcategory', value: selectedCategories[0] },
+                  { label: 'Cover Image', value: coverImage ? 'Uploaded' : '' },
+                  { label: 'Start', value: startDate ? `${formatDateValue(startDate)} ${formatTimeDisplay(startTime)}` : '' },
+                  { label: 'End', value: endDate ? `${formatDateValue(endDate)} ${formatTimeDisplay(endTime)}` : '' },
+                  { label: 'Venue', value: venueName },
+                  { label: 'City', value: city },
+                  { label: 'State', value: state },
+                  { label: 'Tickets', value: savedTickets.length ? `${savedTickets.length} added` : '' },
+                  { label: 'Sponsors', value: normalizeSponsors(sponsors).length ? `${normalizeSponsors(sponsors).length} added` : '' },
+                  { label: 'Artists', value: artists.filter((a) => a.name.trim()).length ? `${artists.filter((a) => a.name.trim()).length} added` : '' },
+                  { label: 'Location', value: fullAddress || [city, state].filter(Boolean).join(', ') || 'Location pending' },
+                ];
+
                 return (
-                <div className="space-y-6">
-                  <div className="text-sm text-muted-foreground mb-4">
-                    Choose a template design for your event. This affects both the events listing page and the event detail page. Preview how your event will look with each template below. All templates show the same information but with completely different UI structures and designs.
-                  </div>
+                  <div className="space-y-6">
+                    <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                      <h3 className="text-lg font-semibold mb-1">Review before publishing</h3>
+                      <p className="text-sm text-white/70">Check what’s filled and what’s missing. You can go back to edit anything.</p>
+                    </div>
 
-                  {/* Template Selection Cards */}
-                  <div className="grid md:grid-cols-3 gap-6">
-                    {listingTemplates.map((template) => {
-                      const isSelected = selectedTemplate === template.name;
-                      const config = template.layoutConfig;
-                      
-                      return (
-                        <div
-                          key={template.id}
-                          className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                            isSelected
-                              ? "border-primary shadow-lg scale-105"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                          onClick={() => setSelectedTemplate(template.name)}
-                        >
-                          <div 
-                            className="aspect-[16/9] relative"
-                            style={{
-                              background: `linear-gradient(135deg, ${config.theme.primaryColor}20, ${config.theme.secondaryColor}20)`,
-                            }}
-                          >
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="text-center p-4">
-                                <div 
-                                  className="w-16 h-16 mx-auto mb-2 rounded-lg flex items-center justify-center"
-                                  style={{ backgroundColor: `${config.theme.primaryColor}30` }}
-                                >
-                                  <div 
-                                    className="w-12 h-12 rounded"
-                                    style={{ backgroundColor: `${config.theme.primaryColor}50` }}
-                                  ></div>
-                                </div>
-                                <p className="text-xs font-semibold">{template.displayName}</p>
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <div className="absolute top-2 right-2">
-                                <div 
-                                  className="w-6 h-6 rounded-full flex items-center justify-center"
-                                  style={{ backgroundColor: config.theme.primaryColor }}
-                                >
-                                  <Check className="w-4 h-4 text-white" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="p-4 bg-background">
-                            <h4 className="font-semibold mb-2">{template.displayName}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {template.description}
-                            </p>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              <Badge variant="outline" className="text-xs">
-                                Listing: {template.layoutConfig.sections.grid.columns === 3 ? "Grid" : template.layoutConfig.sections.grid.columns === "masonry" ? "Masonry" : "List"}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                Detail: {getTemplateConfig(template.name, "detail").displayName}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Live Previews Section */}
-                  <div className="mt-8 space-y-6">
-                    <h3 className="text-lg font-semibold">Preview: How Your Event Will Look</h3>
-                    <p className="text-sm text-muted-foreground">
-                      See how your event will appear with each template. Click on a template above to see its preview below.
-                    </p>
-
-                    {/* Template Previews */}
-                    {selectedTemplate && (() => {
-                      const listingConfig = selectedListingConfig.layoutConfig;
-                      const detailConfig = selectedDetailConfig.layoutConfig;
-                      
-                      return (
-                      <>
-                        {/* Listing Page Preview */}
-                        <Card className="border-2 border-primary">
-                          <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                              <Check className="w-5 h-5 text-primary" />
-                              {selectedListingConfig.displayName} - Events Listing Page Preview
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              This is how your event will appear on the events listing page
-                            </p>
-                          </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {/* Preview Header */}
-                            <div 
-                              className="text-primary-foreground p-4 rounded-lg"
-                              style={{
-                                background: `linear-gradient(135deg, ${listingConfig.theme.primaryColor}, ${listingConfig.theme.secondaryColor})`,
-                              }}
-                            >
-                              <h4 className="text-xl font-bold mb-2">Browse Events</h4>
-                              <p className="text-primary-foreground/90">Discover amazing events happening near you</p>
-                            </div>
-                            
-                            {/* Preview Event Card */}
-                            <div className="border rounded-lg overflow-hidden">
-                              {coverImage ? (
-                                <div className="relative h-32 overflow-hidden">
-                                  <img src={coverImage} alt="Preview" className="w-full h-full object-cover" />
-                                  <div className="absolute top-2 left-2">
-                                    <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-xs">
-                                      {mainCategory || "Category"}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="h-32 bg-muted flex items-center justify-center">
-                                  <p className="text-xs text-muted-foreground">Cover Image</p>
-                                </div>
-                              )}
-                              <div className="p-4">
-                                <h5 className="font-bold text-base mb-2 line-clamp-1">
-                                  {eventTitle || "Your Event Title"}
-                                </h5>
-                                <div className="space-y-1 text-xs text-muted-foreground mb-3">
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    <span>{startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Date TBA"}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    <span className="line-clamp-1">{city && state ? `${city}, ${state}` : "Location TBA"}</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span 
-                                    className="text-sm font-bold"
-                                    style={{ color: listingConfig.theme.primaryColor }}
-                                  >
-                                    {savedTickets.length > 0 ? `From ₹${Math.min(...savedTickets.map(t => Number(t.price) || 0).filter(p => p > 0))}` : "Free"}
-                                  </span>
-                                  <Button 
-                                    size="sm" 
-                                    className="text-xs"
-                                    style={{ 
-                                      backgroundColor: listingConfig.theme.accentColor,
-                                      color: "white"
-                                    }}
-                                  >
-                                    View Details
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground italic">
-                              {selectedListingConfig.layoutConfig.sections.grid.columns === 3 
-                                ? "This is how your event will appear in a 3-column grid layout with other events."
-                                : selectedListingConfig.layoutConfig.sections.grid.columns === "masonry"
-                                ? "This is how your event will appear in a Pinterest-style masonry column layout."
-                                : "This is how your event will appear in a horizontal list layout with sidebar filters."}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Event Detail Page Preview */}
-                      <Card className="border-2 border-primary mt-4">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Check className="w-5 h-5 text-primary" />
-                            {selectedDetailConfig.displayName} - Event Detail Page Preview
-                          </CardTitle>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            This is how your event detail page will look when users click to view full details
-                          </p>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            {/* Preview Hero Section */}
-                            {detailConfig.sections.hero.style === "full-width-image" && (
-                              <>
-                                {coverImage ? (
-                                  <div className="relative h-48 overflow-hidden rounded-lg">
-                                    <img src={coverImage} alt="Preview" className="w-full h-full object-cover" />
-                                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                                      <h4 className="text-xl font-bold text-white mb-1">
-                                        {eventTitle || "Your Event Title"}
-                                      </h4>
-                                      <div className="flex items-center gap-3 text-sm text-white/90">
-                                        <span>{startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : "Date"}</span>
-                                        <span>•</span>
-                                        <span>{city && state ? `${city}, ${state}` : "Location"}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div 
-                                    className="h-48 rounded-lg flex items-center justify-center"
-                                    style={{ backgroundColor: `${detailConfig.theme.primaryColor}20` }}
-                                  >
-                                    <p className="text-xs text-muted-foreground">Cover Image</p>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            
-                            {detailConfig.sections.hero.style === "overlay-content" && (
-                              <div 
-                                className="relative h-32 rounded-lg overflow-hidden"
-                                style={{
-                                  background: `linear-gradient(135deg, ${detailConfig.theme.primaryColor}, ${detailConfig.theme.secondaryColor})`,
-                                }}
-                              >
-                                <div className="absolute inset-0 bg-black/20" />
-                                <div className="relative h-full flex items-center justify-center p-4">
-                                  <div className="text-center text-white">
-                                    <h4 className="text-lg font-bold mb-1">{eventTitle || "Your Event Title"}</h4>
-                                    <p className="text-sm text-white/90">{city && state ? `${city}, ${state}` : "Location"}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {detailConfig.sections.hero.style === "minimal-header" && (
-                              <div className="border-b pb-3">
-                                <Badge 
-                                  className="mb-2"
-                                  style={{ backgroundColor: `${detailConfig.theme.primaryColor}20`, color: detailConfig.theme.primaryColor }}
-                                >
-                                  {mainCategory || "Category"}
-                                </Badge>
-                                <h4 className="text-xl font-bold">{eventTitle || "Your Event Title"}</h4>
-                              </div>
-                            )}
-
-                            {/* Preview Content Sections */}
-                            <div className={`grid ${detailConfig.sections.details.layout === "split-column" ? "md:grid-cols-3" : ""} gap-4`}>
-                              <div className={detailConfig.sections.details.layout === "split-column" ? "md:col-span-2" : ""}>
-                                <div className="space-y-3">
-                                  <div className="p-3 border rounded-lg">
-                                    <h5 className="font-semibold text-sm mb-2">Event Description</h5>
-                                    <p className="text-xs text-muted-foreground line-clamp-2">
-                                      {eventDescription || "Your event description will appear here..."}
-                                    </p>
-                                  </div>
-                                  {coverImage && (
-                                    <div className="p-3 border rounded-lg">
-                                      <h5 className="font-semibold text-sm mb-2">Gallery</h5>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div className="aspect-square bg-muted rounded"></div>
-                                        <div className="aspect-square bg-muted rounded"></div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {detailConfig.sections.details.layout === "split-column" && (
-                                <div className="md:col-span-1">
-                                  <div className="p-3 border rounded-lg sticky top-4">
-                                    <h5 className="font-semibold text-sm mb-2">Event Details</h5>
-                                    <div className="space-y-2 text-xs">
-                                      <div className="flex items-center gap-2">
-                                        <Calendar className="w-3 h-3 text-muted-foreground" />
-                                        <span>{startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : "Date"}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <MapPin className="w-3 h-3 text-muted-foreground" />
-                                        <span>{city && state ? `${city}, ${state}` : "Location"}</span>
-                                      </div>
-                                      <div className="pt-2 border-t">
-                                        <span 
-                                          className="font-bold"
-                                          style={{ color: detailConfig.theme.primaryColor }}
-                                        >
-                                          {savedTickets.length > 0 ? `From ₹${Math.min(...savedTickets.map(t => Number(t.price) || 0).filter(p => p > 0))}` : "Free"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            
-                            <p className="text-xs text-muted-foreground italic">
-                              {detailConfig.sections.details.layout === "stacked" 
-                                ? "All content sections are stacked vertically in a single column."
-                                : detailConfig.sections.details.layout === "split-column"
-                                ? "Content is split into main area (left) and sticky sidebar (right)."
-                                : "Content is displayed in a centered single column with generous spacing."}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      </>
-                      );
-                    })()}
-                  </div>
-
-                  <div className="mt-6 p-4 bg-muted rounded-lg">
-                    <p className="text-sm font-medium mb-2">
-                      Selected Template: <span 
-                        className="font-bold capitalize"
-                        style={{ color: selectedListingConfig.layoutConfig.theme.primaryColor }}
-                      >
-                        {selectedListingConfig.displayName}
-                      </span>
-                    </p>
-                    <div className="grid md:grid-cols-2 gap-3 mt-3 text-xs">
-                      <div>
-                        <p className="font-semibold mb-1">Events Listing Page:</p>
-                        <p className="text-muted-foreground">{selectedListingConfig.description}</p>
+                    <div className="flex flex-wrap items-center gap-3 border border-white/10 bg-white/5 rounded-xl p-4">
+                      <div className="space-y-1">
+                        <p className="text-xs uppercase tracking-[0.12em] text-white/60">Publish State</p>
+                        <p className="text-sm text-white/80">Choose whether to keep this as Draft or Publish it now.</p>
                       </div>
-                      <div>
-                        <p className="font-semibold mb-1">Event Detail Page:</p>
-                        <p className="text-muted-foreground">{selectedDetailConfig.description}</p>
+                      <div className="flex items-center gap-2">
+                        {["DRAFT", "PUBLISHED"].map((state) => {
+                          const isActive = publishState === state;
+                          return (
+                            <Button
+                              key={state}
+                              type="button"
+                              variant={isActive ? "accent" : "outline"}
+                              className={`px-4 ${isActive ? "bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white" : "border-white/30 text-white hover:bg-white/10"}`}
+                              onClick={() => setPublishState(state)}
+                              disabled={isSubmitting}
+                            >
+                              {state === "DRAFT" ? "Save as Draft" : "Publish"}
+                            </Button>
+                          );
+                        })}
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-3">
-                      This template will be applied to both the events listing page and your event's detail page. The template configuration includes theme colors, layout styles, and animations. You can change it later by editing the event.
-                    </p>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {summaryItems.map((item, idx) => (
+                        <Card key={idx} className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-white/60">{item.label}</p>
+                              <p className={`text-sm font-semibold ${item.value ? 'text-white' : 'text-white/50'}`}>
+                                {item.value || 'Not provided'}
+                              </p>
+                            </div>
+                            {statusBadge(Boolean(item.value))}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                        <CardHeader>
+                          <CardTitle className="text-base">Tickets</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {savedTickets.length ? (
+                            savedTickets.map((t, i) => (
+                              <div key={i} className="flex justify-between text-sm">
+                                <span>{t.ticketName}</span>
+                                <span className="text-white/80">{t.price === '0' ? 'Free' : `₹${t.price}`}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-white/60">No tickets added</p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                        <CardHeader>
+                          <CardTitle className="text-base">Sponsors</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {normalizeSponsors(sponsors).length ? (
+                            normalizeSponsors(sponsors).map((s, i) => (
+                              <div key={i} className="flex items-center justify-between text-sm">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold">{s.name || s.company}</p>
+                                  <p className="text-xs text-white/60">{s.tier || 'Sponsor'}</p>
+                                </div>
+                                {s.logo && <img src={s.logo} alt="" className="w-10 h-10 object-contain rounded border border-white/10 bg-white/5" />}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-white/60">No sponsors added</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                        <CardHeader>
+                          <CardTitle className="text-base">Venue</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-white/80">
+                          <p>{venueName || 'Not provided'}</p>
+                          <p className="text-white/60">{fullAddress || [city, state].filter(Boolean).join(', ') || 'Location pending'}</p>
+                          {selectedLocation && (
+                            <p className="text-xs text-white/60">
+                              Coords: {selectedLocation.lat?.toFixed(4)}, {selectedLocation.lng?.toFixed(4)}
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                        <CardHeader>
+                          <CardTitle className="text-base">Artists</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          {artists.filter((a) => a.name.trim()).length ? (
+                            artists
+                              .filter((a) => a.name.trim())
+                              .map((a, i) => (
+                                <div key={i} className="flex justify-between items-center">
+                                  <span className="font-semibold">{a.name}</span>
+                                  {a.instagram && <span className="text-xs text-white/60">{a.instagram}</span>}
+                                </div>
+                              ))
+                          ) : (
+                            <p className="text-sm text-white/60">No artists added</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                      <CardHeader>
+                        <CardTitle className="text-base">Gallery</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {galleryImages.length ? (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {galleryImages.slice(0, 4).map((img, i) => (
+                              <div key={i} className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                                <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white/60">No gallery images uploaded</p>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                </div>
                 );
               })()}
             </CardContent>
@@ -3233,33 +3588,34 @@ const CreateEvent = () => {
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1}
+              className="border-white/30 text-white hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Previous
             </Button>
 
             {currentStep < 8 ? (
-              <Button onClick={nextStep} disabled={isSubmitting}>
+              <Button
+                onClick={nextStep}
+                disabled={isSubmitting}
+                className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              >
                 {isSubmitting ? "Saving..." : "Next"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleSubmit(true)}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Saving..." : (isEditMode ? "Save Changes" : "Save as Draft")}
-                </Button>
-                <Button 
-                  variant="accent" 
-                  onClick={() => handleSubmit(false)}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Publishing..." : (isEditMode ? "Update Event" : "Publish Event")}
-                </Button>
-              </div>
+              <Button 
+                variant="accent" 
+                onClick={() => handleSubmit(publishState)}
+                disabled={isSubmitting}
+                className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              >
+                {isSubmitting
+                  ? "Updating..."
+                  : publishState === "PUBLISHED"
+                    ? (isEditMode ? "Update & Publish" : "Publish Event")
+                    : (isEditMode ? "Update as Draft" : "Save as Draft")}
+              </Button>
             )}
           </div>
         </div>
