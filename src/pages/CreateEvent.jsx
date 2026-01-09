@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Check, Calendar as CalendarIcon, Clock, Globe, Upload, X, ChevronLeft, Plus, MapPin, Ticket, Users, Table2, UsersRound, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
@@ -74,11 +75,23 @@ const CreateEvent = () => {
   const [startTimeOpen, setStartTimeOpen] = useState(false);
   const [endTimeOpen, setEndTimeOpen] = useState(false);
   const [originalDateTime, setOriginalDateTime] = useState({ start: null, end: null }); // Track original start/end for change detection
-  const [sponsors, setSponsors] = useState([{ name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+  const emptySponsor = {
+    name: "",
+    websiteUrl: "",
+    logoUrl: "",
+    isPrimary: false,
+  };
+  const [sponsors, setSponsors] = useState([emptySponsor]);
   const [originalSponsors, setOriginalSponsors] = useState([]);
+  const [originalArtists, setOriginalArtists] = useState([]);
   const [sponsorUploadIndex, setSponsorUploadIndex] = useState(null);
   const [sponsorSaving, setSponsorSaving] = useState(false);
+  const [isSponsored, setIsSponsored] = useState(false);
+  const [originalIsSponsored, setOriginalIsSponsored] = useState(false);
   const [publishState, setPublishState] = useState("DRAFT");
+  const eventCacheRef = useRef(null);
+  const sponsorsLoadedRef = useRef(false);
+  const artistsLoadedRef = useRef(false);
 
   const hourOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const minuteOptions = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
@@ -197,6 +210,12 @@ const CreateEvent = () => {
   const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
   const [selectedEventType, setSelectedEventType] = useState("one-time");
+  const [originalDateInputs, setOriginalDateInputs] = useState({
+    startDate: "",
+    startTime: "",
+    endDate: "",
+    endTime: "",
+  });
   const [ticketPrice, setTicketPrice] = useState("49");
   const [artists, setArtists] = useState([{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]);
   const [advisory, setAdvisory] = useState({
@@ -383,11 +402,22 @@ const CreateEvent = () => {
   }, [backendEventId]);
 
   // Load event data if editing
+  const flattenSponsor = (s, idx = 0) => {
+    const nested = s?.sponsor || {};
+    return {
+      name: s?.name || nested.name || "",
+      websiteUrl: s?.websiteUrl || s?.website || s?.link || nested.websiteUrl || nested.website || nested.link || "",
+      logoUrl: s?.logoUrl || s?.logo || nested.logoUrl || nested.logo || "",
+      isPrimary: typeof s?.isPrimary === "boolean" ? s.isPrimary : idx === 0,
+    };
+  };
+
   useEffect(() => {
     if (!editId) return;
     const stateEvent = location.state?.event;
     const eventToEdit = stateEvent || events.find((e) => e.id === editId);
     if (!eventToEdit) return;
+    eventCacheRef.current = eventToEdit;
 
     const start = eventToEdit.startDate ? new Date(eventToEdit.startDate) : null;
     const end = eventToEdit.endDate ? new Date(eventToEdit.endDate) : null;
@@ -404,10 +434,14 @@ const CreateEvent = () => {
     setMainCategory(eventToEdit.category || "");
     setSelectedCategories([eventToEdit.subCategory || eventToEdit.subcategory || ""]);
     setCoverImage(eventToEdit.flyerImage || eventToEdit.image || eventToEdit.flyer);
-    setStartDate(toDateStr(start));
-    setStartTime(toTimeStr(start));
-    setEndDate(toDateStr(end));
-    setEndTime(toTimeStr(end));
+    const startDateStr = toDateStr(start);
+    const startTimeStr = toTimeStr(start);
+    const endDateStr = toDateStr(end);
+    const endTimeStr = toTimeStr(end);
+    setStartDate(startDateStr);
+    setStartTime(startTimeStr);
+    setEndDate(endDateStr);
+    setEndTime(endTimeStr);
     const normalizedStatus = (eventToEdit.publishStatus || eventToEdit.status || "").toUpperCase();
     setPublishState(normalizedStatus === "PUBLISHED" || normalizedStatus === "ACTIVE" ? "PUBLISHED" : "DRAFT");
     // Track originals for change detection in Step 2
@@ -415,21 +449,25 @@ const CreateEvent = () => {
       start: start ? start.toISOString() : null,
       end: end ? end.toISOString() : null,
     });
+    setOriginalDateInputs({
+      startDate: startDateStr,
+      startTime: startTimeStr,
+      endDate: endDateStr,
+      endTime: endTimeStr,
+    });
     // Sponsors (Step 5)
     if (Array.isArray(eventToEdit.sponsors) && eventToEdit.sponsors.length > 0) {
-      const normalizedSponsors = eventToEdit.sponsors.map((s) => ({
-        name: s.name || "",
-        company: s.company || s.organization || "",
-        website: s.website || s.link || "",
-        tier: s.tier || "",
-        logo: s.logo || s.logoUrl || "",
-        note: s.note || s.description || "",
-      }));
+      const normalizedSponsors = eventToEdit.sponsors.map((s, idx) => flattenSponsor(s, idx));
       setSponsors(normalizedSponsors);
       setOriginalSponsors(normalizedSponsors);
+      setIsSponsored(true);
+      setOriginalIsSponsored(true);
+      sponsorsLoadedRef.current = true;
     } else {
-      setSponsors([{ name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+      setSponsors([emptySponsor]);
       setOriginalSponsors([]);
+      setIsSponsored(Boolean(eventToEdit.isSponsored));
+      setOriginalIsSponsored(Boolean(eventToEdit.isSponsored));
     }
     setTicketPrice(
       eventToEdit.price
@@ -476,17 +514,132 @@ const CreateEvent = () => {
       setCurrentEventType(eventToEdit.type);
     }
 
+    const normalizedArtists = Array.isArray(eventToEdit.artists)
+      ? eventToEdit.artists.map((a) => ({
+          name: a.name || "",
+          photo: a.photo || a.image || "",
+          instagram: a.instagram || a.instagramLink || "",
+          spotify: a.spotify || a.spotifyLink || "",
+          gender: a.gender || "PREFER_NOT_TO_SAY",
+        }))
+      : [];
+
     setArtists(
-      eventToEdit.artists || [{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]
+      normalizedArtists.length
+        ? normalizedArtists
+        : [{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]
     );
+    if (normalizedArtists.length) {
+      setCreatedArtistIndices(normalizedArtists.map((_, idx) => idx));
+      artistsLoadedRef.current = true;
+      setOriginalArtists(normalizedArtists);
+    } else {
+      setOriginalArtists([]);
+    }
   }, [editId, events, location.state, backendEventId, ticketPrice]);
 
-  // Map URL params to backend enum values
-  const eventTypeMapping = {
-    "guest-list": "GUESTLIST",
-    "exclusive": "EXCLUSIVE",
-    "non-exclusive": "NON_EXCLUSIVE"
-  };
+  // Fetch sponsors from backend in edit mode when entering Step 5 (or when ID changes)
+  useEffect(() => {
+    const fetchSponsors = async () => {
+      try {
+        if (!isEditMode || !backendEventId || currentStep !== 5) return;
+        if (sponsorsLoadedRef.current) return;
+        const hasSponsorsLoaded = sponsors.some((s) => s.name || s.logoUrl || s.websiteUrl);
+        if (hasSponsorsLoaded) {
+          sponsorsLoadedRef.current = true;
+          return;
+        }
+
+        // Try cache first
+        const cached = eventCacheRef.current;
+        const sponsorDataCached = Array.isArray(cached?.sponsors) ? cached.sponsors : [];
+        if (sponsorDataCached.length) {
+          const normalizedCached = sponsorDataCached.map((s, idx) => flattenSponsor(s, idx));
+          setSponsors(normalizedCached);
+          setOriginalSponsors(normalizedCached);
+          setIsSponsored(true);
+          setOriginalIsSponsored(true);
+          sponsorsLoadedRef.current = true;
+          return;
+        }
+
+        const response = await apiFetch(`api/event/${backendEventId}`, { method: "GET" });
+        const eventData = response.data?.event || response.data || response.event || response;
+        eventCacheRef.current = eventData;
+        const sponsorData = Array.isArray(eventData?.sponsors) ? eventData.sponsors : [];
+        const normalizedSponsors = sponsorData.map((s, idx) => flattenSponsor(s, idx));
+
+        setSponsors(normalizedSponsors.length ? normalizedSponsors : [emptySponsor]);
+        setOriginalSponsors(normalizedSponsors);
+        setIsSponsored(normalizedSponsors.length > 0 || Boolean(eventData?.isSponsored));
+        setOriginalIsSponsored(normalizedSponsors.length > 0 || Boolean(eventData?.isSponsored));
+        sponsorsLoadedRef.current = true;
+      } catch (err) {
+        console.error("Failed to fetch sponsors for edit mode:", err);
+      }
+    };
+
+    fetchSponsors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendEventId, isEditMode, currentStep]);
+
+  // Fetch artists from backend in edit mode when entering Step 6
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        if (!isEditMode || !backendEventId || currentStep !== 6) return;
+        if (artistsLoadedRef.current) return;
+        const hasArtistsLoaded = artists.some((a) => a.name || a.photo || a.instagram || a.spotify);
+        if (hasArtistsLoaded) return;
+
+        // Try cache first
+        const cached = eventCacheRef.current;
+        const artistDataCached = Array.isArray(cached?.artists) ? cached.artists : [];
+        if (artistDataCached.length) {
+          const normalizedCached = artistDataCached.map((a) => ({
+            name: a.name || "",
+            photo: a.photo || a.image || "",
+            instagram: a.instagram || a.instagramLink || "",
+            spotify: a.spotify || a.spotifyLink || "",
+            gender: a.gender || "PREFER_NOT_TO_SAY",
+          }));
+          setArtists(normalizedCached);
+          setCreatedArtistIndices(normalizedCached.map((_, idx) => idx));
+          setOriginalArtists(normalizedCached);
+          artistsLoadedRef.current = true;
+          return;
+        }
+
+        const response = await apiFetch(`api/event/${backendEventId}`, { method: "GET" });
+        const eventData = response.data?.event || response.data || response.event || response;
+        eventCacheRef.current = eventData;
+        const artistData = Array.isArray(eventData?.artists) ? eventData.artists : [];
+        const normalized = artistData.map((a) => ({
+          name: a.name || "",
+          photo: a.photo || a.image || "",
+          instagram: a.instagram || a.instagramLink || "",
+          spotify: a.spotify || a.spotifyLink || "",
+          gender: a.gender || "PREFER_NOT_TO_SAY",
+        }));
+
+        setArtists(
+          normalized.length
+            ? normalized
+            : [{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]
+        );
+        if (normalized.length) {
+          setCreatedArtistIndices(normalized.map((_, idx) => idx));
+          setOriginalArtists(normalized);
+        }
+        artistsLoadedRef.current = true;
+      } catch (err) {
+        console.error("Failed to fetch artists for edit mode:", err);
+      }
+    };
+
+    fetchArtists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendEventId, isEditMode, currentStep]);
 
   // Set event type category from URL params
   useEffect(() => {
@@ -749,45 +902,11 @@ const CreateEvent = () => {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  // Handle location selection
-  const handleLocationSelect = (location) => {
-    console.log("📍 Location selected:", location);
-    
-    setVenueName(location.displayName.split(',')[0]); // First part is usually the venue/place name
-    setFullAddress(location.displayName);
-    setSelectedLocation(location);
-    setShowSuggestions(false);
-    
-    // Extract city, state, country, and postal code from address
-    if (location.address) {
-      if (location.address.city) setCity(location.address.city);
-      else if (location.address.town) setCity(location.address.town);
-      else if (location.address.village) setCity(location.address.village);
-      
-      if (location.address.state) setState(location.address.state);
-      if (location.address.country) setCountry(location.address.country);
-      if (location.address.postcode) setPostalCode(location.address.postcode);
-    }
-    
-    console.log("✅ Location state updated:", {
-      venueName: location.displayName.split(',')[0],
-      fullAddress: location.displayName,
-      city: location.address?.city || location.address?.town,
-      state: location.address?.state,
-      country: location.address?.country,
-      postalCode: location.address?.postcode,
-      latitude: location.lat,
-      longitude: location.lng
-    });
-    
-    toast.success("Location selected successfully!");
-  };
 
   // Load Leaflet CSS and JS for map
   useEffect(() => {
@@ -1187,21 +1306,21 @@ const CreateEvent = () => {
         return;
       }
 
-      // Combine date and time into ISO format for comparison and update
-      const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
-      const endDateTime = new Date(`${endDate}T${endTime}`).toISOString();
+      const hasInputChanges =
+        startDate !== originalDateInputs.startDate ||
+        startTime !== originalDateInputs.startTime ||
+        endDate !== originalDateInputs.endDate ||
+        endTime !== originalDateInputs.endTime;
 
-      const hasDateChanges =
-        !originalDateTime.start ||
-        !originalDateTime.end ||
-        originalDateTime.start !== startDateTime ||
-        originalDateTime.end !== endDateTime;
-
-      if (isEditMode && backendEventId && !hasDateChanges) {
+      if (isEditMode && backendEventId && !hasInputChanges) {
         toast.info("No changes to update");
         setCurrentStep(currentStep + 1);
         return;
       }
+
+      // Combine date and time into ISO format for comparison and update
+      const startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
+      const endDateTime = new Date(`${endDate}T${endTime}`).toISOString();
 
       // Call API for Step 3 - Update Date & Time
       try {
@@ -1227,6 +1346,7 @@ const CreateEvent = () => {
         toast.success("Date & time updated successfully!");
         console.log("Step 3 API Response:", response);
         setOriginalDateTime({ start: startDateTime, end: endDateTime });
+        setOriginalDateInputs({ startDate, startTime, endDate, endTime });
         
         // Move to next step after successful API call
         setCurrentStep(currentStep + 1);
@@ -1462,11 +1582,53 @@ const CreateEvent = () => {
 
     if (currentStep === 5) {
       const cleanedSponsors = normalizeSponsors(sponsors);
-      const hasChanges = sponsorsChanged();
+      const hasChanges = sponsorsChanged(cleanedSponsors);
 
-      // If nothing entered and nothing to update, just move on
-      if (cleanedSponsors.length === 0 && !originalSponsors.length) {
-        setCurrentStep(currentStep + 1);
+      // If toggle is off, clear sponsors only if previously set, otherwise skip
+      if (!isSponsored) {
+        if (!hasChanges) {
+          setCurrentStep(currentStep + 1);
+          return;
+        }
+        try {
+          setSponsorSaving(true);
+          setLoadingMessage("Saving sponsor details...");
+          setShowLoading(true);
+
+          if (!backendEventId) {
+            toast.error("Event ID not found. Please go back to Step 1.");
+            return;
+          }
+
+          const payload = { sponsors: [] };
+          const response = await updateEventStep6(backendEventId, payload);
+          console.log("Step 5 (Sponsor - cleared) API Response:", response);
+          setOriginalSponsors([]);
+          setOriginalIsSponsored(false);
+          setSponsors([emptySponsor]);
+          toast.success("Sponsor details saved");
+          setCurrentStep(currentStep + 1);
+        } catch (error) {
+          console.error("Error saving sponsors:", error);
+          toast.error(error.message || "Failed to save sponsor details. Please try again.");
+          return;
+        } finally {
+          setSponsorSaving(false);
+          setShowLoading(false);
+          setLoadingMessage("");
+        }
+        return;
+      }
+
+      // Toggle is on
+      if (cleanedSponsors.length === 0) {
+        toast.error("Add at least one sponsor with name to continue.");
+        return;
+      }
+
+      const missingNames = cleanedSponsors.some((s) => !s.name);
+      if (missingNames) {
+        toast.error("Sponsor name is required for each sponsor entry.");
         return;
       }
 
@@ -1488,12 +1650,12 @@ const CreateEvent = () => {
 
         const payload = {
           sponsors: cleanedSponsors,
-          isSponsored: cleanedSponsors.length > 0,
         };
 
         const response = await updateEventStep6(backendEventId, payload);
         console.log("Step 5 (Sponsor) API Response:", response);
         setOriginalSponsors(cleanedSponsors);
+        setOriginalIsSponsored(true);
         toast.success("Sponsor details saved");
         setCurrentStep(currentStep + 1);
       } catch (error) {
@@ -1516,6 +1678,15 @@ const CreateEvent = () => {
           toast.error(`Instagram is required for Artist ${i + 1}`);
           return;
         }
+      }
+
+      const normalizedCurrentArtists = normalizeArtists(artists);
+      const hasArtistChanges = artistsChanged(normalizedCurrentArtists);
+
+      if (isEditMode && !hasArtistChanges) {
+        toast.info("No changes to update");
+        setCurrentStep(currentStep + 1);
+        return;
       }
 
       // Call API for Step 6 - Create Artists (only new ones)
@@ -1918,21 +2089,53 @@ const CreateEvent = () => {
     setTicketModalOpen(true);
   };
 
-  const normalizeSponsors = (list) =>
-    list
+  const normalizeSponsors = (list) => {
+    const mapped = list
       .map((s) => ({
         name: (s.name || "").trim(),
-        company: (s.company || "").trim(),
-        website: (s.website || "").trim(),
-        tier: (s.tier || "").trim(),
-        logo: (s.logo || "").trim(),
-        note: (s.note || "").trim(),
+        logoUrl: (s.logoUrl || s.logo || "").trim(),
+        websiteUrl: (s.websiteUrl || s.website || "").trim(),
+        isPrimary: Boolean(s.isPrimary),
       }))
-      .filter((s) => s.name || s.company || s.website || s.tier || s.logo || s.note);
+      .filter((s) => s.name || s.logoUrl || s.websiteUrl);
 
-  const sponsorsChanged = () => {
-    const filtered = normalizeSponsors(sponsors);
+    if (mapped.length === 1) {
+      mapped[0].isPrimary = true;
+    } else if (mapped.length > 1 && !mapped.some((s) => s.isPrimary)) {
+      mapped[0].isPrimary = true;
+    }
+
+    return mapped;
+  };
+
+  const normalizeArtists = (list) =>
+    (list || [])
+      .map((a) => ({
+        name: (a.name || "").trim(),
+        photo: (a.photo || a.image || "").trim(),
+        instagram: (a.instagram || a.instagramLink || "").trim(),
+        spotify: (a.spotify || a.spotifyLink || "").trim(),
+        gender: a.gender || "PREFER_NOT_TO_SAY",
+      }))
+      .filter((a) => a.name || a.instagram || a.spotify || a.photo);
+
+  const sponsorsChanged = (normalizedList = null) => {
+    const filtered = normalizedList ?? normalizeSponsors(sponsors);
     return JSON.stringify(filtered) !== JSON.stringify(originalSponsors);
+  };
+
+  const artistsChanged = (normalizedList = null) => {
+    const filtered = normalizedList ?? normalizeArtists(artists);
+    return JSON.stringify(filtered) !== JSON.stringify(originalArtists);
+  };
+
+  const setPrimarySponsor = (index) => {
+    setSponsors((prev) =>
+      prev.map((s, i) => ({
+        ...s,
+        isPrimary: i === index,
+      }))
+    );
   };
 
   const handleSponsorChange = (index, key, value) => {
@@ -1944,7 +2147,7 @@ const CreateEvent = () => {
   };
 
   const addSponsorRow = () => {
-    setSponsors((prev) => [...prev, { name: "", company: "", website: "", tier: "", logo: "", note: "" }]);
+    setSponsors((prev) => [...prev, { ...emptySponsor }]);
   };
 
   const removeSponsorRow = (index) => {
@@ -1960,7 +2163,8 @@ const CreateEvent = () => {
       const upload = await uploadTempImage(file, "events/drafts/sponsors");
       setSponsors((prev) => {
         const next = [...prev];
-        next[index] = { ...next[index], logo: upload.url || upload.secure_url || "" };
+        const logoUrl = upload.url || upload.secure_url || "";
+        next[index] = { ...next[index], logoUrl, logo: logoUrl };
         return next;
       });
       toast.success("Logo uploaded");
@@ -2522,142 +2726,147 @@ const CreateEvent = () => {
               {/* Step 5: Sponsor */}
               {currentStep === 5 && (
                 <div className="space-y-5">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        Add sponsor details to highlight partners on your event page.
-                      </p>
-                      <p className="text-xs text-white/60">
-                        Include logo, company URL, and tier (Title, Gold, Silver, Bronze, Community).
-                      </p>
+                  <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-white">Is this event sponsored?</p>
+                        <p className="text-xs text-white/70">
+                          Toggle “Yes” to add sponsor details required by the backend (name required; optional logo URL, website).
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs uppercase tracking-[0.08em] text-white/60">No</span>
+                        <Switch checked={isSponsored} onCheckedChange={setIsSponsored} />
+                        <span className="text-xs uppercase tracking-[0.08em] text-white/60">Yes</span>
+                      </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addSponsorRow}
-                      className="border-white/20 bg-white/5 text-white hover:bg-white/10"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Sponsor
-                    </Button>
+                    {!isSponsored && (
+                      <div className="text-xs text-white/60">
+                        Sponsors are disabled. Click “Next” to continue or toggle “Yes” to add sponsor information.
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-4">
-                    {sponsors.map((sponsor, index) => (
-                      <Card key={index} className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
-                        <CardContent className="p-5 space-y-4">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Sponsor {index + 1}</p>
-                              <h3 className="font-semibold text-white">Brand details</h3>
-                            </div>
-                            {sponsors.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeSponsorRow(index)}
-                                className="text-white hover:text-white"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
+                  {isSponsored && (
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          Add sponsor details to highlight partners on your event page.
+                        </p>
+                        <p className="text-xs text-white/60">
+                          Required: Sponsor name. Optional: logo, website URL. When multiple sponsors exist, mark one as primary.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addSponsorRow}
+                        className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Sponsor
+                      </Button>
+                    </div>
+                  )}
 
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label>Sponsor Name *</Label>
-                              <Input
-                                placeholder="Acme Corp"
-                                value={sponsor.name}
-                                onChange={(e) => handleSponsorChange(index, "name", e.target.value)}
-                              />
+                  {isSponsored && (
+                    <div className="space-y-4">
+                      {sponsors.map((sponsor, index) => (
+                        <Card key={index} className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                          <CardContent className="p-5 space-y-4">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm text-muted-foreground">Sponsor {index + 1}</p>
+                                <h3 className="font-semibold text-white">Brand details</h3>
+                              </div>
+                              {sponsors.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeSponsorRow(index)}
+                                  className="text-white hover:text-white"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
-                            <div className="space-y-2">
-                              <Label>Company / Brand</Label>
-                              <Input
-                                placeholder="Acme Entertainment Pvt Ltd"
-                                value={sponsor.company}
-                                onChange={(e) => handleSponsorChange(index, "company", e.target.value)}
-                              />
-                            </div>
-                          </div>
 
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label>Company Link / Website</Label>
-                              <Input
-                                type="url"
-                                placeholder="https://example.com"
-                                value={sponsor.website}
-                                onChange={(e) => handleSponsorChange(index, "website", e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Tier</Label>
-                              <Select
-                                value={sponsor.tier || ""}
-                                onValueChange={(val) => handleSponsorChange(index, "tier", val)}
-                              >
-                                <SelectTrigger className={`${fieldClass} h-12`}>
-                                  <SelectValue placeholder="Select tier" />
-                                </SelectTrigger>
-                                <SelectContent className={selectMenuClass}>
-                                  <SelectItem value="TITLE">Title Sponsor</SelectItem>
-                                  <SelectItem value="GOLD">Gold</SelectItem>
-                                  <SelectItem value="SILVER">Silver</SelectItem>
-                                  <SelectItem value="BRONZE">Bronze</SelectItem>
-                                  <SelectItem value="COMMUNITY">Community / Partner</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label>Logo</Label>
+                            <div className="grid gap-4 md:grid-cols-2">
                               <div className="space-y-2">
+                                <Label>Sponsor Name *</Label>
                                 <Input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => handleSponsorLogoChange(index, e.target.files?.[0])}
-                                  className="cursor-pointer"
+                                  placeholder="BrandCo"
+                                  value={sponsor.name}
+                                  onChange={(e) => handleSponsorChange(index, "name", e.target.value)}
                                 />
-                                <p className="text-xs text-muted-foreground">PNG / SVG with transparent background preferred</p>
-                                {sponsorUploadIndex === index && (
-                                  <div className="flex items-center gap-2 text-sm text-primary">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Uploading logo...</span>
-                                  </div>
-                                )}
-                                {sponsor.logo && (
-                                  <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-border bg-white/5 flex items-center justify-center">
-                                    <img
-                                      src={sponsor.logo}
-                                      alt={`${sponsor.name || "Sponsor"} logo`}
-                                      className="w-full h-full object-contain p-2"
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Website URL</Label>
+                                <Input
+                                  type="url"
+                                  placeholder="https://brandco.example.com"
+                                  value={sponsor.websiteUrl}
+                                  onChange={(e) => handleSponsorChange(index, "websiteUrl", e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Logo</Label>
+                                <div className="space-y-2">
+                                  <Input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => handleSponsorLogoChange(index, e.target.files?.[0])}
+                                    className="cursor-pointer"
+                                  />
+                                  <p className="text-xs text-muted-foreground">PNG / SVG with transparent background preferred</p>
+                                  {sponsorUploadIndex === index && (
+                                    <div className="flex items-center gap-2 text-sm text-primary">
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span>Uploading logo...</span>
+                                    </div>
+                                  )}
+                                  {sponsor.logoUrl && (
+                                    <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-border bg-white/5 flex items-center justify-center">
+                                      <img
+                                        src={sponsor.logoUrl}
+                                        alt={`${sponsor.name || "Sponsor"} logo`}
+                                        className="w-full h-full object-contain p-2"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {sponsors.length > 1 ? (
+                                  <>
+                                    <Switch
+                                      checked={Boolean(sponsor.isPrimary)}
+                                      onCheckedChange={() => setPrimarySponsor(index)}
                                     />
+                                    <div>
+                                      <p className="text-sm text-white">Mark as primary sponsor</p>
+                                      <p className="text-xs text-white/60">Required when multiple sponsors exist.</p>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-xs text-white/70 bg-white/10 px-3 py-2 rounded-lg border border-white/10">
+                                    Single sponsor is primary by default.
                                   </div>
                                 )}
                               </div>
                             </div>
-                            <div className="space-y-2">
-                              <Label>Notes (optional)</Label>
-                              <Textarea
-                                rows={4}
-                                placeholder="Activation details, booth info, deliverables..."
-                                value={sponsor.note}
-                                onChange={(e) => handleSponsorChange(index, "note", e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
 
-                  {sponsors.length === 0 && (
+                  {isSponsored && sponsors.length === 0 && (
                     <div className="border border-dashed border-white/15 rounded-xl p-6 text-sm text-muted-foreground text-center">
                       No sponsors added yet. Click “Add Sponsor” to include partners.
                     </div>

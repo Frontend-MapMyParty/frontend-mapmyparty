@@ -1,0 +1,464 @@
+import React, { useMemo, useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Shield,
+  Sparkles,
+  Clock,
+  MapPin,
+  Radio,
+  Users,
+  Ticket,
+  QrCode,
+  CheckCircle2,
+  XCircle,
+  Info,
+  Loader2,
+  ArrowLeft,
+  Layers,
+} from "lucide-react";
+import { getLiveEventSamples, formatDateTime } from "@/data/liveEventsSample";
+
+const Stat = ({ label, value, hint, icon: Icon }) => (
+  <div className="rounded-2xl bg-white/5 border border-white/10 p-4 shadow-lg shadow-black/25">
+    <div className="flex items-center justify-between">
+      <p className="text-xs uppercase tracking-[0.2em] text-white/60 flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4 text-emerald-300" />} {label}
+      </p>
+      <span className="text-[10px] text-white/40">{hint}</span>
+    </div>
+    <p className="text-3xl font-bold mt-2">{value}</p>
+  </div>
+);
+
+const Modal = ({ open, onClose, children }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur">
+      <div className="bg-[#0d1526] border border-white/10 rounded-2xl p-5 w-full max-w-lg shadow-2xl shadow-black/40">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const TicketPanel = ({
+  ticket,
+  decision,
+  onAllow,
+  onReject,
+  locked,
+  message,
+  error,
+  onReset,
+}) => (
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-xl shadow-black/30 space-y-4">
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-xs uppercase tracking-[0.2em] text-white/60 flex items-center gap-2">
+          <Ticket className="w-4 h-4 text-amber-300" /> Ticket • #{ticket.ticketId}
+        </p>
+        <h3 className="text-xl font-semibold">{ticket.holder}</h3>
+        <p className="text-sm text-white/60">{ticket.email}</p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-white/60">{ticket.ticketType}</p>
+        <p className="text-lg font-bold">Qty {ticket.quantity}</p>
+        <p className="text-sm text-white/60">₹{ticket.price?.toLocaleString()}</p>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+        <p className="text-xs text-white/60">Event</p>
+        <p className="font-semibold">{ticket.eventTitle}</p>
+        <p className="text-xs text-white/60 mt-1">{ticket.schedule}</p>
+      </div>
+      <div className="rounded-xl bg-black/30 border border-white/10 p-3">
+        <p className="text-xs text-white/60">Venue</p>
+        <p className="font-semibold">{ticket.venue}</p>
+        <p className="text-xs text-white/60 mt-1">Booking ID: {ticket.bookingId}</p>
+      </div>
+    </div>
+
+    <div className="rounded-xl bg-black/20 border border-white/10 p-3 text-sm text-white/70 flex items-center gap-2">
+      <Info className="w-4 h-4 text-cyan-300" />
+      {decision === "allowed"
+        ? "Allowed • Check-in completed"
+        : decision === "rejected"
+        ? "Rejected • Entry denied"
+        : ticket.status}
+    </div>
+
+    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-white/60 mb-2 flex items-center gap-2">
+        <Users className="w-4 h-4 text-emerald-300" /> Attendees ({ticket.attendees?.length || 0})
+      </p>
+      <div className="space-y-2">
+        {(ticket.attendees || []).map((att, idx) => (
+          <div
+            key={att.id || idx}
+            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          >
+            <div>
+              <p className="text-sm font-semibold">{att.name}</p>
+              <p className="text-xs text-white/60">{att.email}</p>
+            </div>
+            <div className="text-right text-xs text-white/60">
+              <p>{att.type || ticket.ticketType}</p>
+              {att.phone && <p>{att.phone}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-white/60 mb-2 flex items-center gap-2">
+        <Ticket className="w-4 h-4 text-amber-300" /> Payment
+      </p>
+      <div className="space-y-1 text-sm text-white/70">
+        <div className="flex justify-between">
+          <span>Ticket ({ticket.quantity} × ₹{ticket.price?.toLocaleString()})</span>
+          <span>₹{(ticket.breakdown?.base || 0).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Fees</span>
+          <span>₹{(ticket.breakdown?.fees || 0).toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between font-semibold text-white">
+          <span>Total Paid</span>
+          <span>₹{(ticket.breakdown?.total || 0).toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+
+    {message && <p className="text-sm text-emerald-300">{message}</p>}
+    {error && <p className="text-sm text-red-300">{error}</p>}
+
+    <div className="flex items-center gap-2">
+      <button
+        onClick={onAllow}
+        disabled={locked}
+        className="px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-50 hover:bg-emerald-500/25 transition disabled:opacity-60"
+      >
+        Allow Entry
+      </button>
+      <button
+        onClick={onReject}
+        disabled={locked}
+        className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-400/30 text-red-50 hover:bg-red-500/25 transition disabled:opacity-60"
+      >
+        Reject
+      </button>
+      <button
+        onClick={onReset}
+        className="ml-auto px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm"
+      >
+        Verify another
+      </button>
+    </div>
+  </div>
+);
+
+const ReceptionDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { liveEvents } = useMemo(() => getLiveEventSamples(), []);
+  const event = useMemo(() => liveEvents.find((e) => e.id === id) || liveEvents[0], [id, liveEvents]);
+
+  const ticketTotals = useMemo(() => {
+    if (!event) return { total: 0, sold: 0, checkedIn: 0, types: 0 };
+    return event.ticketTypes.reduce(
+      (acc, t) => {
+        acc.total += t.totalQty || 0;
+        acc.sold += t.soldQty || 0;
+        acc.checkedIn += t.checkedIn || 0;
+        acc.types += 1;
+        return acc;
+      },
+      { total: 0, sold: 0, checkedIn: 0, types: 0 }
+    );
+  }, [event]);
+
+  const [accepted, setAccepted] = useState(ticketTotals.checkedIn);
+  const [rejected, setRejected] = useState(0);
+  const [ticketInput, setTicketInput] = useState("");
+  const [ticket, setTicket] = useState(null);
+  const [decision, setDecision] = useState(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [reason, setReason] = useState("");
+  const [showReason, setShowReason] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    setAccepted(ticketTotals.checkedIn);
+    setRejected(0);
+    setTicket(null);
+    setDecision(null);
+    setMessage("");
+    setError("");
+    setTicketInput("");
+    setReason("");
+  }, [ticketTotals]);
+
+  if (!event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white">
+        <div className="text-center space-y-3">
+          <p className="text-lg">Event not found</p>
+          <button
+            onClick={() => navigate("/organizer/reception")}
+            className="px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition"
+          >
+            Back to reception
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const buildDemoTicket = (ticketId = "123456") => {
+    const primaryTicket = event.ticketTypes?.[0];
+    const attendees = [
+      { id: "AT-001", name: "John Anderson", email: "john.anderson@example.com", phone: "+91 98765 11122", type: primaryTicket?.name || "VIP Table" },
+      { id: "AT-002", name: "Sara Menon", email: "sara.menon@example.com", phone: "+91 98200 12345", type: primaryTicket?.name || "VIP Table" },
+    ];
+    const base = (primaryTicket?.price || 8500) * 2;
+    const fees = Math.round(base * 0.05);
+    return {
+      ticketId,
+      bookingId: "BKG-1842",
+      holder: "John Anderson",
+      email: "john.anderson@example.com",
+      phone: "+91 98765 11122",
+      ticketType: primaryTicket?.name || "VIP Table",
+      quantity: 2,
+      price: primaryTicket?.price || 8500,
+      attendees,
+      breakdown: { base, fees, total: base + fees },
+      eventTitle: event.title,
+      venue: `${event.venue}, ${event.city}`,
+      schedule: `${formatDateTime(event.startDate)} — ${formatDateTime(event.endDate)}`,
+      status: "Pending Check-in",
+    };
+  };
+
+  const resetTicket = () => {
+    setTicket(null);
+    setDecision(null);
+    setMessage("");
+    setError("");
+    setReason("");
+    setTicketInput("");
+    setProcessing(false);
+  };
+
+  const loadTicket = (ticketId) => {
+    if (ticketId === "123456") {
+      setTicket(buildDemoTicket(ticketId));
+      setDecision(null);
+      setMessage(`Loaded ticket #${ticketId} for John Anderson`);
+      setError("");
+      setProcessing(false);
+    } else {
+      setError("Ticket not found. Use demo ID 123456 for now.");
+      setTicket(null);
+      setDecision(null);
+      setProcessing(false);
+    }
+  };
+
+  const handleScan = () => {
+    setProcessing(true);
+    setTimeout(() => loadTicket("123456"), 500);
+  };
+
+  const handleSubmitId = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    loadTicket(ticketInput.trim());
+  };
+
+  const handleAllow = () => {
+    if (!ticket || decision) return;
+    setDecision("allowed");
+    setAccepted((prev) => prev + 1);
+    setMessage(`Allowed ${ticket.holder}. Check-in completed.`);
+  };
+
+  const handleRejectConfirm = () => {
+    if (!reason.trim()) {
+      setError("Please provide a reason to reject.");
+      return;
+    }
+    setDecision("rejected");
+    setRejected((prev) => prev + 1);
+    setMessage(`Rejected ${ticket.holder}.`);
+    setError("");
+    setShowReason(false);
+  };
+
+  const seatsByType = event.ticketTypes?.map((t) => ({
+    name: t.name,
+    sold: t.soldQty,
+    total: t.totalQty,
+    checkedIn: t.checkedIn,
+  }));
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white">
+      <div className="px-4 lg:px-6 py-5 border-b border-white/10 bg-white/5 backdrop-blur">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/organizer/reception")}
+              className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.25em] text-white/50 flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-300" /> Reception Desk
+              </p>
+              <h1 className="text-2xl font-extrabold">{event.title}</h1>
+              <p className="text-sm text-white/60 flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                {formatDateTime(event.startDate)} — {formatDateTime(event.endDate)}
+                <span className="h-1 w-1 rounded-full bg-white/30" />
+                <MapPin className="w-4 h-4" />
+                {event.venue}, {event.city}, {event.state}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-white/60">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            Live window • Today
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 lg:px-6 py-6 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Stat label="Checked-in" value={accepted} hint="Includes prior scans" icon={Users} />
+          <Stat label="Rejected" value={rejected} hint="Flagged at entry" icon={XCircle} />
+          <Stat label="Sold" value={`${ticketTotals.sold} / ${ticketTotals.total}`} hint="Total tickets" icon={Ticket} />
+          <Stat label="Types" value={ticketTotals.types} hint="Seat / ticket types" icon={Layers} />
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/30">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/60 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-300" /> Check-in desk
+              </p>
+              <h3 className="text-xl font-semibold">{event.title}</h3>
+              <p className="text-xs text-white/60">Select method: scan QR or enter ticket ID.</p>
+            </div>
+            {message && <span className="text-xs text-emerald-300">{message}</span>}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <QrCode className="w-4 h-4 text-cyan-300" /> QR Scan
+              </p>
+              <p className="text-xs text-white/60 mt-1">Use scanner or simulate for demo.</p>
+              <button
+                onClick={handleScan}
+                disabled={processing}
+                className="mt-3 w-full px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/30 to-emerald-500/30 border border-white/10 hover:border-emerald-300/40 transition disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                Simulate QR Scan
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-amber-300" /> Ticket ID (6 digits)
+              </p>
+              <p className="text-xs text-white/60 mt-1">Demo works with 123456 for now.</p>
+              <form onSubmit={handleSubmitId} className="mt-3 space-y-2">
+                <input
+                  value={ticketInput}
+                  onChange={(e) => setTicketInput(e.target.value)}
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                  placeholder="Enter 6-digit ticket ID"
+                  className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                />
+                <button
+                  type="submit"
+                  disabled={processing}
+                  className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm disabled:opacity-60"
+                >
+                  Verify Ticket ID
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+        </div>
+
+        {ticket && (
+          <TicketPanel
+            ticket={ticket}
+            decision={decision}
+            onAllow={handleAllow}
+            onReject={() => setShowReason(true)}
+            locked={!!decision}
+            message={message}
+            error={error}
+            onReset={resetTicket}
+          />
+        )}
+
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/30">
+          <div className="flex items-center gap-2 mb-3">
+            <Radio className="w-5 h-5 text-emerald-300" />
+            <h4 className="text-lg font-semibold">Event tracker</h4>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {seatsByType?.map((s) => (
+              <div key={s.name} className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <p className="text-sm font-semibold">{s.name}</p>
+                <p className="text-xs text-white/60">Sold: {s.sold} / {s.total}</p>
+                <p className="text-xs text-white/60">Checked-in: {s.checkedIn}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Modal open={showReason} onClose={() => setShowReason(false)}>
+        <h3 className="text-lg font-semibold text-white mb-2">Reject ticket</h3>
+        <p className="text-sm text-white/70 mb-3">Provide a reason to deny entry.</p>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-red-400/40"
+          placeholder="e.g., QR mismatch, ticket already used, ID not verified"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            onClick={() => setShowReason(false)}
+            className="px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleRejectConfirm}
+            className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-400/30 text-red-50 hover:bg-red-500/25 transition text-sm"
+          >
+            Submit & Reject
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default ReceptionDetail;

@@ -24,6 +24,8 @@ import PromoterProfile from "./pages/PromoterProfile";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
+import LiveEventPage from "./pages/LiveEventPage";
+import ReceptionDetail from "./pages/ReceptionDetail";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,41 @@ const App = () => {
             <Route path="/organizer/dashboard" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/myevents" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/analytics" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/live" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/reception" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/financial" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/reception/:id" element={
+              <ProtectedRoute requiredRole="organizer">
+                <ReceptionDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/live/:id" element={
+              <ProtectedRoute requiredRole="organizer">
+                <LiveEventPage />
               </ProtectedRoute>
             } />
             <Route path="/organizer/dashboard-v2" element={<Navigate to="/organizer/dashboard" replace />} />

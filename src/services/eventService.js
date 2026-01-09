@@ -847,6 +847,11 @@ export async function updateEventStep6(eventId, updateData) {
   if (updateData.organizerNote && updateData.organizerNote.trim() !== "") {
     payload.organizerNote = updateData.organizerNote.trim();
   }
+
+  // Sponsors data (allow empty array to clear)
+  if (updateData.sponsors !== undefined) {
+    payload.sponsors = updateData.sponsors;
+  }
   
   // Check if there's anything to update
   if (Object.keys(payload).length === 0) {

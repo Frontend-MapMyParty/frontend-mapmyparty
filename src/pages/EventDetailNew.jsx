@@ -7,12 +7,13 @@ import {
   ChevronLeft, Calendar, MapPin, Clock, Users, Share2, Heart, 
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram, 
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
-  Navigation, Building, User, BookOpen
+  Navigation, Building, User, BookOpen, Medal
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch } from "@/config/api";
 
 const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
+const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
 
 const EventDetailNew = () => {
   const { id } = useParams();
@@ -24,6 +25,16 @@ const EventDetailNew = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [ticketQuantities, setTicketQuantities] = useState({});
   const [showBookingModal, setShowBookingModal] = useState(false);
+
+  const hasSponsors = useMemo(
+    () => Array.isArray(event?.sponsors) && event.sponsors.length > 0 && (event?.isSponsored ?? true),
+    [event?.isSponsored, event?.sponsors]
+  );
+
+  const sponsorsSorted = useMemo(() => {
+    if (!hasSponsors) return [];
+    return [...event.sponsors].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+  }, [event?.sponsors, hasSponsors]);
 
   const normalizeEvent = (raw = {}) => {
     const data = raw?.data ?? raw; // handle api shapes {data:{...}}
@@ -56,6 +67,29 @@ const EventDetailNew = () => {
               (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
           ),
         }))
+      : [];
+
+    const sponsors = Array.isArray(data.sponsors)
+      ? data.sponsors.map((s) => {
+          const nested = s.sponsor || {};
+          return {
+            id: s.id || s._id || s.sponsorId || nested.id || nested._id || nested.name || nested.logoUrl || s.name || s.logoUrl || s.logo || s.image,
+            name: s.name || nested.name || s.brandName || "Sponsor",
+            logo:
+              s.logoUrl ||
+              nested.logoUrl ||
+              s.logo ||
+              nested.logo ||
+              s.image ||
+              nested.image ||
+              s.flyerImage ||
+              s.flyerImageUrl ||
+              SPONSOR_PLACEHOLDER,
+            website: s.websiteUrl || nested.websiteUrl || s.website || nested.website || s.url || nested.url || s.link || "",
+            isPrimary: !!(s.isPrimary ?? s.primary ?? nested.isPrimary),
+            description: s.description || nested.description || s.about || nested.about || "",
+          };
+        })
       : [];
 
     const reviewsCount = Array.isArray(data.reviews)
@@ -149,7 +183,7 @@ const EventDetailNew = () => {
       subCategory: data.subCategory,
       categorySlug: data.categorySlug,
       questions: data.questions,
-      sponsors: data.sponsors || [],
+      sponsors,
       flyerImage: data.flyerImage,
       flyerPublicId: data.flyerPublicId,
       isSponsored: data.isSponsored,
@@ -402,19 +436,21 @@ const EventDetailNew = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-[rgba(100,200,255,0.2)]">
-              {["about", "gallery", "location", "organizer"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
-                    activeTab === tab
-                      ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
-                      : "bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)]"
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+              {["about", "gallery", "location", "organizer", hasSponsors ? "sponsors" : null]
+                .filter(Boolean)
+                .map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
+                      activeTab === tab
+                        ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+                        : "bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)]"
+                    }`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
             </div>
 
             {/* About Tab */}
@@ -609,6 +645,75 @@ const EventDetailNew = () => {
                       <Instagram className="h-4 w-4 mr-2" />
                       Instagram
                     </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Sponsors Tab */}
+            {activeTab === "sponsors" && hasSponsors && (
+              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.08)] rounded-xl">
+                <CardContent className="p-6 md:p-8">
+                  <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-[#D60024]/15 border border-[#D60024]/30 text-[#D60024]">
+                        <Medal className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-white">Sponsors</h2>
+                        <p className="text-[rgba(255,255,255,0.7)] text-sm">
+                          Proud partners making this experience possible
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className="bg-white/10 text-white border border-white/20">
+                      {sponsorsSorted.length} {sponsorsSorted.length === 1 ? "Sponsor" : "Sponsors"}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {sponsorsSorted.map((sponsor) => (
+                      <div
+                        key={sponsor.id}
+                        className={`p-5 rounded-xl border backdrop-blur-sm bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] transition-all duration-200 shadow-[0_10px_40px_rgba(0,0,0,0.35)] ${
+                          sponsor.isPrimary
+                            ? "border-[#D60024]/50 ring-1 ring-[#D60024]/60"
+                            : "border-[rgba(100,200,255,0.2)]"
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <img
+                            src={sponsor.logo || SPONSOR_PLACEHOLDER}
+                            alt={sponsor.name}
+                            className="w-16 h-16 rounded-lg object-cover border border-[rgba(255,255,255,0.1)] bg-black/30"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h3 className="text-lg font-semibold text-white">{sponsor.name}</h3>
+                              {sponsor.isPrimary && (
+                                <Badge className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white border-0">
+                                  Primary Sponsor
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[rgba(255,255,255,0.75)] text-sm leading-relaxed line-clamp-3">
+                              {sponsor.description || "Key partner supporting this event."}
+                            </p>
+                            {sponsor.website && (
+                              <a
+                                href={sponsor.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 mt-3 text-[#60a5fa] hover:underline text-sm font-medium"
+                              >
+                                <Globe className="h-4 w-4" />
+                                Visit Website
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

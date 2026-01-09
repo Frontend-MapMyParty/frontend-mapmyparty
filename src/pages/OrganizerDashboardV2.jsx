@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import { buildUrl } from "@/config/api";
 import {
@@ -18,16 +18,18 @@ import {
   Menu,
   Home,
   Users,
-  BarChart2,
   Download,
   ChevronDown,
   LogOut,
+  Radio,
+  Shield,
 } from "lucide-react";
 import FinancialReporting from "./FinancialReporting";
-import TicketsAndReservations from "./TicketsAndReservations";
 import OrganizerDash from "./OrganizerDash";
 import AudienceAnalytics from "./AudienceAnalytics";
 import MyEvents from "./MyEvents";
+import LiveEvents from "./LiveEvents";
+import Reception from "./Reception";
 
 // Profile Content Component
 const OrganizerProfileContent = ({ user }) => {
@@ -522,6 +524,7 @@ const OrganizerDashboardV2 = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [footerMenuOpen, setFooterMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Note: Authentication is handled by ProtectedRoute wrapper
   // No need for redundant auth check here
@@ -591,9 +594,27 @@ const OrganizerDashboardV2 = () => {
     { id: "dashboard", name: "Dashboard", icon: <Home className="w-6 h-6 mr-3" /> },
     { id: "myevents", name: "My Events", icon: <Calendar className="w-6 h-6 mr-3" /> },
     { id: "analytics", name: "Audience Analytics", icon: <Users className="w-6 h-6 mr-3" /> },
-    { id: "ticketing", name: "Tickets and Reservation", icon: <BarChart2 className="w-6 h-6 mr-3" /> },
+    { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
+    { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
     { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
+
+  // Sync active tab from URL
+  useEffect(() => {
+    const path = location.pathname || "";
+    if (path.startsWith("/organizer/myevents")) setActiveTab("myevents");
+    else if (path.startsWith("/organizer/analytics")) setActiveTab("analytics");
+    else if (path.startsWith("/organizer/live")) setActiveTab("live");
+    else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
+    else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
+    else setActiveTab("dashboard");
+  }, [location.pathname]);
+
+  const handleNav = (id) => {
+    setActiveTab(id);
+    const base = id === "dashboard" ? "/organizer/dashboard" : `/organizer/${id}`;
+    navigate(base);
+  };
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
@@ -620,7 +641,7 @@ const OrganizerDashboardV2 = () => {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleNav(item.id)}
                 className={`flex items-center w-full px-3 py-3 text-sm font-medium rounded-xl transition ${
                   activeTab === item.id
                     ? "text-white bg-white/10 border border-white/10 shadow-lg shadow-black/20"
@@ -711,7 +732,8 @@ const OrganizerDashboardV2 = () => {
 
             {activeTab === "myevents" && <MyEvents />}
             {activeTab === "analytics" && <AudienceAnalytics />}
-            {activeTab === "ticketing" && <TicketsAndReservations />}
+            {activeTab === "live" && <LiveEvents />}
+            {activeTab === "reception" && <Reception />}
             {activeTab === "financial" && <FinancialReporting />}
             {activeTab === "profile" && <OrganizerProfileContent user={user} />}
           </div>
