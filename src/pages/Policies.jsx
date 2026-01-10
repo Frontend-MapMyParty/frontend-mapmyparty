@@ -47,11 +47,11 @@ const Policies = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="privacy" className="w-full">
+        <Tabs defaultValue="terms" className="w-full">
           <TabsList className="grid grid-cols-3 bg-white/5 border border-white/10">
+            <TabsTrigger value="terms">Terms &amp; Conditions</TabsTrigger>
+            <TabsTrigger value="privacy">Privacy Policy</TabsTrigger>
             <TabsTrigger value="refund">Refund Policy</TabsTrigger>
-            <TabsTrigger value="terms">T&C</TabsTrigger>
-            <TabsTrigger value="policies">Privacy Policy</TabsTrigger>
           </TabsList>
 
           {Object.entries(sections).map(([key, section]) => {
