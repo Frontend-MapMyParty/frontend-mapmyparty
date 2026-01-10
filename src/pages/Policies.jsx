@@ -51,7 +51,7 @@ const Policies = () => {
           <TabsList className="grid grid-cols-3 bg-white/5 border border-white/10">
             <TabsTrigger value="refund">Refund Policy</TabsTrigger>
             <TabsTrigger value="terms">T&C</TabsTrigger>
-            <TabsTrigger value="privacy">Privacy Policy</TabsTrigger>
+            <TabsTrigger value="policies">Privacy Policy</TabsTrigger>
           </TabsList>
 
           {Object.entries(sections).map(([key, section]) => {

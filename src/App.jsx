@@ -48,7 +48,7 @@ const App = () => {
             <Route path="/events/:id/overview" element={<EventOverviewPage />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/privacy" element={<Policies />} />
+            <Route path="/policies" element={<Policies />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/google/callback" element={<GoogleCallback />} />
             
