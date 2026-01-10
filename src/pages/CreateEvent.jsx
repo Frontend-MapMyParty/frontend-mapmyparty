@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -16,7 +24,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Check, Calendar as CalendarIcon, Clock, Globe, Upload, X, ChevronLeft, Plus, MapPin, Ticket, Users, Table2, UsersRound, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar as CalendarIcon, Clock, Globe, Upload, X, ChevronLeft, Plus, Ticket, Users, Table2, UsersRound, Loader2, Smile } from "lucide-react";
 import Header from "@/components/Header";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { toast } from "sonner";
@@ -95,6 +103,7 @@ const CreateEvent = () => {
   const [isSponsored, setIsSponsored] = useState(false);
   const [originalIsSponsored, setOriginalIsSponsored] = useState(false);
   const [publishState, setPublishState] = useState("DRAFT");
+  const [isPublished, setIsPublished] = useState(false);
   const eventCacheRef = useRef(null);
   const sponsorsLoadedRef = useRef(false);
   const artistsLoadedRef = useRef(false);
@@ -241,21 +250,17 @@ const CreateEvent = () => {
     cloakroom: false,
   });
   const [customAdvisories, setCustomAdvisories] = useState([]);
+  const [newCustomAdvisory, setNewCustomAdvisory] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [advisoryDialogOpen, setAdvisoryDialogOpen] = useState(false);
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [customQuestions, setCustomQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
   const [organizerNote, setOrganizerNote] = useState("");
   const [selectedEventTypeCategory, setSelectedEventTypeCategory] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState(null);
   const [fullAddress, setFullAddress] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchingLocation, setSearchingLocation] = useState(false);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const venueInputRef = useRef(null);
-  const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
+  const [venueThemePulse, setVenueThemePulse] = useState(false);
 
   // Ensure backendEventId is set when editing (even if session flags are missing)
   useEffect(() => {
@@ -265,6 +270,15 @@ const CreateEvent = () => {
       sessionStorage.setItem('draftStarted', 'true');
     }
   }, [isEditMode, editId, backendEventId]);
+
+  // Small pulse to emphasize manual entry section
+  useEffect(() => {
+    if (currentStep === 4) {
+      setVenueThemePulse(true);
+      const timer = setTimeout(() => setVenueThemePulse(false), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
 
   // Neon event theme colors (toned-down)
   const pageTheme = {
@@ -383,13 +397,6 @@ const CreateEvent = () => {
             setVenueEmail(venueData.email || '');
             setFullAddress(venueData.fullAddress || '');
             
-            if (venueData.latitude && venueData.longitude) {
-              setSelectedLocation({
-                lat: venueData.latitude,
-                lng: venueData.longitude
-              });
-            }
-            
             console.log('✅ Loaded venue data from localStorage, venueId:', savedVenueId);
             
             // Force update the original venue data for change detection
@@ -502,12 +509,6 @@ const CreateEvent = () => {
       setVenueEmail(eventToEdit.venueEmail || "");
       setOrganizerNote(eventToEdit.organizerNote || "");
       setFullAddress(firstVenue.fullAddress || firstVenue.address || "");
-      if (firstVenue.latitude && firstVenue.longitude) {
-        setSelectedLocation({
-          lat: firstVenue.latitude,
-          lng: firstVenue.longitude,
-        });
-      }
     } else if (eventToEdit.location) {
       const locationParts = eventToEdit.location.split(", ");
       if (locationParts.length > 0) setVenueName(locationParts[0]);
@@ -817,208 +818,8 @@ const CreateEvent = () => {
     }
   }, [backendEventId, isEditMode]);
 
-  // Search for locations using Photon API (OpenStreetMap-based, CORS-friendly)
-  const searchLocations = async (query) => {
-    if (!query || query.length < 3) {
-      setLocationSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    setSearchingLocation(true);
-    
-    try {
-      // Using Photon API instead of Nominatim (more CORS-friendly)
-      const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`,
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch locations: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.features || data.features.length === 0) {
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-      
-      const suggestions = data.features.map(feature => {
-        const props = feature.properties;
-        const coords = feature.geometry.coordinates;
-        
-        // Build display name from properties
-        const parts = [];
-        if (props.name) parts.push(props.name);
-        if (props.city) parts.push(props.city);
-        else if (props.county) parts.push(props.county);
-        if (props.state) parts.push(props.state);
-        if (props.country) parts.push(props.country);
-        
-        const displayName = parts.join(', ') || 'Unknown Location';
-        
-        return {
-          name: props.name || displayName,
-          lat: coords[1], // Photon uses [lng, lat] format
-          lng: coords[0],
-          address: {
-            city: props.city || props.county || '',
-            state: props.state || '',
-            country: props.country || '',
-            postcode: props.postcode || '',
-          },
-          displayName: displayName,
-        };
-      });
-      
-      setLocationSuggestions(suggestions);
-      setShowSuggestions(true);
-    } catch (error) {
-      console.error('Error searching locations:', error);
-      toast.error('Failed to search locations. Please try again.');
-    } finally {
-      setSearchingLocation(false);
-    }
-  };
-
-  // Debounce location search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (venueName && !selectedLocation) {
-        searchLocations(venueName);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [venueName, selectedLocation]);
-
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (venueInputRef.current && !venueInputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  // Load Leaflet CSS and JS for map
-  useEffect(() => {
-    // Check if Leaflet is already loaded
-    if (window.L) {
-      setLeafletLoaded(true);
-      console.log("✅ Leaflet already loaded");
-      return;
-    }
-
-    // Add Leaflet CSS
-    if (!document.querySelector('link[href*="leaflet.css"]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-      link.crossOrigin = '';
-      document.head.appendChild(link);
-      console.log("📦 Loading Leaflet CSS...");
-    }
-
-    // Add Leaflet JS
-    if (!document.querySelector('script[src*="leaflet.js"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
-      script.crossOrigin = '';
-      script.async = true;
-      script.onload = () => {
-        setLeafletLoaded(true);
-        console.log("✅ Leaflet loaded successfully");
-      };
-      script.onerror = () => {
-        console.error("❌ Failed to load Leaflet");
-        toast.error("Failed to load map library");
-      };
-      document.head.appendChild(script);
-      console.log("📦 Loading Leaflet JS...");
-    }
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
-
-  // Initialize Leaflet map when location is selected and Leaflet is loaded
-  useEffect(() => {
-    if (!selectedLocation || !mapContainerRef.current || !leafletLoaded || !window.L) {
-      console.log("⏳ Waiting for map initialization...", {
-        selectedLocation: !!selectedLocation,
-        mapContainer: !!mapContainerRef.current,
-        leafletLoaded,
-        windowL: !!window.L
-      });
-      return;
-    }
-
-    console.log("🗺️ Initializing map for location:", selectedLocation);
-
-    try {
-      // Remove existing map instance if any
-      if (mapInstanceRef.current) {
-        console.log("🗑️ Removing old map instance");
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-
-      // Clear the container
-      mapContainerRef.current.innerHTML = '';
-
-      // Create new map
-      const map = window.L.map(mapContainerRef.current, {
-        center: [selectedLocation.lat, selectedLocation.lng],
-        zoom: 15,
-        scrollWheelZoom: true,
-      });
-
-      // Add tile layer (map style)
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map);
-
-      // Add marker with popup
-      const marker = window.L.marker([selectedLocation.lat, selectedLocation.lng])
-        .addTo(map)
-        .bindPopup(`<b>${selectedLocation.displayName.split(',')[0]}</b><br>${selectedLocation.displayName}`)
-        .openPopup();
-
-      // Store map instance for cleanup
-      mapInstanceRef.current = map;
-
-      console.log("✅ Map initialized successfully");
-
-      // Force map to refresh after a short delay
-      setTimeout(() => {
-        if (map) {
-          map.invalidateSize();
-        }
-      }, 100);
-
-    } catch (error) {
-      console.error('❌ Error initializing map:', error);
-      toast.error("Failed to load map");
-    }
-  }, [selectedLocation, leafletLoaded]);
+  // Build a readable full address string from a suggestion
+  // Manual-only venue entry (no external suggestions or maps)
 
   const steps = [
     { number: 1, title: "Event Details" },
@@ -1422,18 +1223,19 @@ const CreateEvent = () => {
       }
 
       // Prepare venue data
+      const fallbackAddressParts = [venueName, city, state, postalCode, country || "India"].filter(Boolean);
       const venueData = {
         name: venueName,
         contact: venueContact,
         email: venueEmail,
-        fullAddress: fullAddress || `${venueName}, ${city}, ${state}`,
+        fullAddress: fullAddress || fallbackAddressParts.join(", "),
         city: city,
         state: state,
-        country: country,
+        country: country || "India",
         postalCode: postalCode,
-        latitude: selectedLocation?.lat || 0,
-        longitude: selectedLocation?.lng || 0,
-        googlePlaceId: "", // Optional - could be added later
+        latitude: 0,
+        longitude: 0,
+        googlePlaceId: "", // Optional - not used in manual mode
         eventId: backendEventId, // Use backend event ID
         isPrimary: true,
       };
@@ -1734,10 +1536,18 @@ const CreateEvent = () => {
           if (!createdArtistIndices.includes(i)) {
             console.log(`🎤 Creating artist ${i + 1}:`, artist);
             
-            const response = await createArtist({
+            const artistPayload = {
               ...artist,
+              instagramLink: artist.instagram || null,  // Map instagram to instagramLink
+              spotifyLink: artist.spotify || null,     // Also fix spotify for consistency
               eventId: backendEventId,
-            });
+            };
+            
+            // Remove the old field names to avoid confusion
+            delete artistPayload.instagram;
+            delete artistPayload.spotify;
+            
+            const response = await createArtist(artistPayload);
             
             artistResponses.push(response);
             
@@ -2415,8 +2225,9 @@ const CreateEvent = () => {
                 onClick={() => navigate(-1)}
               >
                 <ChevronLeft className="w-5 h-5" />
+                 <span className="text-sm text-gray-300">Back</span>
               </Button>
-              <span className="text-sm text-gray-300">Back</span>
+              {/* <span className="text-sm text-gray-300">Back</span> */}
             </div>
             
             {backendEventId && !isEditMode && currentStep === 1 && (
@@ -2465,11 +2276,7 @@ const CreateEvent = () => {
                         {selectedEventTypeCategory}
                       </Badge>
                     )}
-                    {eventId && !isEditMode && (
-                      <Badge variant="outline" className="text-xs font-mono border-white/20 text-white">
-                        ID: {eventId}
-                      </Badge>
-                    )}
+                    
                     {backendEventId && !isEditMode && (
                       <Badge className="bg-[#e11d48]/15 text-white border-[#e11d48]/30">
                         📝 Draft
@@ -3154,166 +2961,114 @@ const CreateEvent = () => {
 
               {/* Step 4: Venue & Location */}
               {currentStep === 4 && (
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Label htmlFor="venueName">Venue Name *</Label>
-                    <Input
-                      ref={venueInputRef}
-                      id="venueName"
-                      placeholder="Search for a venue or location..."
-                      value={venueName}
-                      onChange={(e) => {
-                        setVenueName(e.target.value);
-                        setSelectedLocation(null); // Reset selected location when typing
-                      }}
-                      onFocus={() => {
-                        if (locationSuggestions.length > 0) {
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      autoComplete="off"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {searchingLocation ? "Searching..." : "Start typing to see location suggestions"}
-                    </p>
-                    
-                    {/* Suggestions Dropdown */}
-                    {showSuggestions && locationSuggestions.length > 0 && (
-                      <Card className="absolute z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
-                        <CardContent className="p-0">
-                          {locationSuggestions.map((suggestion, index) => (
-                            <div
-                              key={index}
-                              className="px-4 py-3 hover:bg-muted cursor-pointer border-b last:border-b-0 transition-colors"
-                              onClick={() => handleLocationSelect(suggestion)}
-                            >
-                              <div className="flex items-start gap-2">
-                                <MapPin className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {suggestion.displayName.split(',')[0]}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {suggestion.displayName}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-white/60">Venue</p>
+                        <h3 className="text-lg font-semibold text-white">Location Details</h3>
+                      </div>
+                      <div className="flex gap-2 text-[11px]">
+                        <span className="px-3 py-1 rounded-full bg-[#2563eb]/15 text-[#8ab4ff] border border-[#2563eb]/30">Manual entry</span>
+                        <span className="px-3 py-1 rounded-full bg-[#e11d48]/15 text-[#ff9cb7] border border-[#e11d48]/30">Required fields *</span>
+                      </div>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        placeholder="Enter city"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="state">State *</Label>
-                      <Input
-                        id="state"
-                        placeholder="Enter state"
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="country">Country</Label>
-                      <Input
-                        id="country"
-                        placeholder="Enter country"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="postalCode">Postal Code</Label>
-                      <Input
-                        id="postalCode"
-                        placeholder="Enter postal code"
-                        value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="venueContact">Contact Number *</Label>
-                      <Input
-                        id="venueContact"
-                        type="tel"
-                        placeholder="Enter contact number"
-                        value={venueContact}
-                        onChange={(e) => setVenueContact(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="venueEmail">Email *</Label>
-                      <Input
-                        id="venueEmail"
-                        type="email"
-                        placeholder="Enter email"
-                        value={venueEmail}
-                        onChange={(e) => setVenueEmail(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="address">Full Address</Label>
-                    <Textarea 
-                      id="address" 
-                      placeholder="Enter full address" 
-                      value={fullAddress}
-                      onChange={(e) => setFullAddress(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Map Location</Label>
-                    {selectedLocation ? (
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        {!leafletLoaded ? (
-                          <div className="w-full h-64 rounded-lg border border-border overflow-hidden bg-muted flex items-center justify-center">
-                            <div className="text-center">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                              <p className="text-sm text-muted-foreground">Loading map...</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div 
-                            ref={mapContainerRef}
-                            className="w-full h-64 rounded-lg border border-border overflow-hidden"
-                            style={{ minHeight: '256px', backgroundColor: '#f0f0f0' }}
-                          />
-                        )}
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin className="w-4 h-4" />
-                          <span>{selectedLocation.displayName}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Coordinates: {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
-                        </div>
+                        <Label htmlFor="venueName">Venue Name *</Label>
+                        <Input
+                          id="venueName"
+                          placeholder="e.g., Red Fort Delhi"
+                          value={venueName}
+                          onChange={(e) => setVenueName(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
                       </div>
-                    ) : (
-                      <div className="border rounded-lg p-8 text-center text-muted-foreground">
-                        <MapPin className="mx-auto mb-2" size={32} />
-                        <p className="text-sm">Select a location from suggestions to see it on the map</p>
-                        <p className="text-xs mt-1">Type at least 3 characters in the venue field</p>
+                      <div className="space-y-2">
+                        <Label htmlFor="city">City *</Label>
+                        <Input
+                          id="city"
+                          placeholder="Enter city"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
                       </div>
-                    )}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="state">State *</Label>
+                        <Input
+                          id="state"
+                          placeholder="Enter state"
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="country">Country *</Label>
+                        <Input
+                          id="country"
+                          placeholder="Enter country"
+                          value={country}
+                          onChange={(e) => setCountry(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="postalCode">Postal / PIN Code *</Label>
+                        <Input
+                          id="postalCode"
+                          placeholder="e.g., 110025"
+                          value={postalCode}
+                          onChange={(e) => setPostalCode(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="venueContact">Contact Number *</Label>
+                        <Input
+                          id="venueContact"
+                          type="tel"
+                          placeholder="Enter contact number"
+                          value={venueContact}
+                          onChange={(e) => setVenueContact(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="venueEmail">Email *</Label>
+                        <Input
+                          id="venueEmail"
+                          type="email"
+                          placeholder="Enter email"
+                          value={venueEmail}
+                          onChange={(e) => setVenueEmail(e.target.value)}
+                          className={`${fieldClass} h-11`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="address">Full Address (optional)</Label>
+                        <Textarea 
+                          id="address" 
+                          placeholder="Building / street / landmark"
+                          value={fullAddress}
+                          onChange={(e) => setFullAddress(e.target.value)}
+                          rows={3}
+                          className={`${fieldClass} min-h-[44px]`}
+                        />
+                        <p className="text-xs text-white/60">Provide extra directions if needed. This won’t block submission.</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -3450,179 +3205,345 @@ const CreateEvent = () => {
               )}
 
               {/* Step 7: Additional Information */}
-              {currentStep === 7 && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="terms">Terms & Conditions</Label>
-                    <div className="border border-input rounded-md">
-                      <ReactQuill
-                        theme="snow"
-                        value={termsAndConditions}
-                        onChange={setTermsAndConditions}
-                        placeholder="Enter any terms and conditions..."
-                        modules={{
-                          toolbar: [
-                            ['bold', 'italic', 'underline'],
-                            [{ list: 'ordered' }, { list: 'bullet' }],
-                            [{ color: [] }, { background: [] }],
-                            [{ size: ['small', false, 'large', 'huge'] }],
-                            ['clean'],
-                          ],
-                        }}
-                      />
-                    </div>
-                  </div>
+              {currentStep === 7 && (() => {
+                const advisoryOptions = [
+                  { id: 'smokingAllowed', label: '🚬 Smoking allowed' },
+                  { id: 'drinkingAllowed', label: '🍺 Drinking allowed' },
+                  { id: 'petsAllowed', label: '🐾 Pets allowed' },
+                  { id: 'ageRestricted', label: '🔞 Show is 18+' },
+                  { id: 'camerasAllowed', label: '📸 Cameras and photos allowed' },
+                  { id: 'outsideFoodAllowed', label: '🍔 Outside food & drinks allowed' },
+                  { id: 'seatingProvided', label: '🪑 Seating provided' },
+                  { id: 'wheelchairAccessible', label: '♿ Wheelchair accessible venue' },
+                  { id: 'liveMusic', label: '🎵 Live music' },
+                  { id: 'parkingAvailable', label: '🚗 Parking available' },
+                  { id: 'reentryAllowed', label: '🔁 Re-entry allowed' },
+                  { id: 'onsitePayments', label: '💳 On-site payments available' },
+                  { id: 'securityCheck', label: '👮 Security check at entry' },
+                  { id: 'cloakroom', label: '🧥 Cloakroom available' },
+                ];
+                const emojiPalette = [
+                  "✨","✅","⚠️","🚫","🎟️","🎉","🎵","🍽️","🍺","🍷","🥤","🍾","🚭","📸","🧒","🔞",
+                  "🧳","🎒","🕒","⏰","🚗","🅿️","♿","🎭","🎬","🎧","🎤","🎸","🪩","🎆","🎇","🏟️","🧥","🔒","🛡️"
+                ];
 
-                  <div className="space-y-4">
-                    <Label>Advisory</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[
-                        { id: 'smokingAllowed', label: '🚬 Smoking allowed' },
-                        { id: 'drinkingAllowed', label: '🍺 Drinking allowed' },
-                        { id: 'petsAllowed', label: '🐾 Pets allowed' },
-                        { id: 'ageRestricted', label: '🔞 Show is 18+' },
-                        { id: 'camerasAllowed', label: '📸 Cameras and photos allowed' },
-                        { id: 'outsideFoodAllowed', label: '🍔 Outside food & drinks allowed' },
-                        { id: 'seatingProvided', label: '🪑 Seating provided' },
-                        { id: 'wheelchairAccessible', label: '♿ Wheelchair accessible venue' },
-                        { id: 'liveMusic', label: '🎵 Live music' },
-                        { id: 'parkingAvailable', label: '🚗 Parking available' },
-                        { id: 'reentryAllowed', label: '🔁 Re-entry allowed' },
-                        { id: 'onsitePayments', label: '💳 On-site payments available' },
-                        { id: 'securityCheck', label: '👮 Security check at entry' },
-                        { id: 'cloakroom', label: '🧥 Cloakroom available' },
-                      ].map((item) => (
-                        <div className="flex items-center space-x-2" key={item.id}>
-                          <Checkbox
-                            id={item.id}
-                            checked={advisory[item.id]}
-                            onCheckedChange={(checked) => setAdvisory({ ...advisory, [item.id]: !!checked })}
-                          />
-                          <Label htmlFor={item.id} className="cursor-pointer font-normal text-sm">
-                            {item.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
+                const selectedBuiltIns = advisoryOptions.filter((item) => advisory[item.id]);
+                const hasSelections = selectedBuiltIns.length > 0 || customAdvisories.length > 0;
 
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Custom Advisory</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCustomAdvisories([...customAdvisories, ''])}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Custom Advisory
-                        </Button>
-                      </div>
-
-                      {customAdvisories.length > 0 && (
+                return (
+                  <div className="space-y-5">
+                    <Card className="border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] shadow-[0_20px_80px_rgba(0,0,0,0.55)]">
+                      <CardHeader className="pb-2">
+                        <p className="text-xs uppercase tracking-[0.2em] text-white/50">Step 7</p>
+                        <CardTitle className="text-xl text-white">Additional Info</CardTitle>
+                        <p className="text-sm text-white/70">Set policies, advisories, and helpful notes for attendees.</p>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
                         <div className="space-y-2">
-                          {customAdvisories.map((advisoryItem, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Input
-                                placeholder="Enter custom advisory..."
-                                value={advisoryItem}
-                                onChange={(e) => {
-                                  const next = [...customAdvisories];
-                                  next[index] = e.target.value;
-                                  setCustomAdvisories(next);
-                                }}
-                                className="flex-1"
-                              />
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <Label htmlFor="terms" className="text-white">Terms & Conditions</Label>
+                              <p className="text-xs text-white/60">Describe entry rules, refunds, or other policies.</p>
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#0c1324] via-[#0f172a] to-[#0b1224] shadow-[0_20px_70px_rgba(0,0,0,0.5)] p-3">
+                            <ReactQuill
+                              theme="snow"
+                              value={termsAndConditions}
+                              onChange={setTermsAndConditions}
+                              placeholder="Enter any terms and conditions..."
+                              style={{
+                                background: "rgba(255,255,255,0.03)",
+                                borderRadius: "12px",
+                                border: "1px solid rgba(255,255,255,0.14)",
+                                color: "#e5e7eb",
+                              }}
+                              className="text-white"
+                              modules={{
+                                toolbar: [
+                                  ['bold', 'italic', 'underline'],
+                                  [{ list: 'ordered' }, { list: 'bullet' }],
+                                  [{ color: [] }, { background: [] }],
+                                  [{ size: ['small', false, 'large', 'huge'] }],
+                                  ['clean'],
+                                ],
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <Label className="text-white">Advisories</Label>
+                              <p className="text-xs text-white/60">Pick multiple advisories and add your own.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <Button
                                 type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== index))}
+                                variant="outline"
+                                className="border-white/30 text-white bg-white/5 hover:bg-white/10"
+                                onClick={() => setAdvisoryDialogOpen(true)}
                               >
-                                <X className="w-4 h-4" />
+                                {hasSelections ? `${selectedBuiltIns.length + customAdvisories.length} selected` : "Open advisory picker"}
                               </Button>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                          </div>
 
-                  <div className="space-y-4">
-                    <Label>Custom Questions for Attendees</Label>
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="Question (e.g., Dietary requirements?)"
-                          value={newQuestion}
-                          onChange={(e) => setNewQuestion(e.target.value)}
-                        />
-                        <Textarea
-                          placeholder="Answer (optional - organizer can provide default answer)"
-                          value={newAnswer}
-                          onChange={(e) => setNewAnswer(e.target.value)}
-                          rows={2}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (newQuestion.trim()) {
-                              setCustomQuestions([...customQuestions, { question: newQuestion, answer: newAnswer }]);
-                              setNewQuestion('');
-                              setNewAnswer('');
-                              toast.success('Question added');
-                            } else {
-                              toast.error('Please enter a question');
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Question
-                        </Button>
-                      </div>
+                          <Dialog open={advisoryDialogOpen} onOpenChange={setAdvisoryDialogOpen}>
+                            <DialogContent className="max-w-4xl border-white/15 bg-[#0b1224]/95 text-white shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+                              <DialogHeader>
+                                <DialogTitle className="text-2xl">Choose advisories</DialogTitle>
+                                <DialogDescription className="text-white/70">
+                                  Turn on as many as you need, or add a custom advisory.
+                                </DialogDescription>
+                              </DialogHeader>
 
-                      {customQuestions.length > 0 && (
-                        <div className="space-y-3 mt-4">
-                          {customQuestions.map((q, index) => (
-                            <Card key={index}>
-                              <CardContent className="pt-4">
-                                <div className="flex justify-between items-start gap-2">
-                                  <div className="flex-1 space-y-1">
-                                    <p className="font-medium text-sm">Q: {q.question}</p>
-                                    {q.answer && <p className="text-sm text-muted-foreground">A: {q.answer}</p>}
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {advisoryOptions.map((item) => {
+                                    const active = advisory[item.id];
+                                    return (
+                                      <button
+                                        key={item.id}
+                                        type="button"
+                                        className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${
+                                          active
+                                            ? "border-[#2563eb]/70 bg-[#2563eb]/15 text-white shadow-[0_12px_40px_rgba(37,99,235,0.25)]"
+                                            : "border-white/15 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10"
+                                        }`}
+                                        onClick={() => setAdvisory({ ...advisory, [item.id]: !active })}
+                                      >
+                                        <Checkbox
+                                          checked={active}
+                                          onCheckedChange={(checked) => setAdvisory({ ...advisory, [item.id]: !!checked })}
+                                        />
+                                        <span className="text-sm font-medium">{item.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="border-t border-white/10 pt-4 space-y-3">
+                                  <p className="text-sm font-semibold text-white">Custom advisory</p>
+                                  <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex-1 flex gap-2">
+                                      <Input
+                                        placeholder="e.g., No re-entry after 10 PM"
+                                        value={newCustomAdvisory}
+                                        onChange={(e) => setNewCustomAdvisory(e.target.value)}
+                                        className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="border-white/20 text-white bg-white/5 hover:bg-white/10"
+                                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                                      >
+                                        <Smile className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="accent"
+                                      className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg"
+                                      onClick={() => {
+                                        const trimmed = newCustomAdvisory.trim();
+                                        if (!trimmed) return;
+                                        setCustomAdvisories([...customAdvisories, trimmed]);
+                                        setNewCustomAdvisory("");
+                                        toast.success("Custom advisory added");
+                                      }}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
                                   </div>
+
+                                  {showEmojiPicker && (
+                                    <div className="rounded-xl border border-white/15 bg-white/5 p-3 space-y-2">
+                                      <p className="text-xs uppercase tracking-[0.08em] text-white/60">Emoji</p>
+                                      <div className="grid grid-cols-8 gap-2 text-lg">
+                                        {emojiPalette.map((emoji, idx) => (
+                                          <button
+                                            key={`emoji-${idx}`}
+                                            type="button"
+                                            className="h-10 w-10 rounded-lg border border-white/10 bg-[#0f172a] hover:border-white/30 hover:bg-white/10 transition"
+                                            onClick={() => setNewCustomAdvisory((prev) => `${prev}${emoji}`)}
+                                          >
+                                            {emoji}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {customAdvisories.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {customAdvisories.map((item, idx) => (
+                                        <button
+                                          key={`custom-dialog-${idx}`}
+                                          type="button"
+                                          className="group flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white hover:border-[#e11d48]/50 hover:bg-[#e11d48]/15"
+                                          onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== idx))}
+                                        >
+                                          ✨ {item}
+                                          <X className="w-3 h-3 text-white/70 group-hover:text-white" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-sm text-white/70">
+                                  {hasSelections
+                                    ? `${selectedBuiltIns.length + customAdvisories.length} selected`
+                                    : "No advisories selected yet"}
+                                </p>
+                                <div className="flex gap-2 justify-end">
                                   <Button
+                                    type="button"
                                     variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      setCustomQuestions(customQuestions.filter((_, i) => i !== index));
-                                      toast.success('Question removed');
-                                    }}
+                                    className="text-white/80 hover:text-white"
+                                    onClick={() => setAdvisoryDialogOpen(false)}
                                   >
-                                    <X className="w-4 h-4" />
+                                    Close
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="accent"
+                                    className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg"
+                                    onClick={() => setAdvisoryDialogOpen(false)}
+                                  >
+                                    Done
                                   </Button>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Organizer Notes (Private)</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Add any internal notes..."
-                      rows={3}
-                      value={organizerNote}
-                      onChange={(e) => setOrganizerNote(e.target.value)}
-                    />
+                          {hasSelections ? (
+                            <div className="flex flex-wrap gap-2">
+                              {selectedBuiltIns.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="group flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white hover:border-[#e11d48]/40 hover:bg-[#e11d48]/10"
+                                  onClick={() => setAdvisory({ ...advisory, [item.id]: false })}
+                                >
+                                  {item.label}
+                                  <X className="w-3 h-3 text-white/70 group-hover:text-white" />
+                                </button>
+                              ))}
+                              {customAdvisories.map((item, idx) => (
+                                <button
+                                  key={`custom-${idx}`}
+                                  type="button"
+                                  className="group flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white hover:border-[#e11d48]/40 hover:bg-[#e11d48]/10"
+                                  onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== idx))}
+                                >
+                                  ✨ {item}
+                                  <X className="w-3 h-3 text-white/70 group-hover:text-white" />
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-white/60 border border-dashed border-white/20 rounded-lg px-3 py-2 bg-white/5">
+                              No advisories selected yet. Use “Select advisories” to add them.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <Label className="text-white">Custom Questions for Attendees</Label>
+                              <p className="text-xs text-white/60">Collect details like dietary needs or preferences.</p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-white/30 text-white bg-white/5 hover:bg-white/10"
+                              onClick={() => {
+                                if (newQuestion.trim()) {
+                                  setCustomQuestions([...customQuestions, { question: newQuestion, answer: newAnswer }]);
+                                  setNewQuestion('');
+                                  setNewAnswer('');
+                                  toast.success('Question added');
+                                } else {
+                                  toast.error('Please enter a question');
+                                }
+                              }}
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Question
+                            </Button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Question (e.g., Dietary requirements?)"
+                              value={newQuestion}
+                              onChange={(e) => setNewQuestion(e.target.value)}
+                              className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                            />
+                            <Textarea
+                              placeholder="Answer (optional - organizer can provide default answer)"
+                              value={newAnswer}
+                              onChange={(e) => setNewAnswer(e.target.value)}
+                              rows={2}
+                              className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                            />
+                          </div>
+
+                          {customQuestions.length > 0 ? (
+                            <div className="space-y-3">
+                              {customQuestions.map((q, index) => (
+                                <Card key={index} className="border border-white/10 bg-white/5">
+                                  <CardContent className="pt-4">
+                                    <div className="flex justify-between items-start gap-2">
+                                      <div className="flex-1 space-y-1">
+                                        <p className="font-medium text-sm text-white">Q: {q.question}</p>
+                                        {q.answer && <p className="text-sm text-white/70">A: {q.answer}</p>}
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-white/70 hover:text-white"
+                                        onClick={() => {
+                                          setCustomQuestions(customQuestions.filter((_, i) => i !== index));
+                                          toast.success('Question removed');
+                                        }}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-white/60">No questions added yet.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="notes" className="text-white">Organizer Notes (Private)</Label>
+                          <Textarea
+                            id="notes"
+                            placeholder="Add any internal notes..."
+                            rows={3}
+                            value={organizerNote}
+                            onChange={(e) => setOrganizerNote(e.target.value)}
+                            className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </>
-              )}
+                );
+              })()}
 
               {/* Step 8: Review & Publish */}
               {currentStep === 8 && (() => {
@@ -3743,12 +3664,7 @@ const CreateEvent = () => {
                         </CardHeader>
                         <CardContent className="space-y-2 text-sm text-white/80">
                           <p>{venueName || 'Not provided'}</p>
-                          <p className="text-white/60">{fullAddress || [city, state].filter(Boolean).join(', ') || 'Location pending'}</p>
-                          {selectedLocation && (
-                            <p className="text-xs text-white/60">
-                              Coords: {selectedLocation.lat?.toFixed(4)}, {selectedLocation.lng?.toFixed(4)}
-                            </p>
-                          )}
+                          <p className="text-white/60">{fullAddress || [city, state, postalCode].filter(Boolean).join(', ') || 'Location pending'}</p>
                         </CardContent>
                       </Card>
 
