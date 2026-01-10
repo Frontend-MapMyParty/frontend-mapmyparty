@@ -11,7 +11,8 @@ import {
   ChevronLeft, Calendar, MapPin, Clock, Users, Share2, Heart, 
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram, 
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
-  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles
+  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles,
+  AlertTriangle, Megaphone
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
@@ -50,6 +51,34 @@ const EventDetailNew = () => {
     return [...event.sponsors].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   }, [event?.sponsors, hasSponsors]);
 
+  const formatAdvisory = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === "string") return raw;
+    if (Array.isArray(raw)) {
+      const items = raw
+        .map((item) => {
+          if (!item) return null;
+          if (typeof item === "string") return item;
+          if (typeof item === "object") {
+            return Object.entries(item)
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+              .join(", ");
+          }
+          return String(item);
+        })
+        .filter(Boolean);
+      return items.length ? items.join(", ") : null;
+    }
+    if (typeof raw === "object") {
+      const items = Object.entries(raw)
+        .filter(([, v]) => v !== false && v !== null && v !== undefined)
+        .map(([k, v]) => (typeof v === "boolean" ? k : `${k}: ${v}`));
+      return items.length ? items.join(", ") : null;
+    }
+    return String(raw);
+  };
+
   const normalizeEvent = (raw = {}) => {
     const data = raw?.data ?? raw; // handle api shapes {data:{...}}
     const startDate = data.startDate || data.date || data.start_time || data.start;
@@ -80,6 +109,10 @@ const EventDetailNew = () => {
             (Number(t.totalQty) || 0) -
               (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
           ),
+          maxPerUser:
+            t.maxPerUser !== undefined && t.maxPerUser !== null
+              ? Number(t.maxPerUser)
+              : null,
         }))
       : [];
 
@@ -181,13 +214,23 @@ const EventDetailNew = () => {
             followers: 0,
           },
       tags: data.tags || [],
-      ageRestriction: data.ageRestriction || data.age_limit || "Not specified",
+      ageRestriction: data.TC?.ageRestriction || data.ageRestriction || data.age_limit || "Not specified",
       dresscode: data.dresscode || "Not specified",
       parking: data.parking || "Not specified",
       accessibility: data.accessibility || "Not specified",
       reviews: reviewsCount,
-      advisory: data.advisory || data.advisories || null,
+      advisory: formatAdvisory(data.advisory?.warnings || data.advisory || data.advisories),
       terms: data.TC?.terms || data.terms || "",
+      reviewsList: Array.isArray(data.reviews)
+        ? data.reviews.map((r) => ({
+            id: r.id || r._id,
+            rating: r.rating || 0,
+            comment: r.comment || "",
+            userName: r.user?.name || "Guest",
+            avatar: r.user?.avatar,
+            createdAt: r.createdAt,
+          }))
+        : [],
       stats: data.stats || data._count || {},
       artists: data.artists || [],
       type: data.type,
@@ -229,36 +272,18 @@ const EventDetailNew = () => {
         setLoading(true);
         let raw = null;
 
-        // 1) Try by id/slug using main endpoint
+        // Use slug-first endpoint; fallback to main only if that fails
         try {
-          raw = await tryFetch(`/api/event/${encodeURIComponent(id)}`);
-        } catch (errMain) {
-          console.warn("Primary fetch failed, trying slug and list fallback", errMain);
+          raw = await tryFetch(`/api/event/slug/${encodeURIComponent(id)}`);
+        } catch (errSlug) {
+          console.warn("Slug fetch failed, falling back to id endpoint", errSlug);
         }
 
-        // 2) Try explicit slug endpoint if available
         if (!raw) {
           try {
-            raw = await tryFetch(`/api/event/slug/${encodeURIComponent(id)}`);
-          } catch (errSlug) {
-            console.warn("Slug fetch failed", errSlug);
-          }
-        }
-
-        // 3) Try listing all events and match by slug/id
-        if (!raw) {
-          try {
-            const listRes = await tryFetch(`/api/event`);
-            const list = Array.isArray(listRes?.events) ? listRes.events : Array.isArray(listRes) ? listRes : listRes?.data || [];
-            raw = list.find(
-              (e) =>
-                e?.id === id ||
-                e?._id === id ||
-                e?.slug === id ||
-                e?.eventId === id
-            );
-          } catch (errList) {
-            console.warn("List fetch failed", errList);
+            raw = await tryFetch(`/api/event/${encodeURIComponent(id)}`);
+          } catch (errMain) {
+            console.warn("Primary fetch failed", errMain);
           }
         }
 
@@ -303,10 +328,20 @@ const EventDetailNew = () => {
   };
 
   const handleQuantityChange = (ticketId, change) => {
-    setTicketQuantities(prev => ({
-      ...prev,
-      [ticketId]: Math.max(0, (prev[ticketId] || 0) + change)
-    }));
+    setTicketQuantities((prev) => {
+      const ticket = event?.tickets?.find((t) => t.id === ticketId);
+      const current = prev[ticketId] || 0;
+      const next = Math.max(0, current + change);
+
+      if (!ticket) return { ...prev, [ticketId]: next };
+
+      const availabilityCap = ticket.available ?? Infinity;
+      const perUserCap = ticket.maxPerUser ?? Infinity;
+      const cap = Math.min(availabilityCap, perUserCap);
+      const capped = Math.min(next, cap);
+
+      return { ...prev, [ticketId]: capped };
+    });
   };
 
   const totalTickets = useMemo(() => {
@@ -315,11 +350,46 @@ const EventDetailNew = () => {
 
   const totalAmount = useMemo(() => {
     if (!event) return 0;
-    return event.tickets.reduce((sum, ticket) => {
+    const tickets = Array.isArray(event.tickets) ? event.tickets : [];
+    return tickets.reduce((sum, ticket) => {
       const qty = ticketQuantities[ticket.id] || 0;
-      return sum + (ticket.price * qty);
+      return sum + ticket.price * qty;
     }, 0);
   }, [ticketQuantities, event]);
+
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "—";
+    const num = Number(value);
+    if (Number.isNaN(num)) return "—";
+    return `₹${num.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const getTicketCap = (ticket) => {
+    if (!ticket) return Infinity;
+    const availabilityCap = ticket.available ?? Infinity;
+    const perUserCap = ticket.maxPerUser ?? Infinity;
+    return Math.min(availabilityCap, perUserCap);
+  };
+
+  const isSalesClosed = useMemo(() => {
+    const status = (event?.eventStatus || "").toUpperCase();
+    const publish = (event?.publishStatus || "").toUpperCase();
+    return ["COMPLETED", "CANCELLED"].includes(status) || publish === "DRAFT";
+  }, [event?.eventStatus, event?.publishStatus]);
+
+  const isSoldOut = useMemo(() => {
+    if (!event?.tickets?.length) return false;
+    return event.tickets.every((t) => (t.available || 0) === 0);
+  }, [event?.tickets]);
+
+  const bookingDisabledReason = useMemo(() => {
+    if (isSalesClosed) return "Sales closed";
+    if (isSoldOut) return "Sold out";
+    return "";
+  }, [isSalesClosed, isSoldOut]);
 
   const persistUserProfile = (userData = {}, fallback = {}) => {
     const merged = { ...fallback, ...(userData || {}) };
@@ -541,22 +611,22 @@ const EventDetailNew = () => {
 
         {/* Action Buttons */}
         <div className="absolute top-6 right-6 flex gap-2">
-          <Button
+          {/* <Button
             variant="ghost"
             onClick={() => navigate(`/events/${event.id}/overview`)}
             className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
             title="View Overview"
           >
             <BookOpen className="h-5 w-5" />
-          </Button>
-          <Button
+          </Button> */}
+          {/* <Button
             variant="ghost"
             onClick={() => setIsLiked(!isLiked)}
             className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
             title={isLiked ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart className={`h-5 w-5 ${isLiked ? 'fill-[#D60024] text-[#D60024]' : ''}`} />
-          </Button>
+          </Button> */}
           <Button
             variant="ghost"
             onClick={handleShare}
@@ -570,6 +640,34 @@ const EventDetailNew = () => {
         {/* Event Info Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
           <div className="max-w-7xl mx-auto">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {event.type && (
+                <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
+                  {event.type}
+                </Badge>
+              )}
+              {event.eventStatus && (
+                <Badge
+                  className={`px-3 py-1 ${
+                    event.eventStatus?.toUpperCase() === "COMPLETED"
+                      ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30"
+                      : "bg-amber-500/20 text-amber-100 border border-amber-300/30"
+                  }`}
+                >
+                  {event.eventStatus}
+                </Badge>
+              )}
+              {event.publishStatus && (
+                <Badge className="bg-sky-500/20 text-sky-100 border border-sky-300/30 px-3 py-1">
+                  {event.publishStatus}
+                </Badge>
+              )}
+              {event.subCategory && (
+                <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
+                  {event.subCategory}
+                </Badge>
+              )}
+            </div>
             <Badge className="bg-[#D60024] text-white mb-4 px-3 py-1">{event.category}</Badge>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">{event.title}</h1>
             <div className="flex flex-wrap gap-4 md:gap-6 text-white/90">
@@ -585,10 +683,10 @@ const EventDetailNew = () => {
                 <MapPin className="h-5 w-5 text-[#60a5fa]" />
                 <span>{event.location}</span>
               </div>
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#60a5fa]" />
                 <span>{event.attendees?.toLocaleString()} attending</span>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
@@ -601,7 +699,14 @@ const EventDetailNew = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-[rgba(100,200,255,0.2)]">
-              {["about", "gallery", "location", "organizer", hasSponsors ? "sponsors" : null]
+              {[
+                "about",
+                "gallery",
+                "location",
+                "organizer",
+                event.artists?.length ? "artists" : null,
+                hasSponsors ? "sponsors" : null,
+              ]
                 .filter(Boolean)
                 .map((tab) => (
                   <button
@@ -638,6 +743,9 @@ const EventDetailNew = () => {
                         <span>{highlight}</span>
                       </div>
                     ))}
+                    {event.highlights.length === 0 && (
+                      <p className="text-[rgba(255,255,255,0.65)]">Highlights will be shared soon.</p>
+                    )}
                   </div>
 
                   <div className="mt-6 pt-6 border-t border-[rgba(100,200,255,0.2)] grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -656,6 +764,36 @@ const EventDetailNew = () => {
                     <div>
                       <p className="text-[rgba(255,255,255,0.65)] text-sm mb-1">Accessibility</p>
                       <p className="text-white font-semibold">{event.accessibility}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
+                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-300" />
+                        Advisory
+                      </div>
+                      <p className="text-white/85 text-sm leading-relaxed">
+                        {event.advisory || "No advisories listed."}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
+                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
+                        <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                        Terms
+                      </div>
+                      <p className="text-white/85 text-sm leading-relaxed whitespace-pre-line">
+                        {event.terms || "Terms will be shared at checkout."}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
+                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
+                        <Megaphone className="h-4 w-4 text-sky-300" />
+                        Organizer Note
+                      </div>
+                      <p className="text-white/85 text-sm leading-relaxed">
+                        {event.organizerNote || "No additional notes from the organizer."}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -883,6 +1021,100 @@ const EventDetailNew = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Artists Tab */}
+            {activeTab === "artists" && event.artists?.length > 0 && (
+              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+                <CardContent className="p-6 md:p-8">
+                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <Sparkles className="h-6 w-6 text-[#D60024]" />
+                    Lineup & Artists
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {event.artists.map((artist) => (
+                      <div
+                        key={artist.id}
+                        className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5 flex gap-4 items-center"
+                      >
+                        <img
+                          src={artist.image || artist.photo || FALLBACK_IMAGE}
+                          alt={artist.name}
+                          className="w-16 h-16 rounded-full object-cover border border-white/10"
+                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-white font-semibold">{artist.name}</p>
+                            {artist.gender && (
+                              <span className="text-xs text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+                                {artist.gender}
+                              </span>
+                            )}
+                          </div>
+                          {artist.instagramLink && (
+                            <a
+                              href={artist.instagramLink}
+                              className="text-xs text-[#60a5fa] hover:underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Instagram
+                            </a>
+                          )}
+                          {artist.spotifyLink && (
+                            <a
+                              href={artist.spotifyLink}
+                              className="text-xs text-[#22c55e] hover:underline block"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Spotify
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Reviews */}
+            {event.reviewsList?.length > 0 && (
+              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+                <CardContent className="p-6 md:p-8 space-y-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Star className="h-6 w-6 text-[#fbbf24]" />
+                    What attendees said
+                  </h2>
+                  <div className="space-y-3">
+                    {event.reviewsList.map((review) => (
+                      <div
+                        key={review.id}
+                        className="p-4 rounded-lg bg-white/5 border border-[rgba(100,200,255,0.15)]"
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <img
+                            src={review.avatar || FALLBACK_IMAGE}
+                            alt={review.userName}
+                            className="w-10 h-10 rounded-full object-cover border border-white/10"
+                          />
+                          <div>
+                            <p className="text-white font-semibold">{review.userName}</p>
+                            <p className="text-xs text-white/60">
+                              {new Date(review.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <span className="ml-auto text-sm text-amber-200 font-semibold">
+                            {review.rating} ★
+                          </span>
+                        </div>
+                        <p className="text-white/80 text-sm leading-relaxed">{review.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column - Booking Section */}
@@ -896,40 +1128,65 @@ const EventDetailNew = () => {
                   </h3>
                   
                   <div className="space-y-4 mb-6">
-                    {event.tickets.map((ticket) => (
-                      <div key={ticket.id} className="p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
+                    {event.tickets.map((ticket) => {
+                      const cap = getTicketCap(ticket);
+                      const qty = ticketQuantities[ticket.id] || 0;
+                      return (
+                      <div
+                        key={ticket.id}
+                        className={`p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)] ${
+                          ticket.available === 0 ? "opacity-60" : ""
+                        }`}
+                      >
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <h4 className="font-semibold text-white">{ticket.name}</h4>
                             <p className="text-xs text-[rgba(255,255,255,0.65)]">{ticket.description}</p>
                           </div>
-                          <span className="text-lg font-bold text-[#D60024]">₹{ticket.price.toLocaleString()}</span>
+                          <span className="text-lg font-bold text-[#D60024]">{formatCurrency(ticket.price)}</span>
                         </div>
                         <div className="flex items-center justify-between mt-3">
-                          <span className="text-xs text-[rgba(255,255,255,0.65)]">{ticket.available} available</span>
+                          <div className="text-xs text-[rgba(255,255,255,0.65)] space-y-1">
+                            <p>{ticket.available} available</p>
+                            {Number.isFinite(cap) && cap < Infinity && (
+                              <p className="text-[rgba(255,255,255,0.55)]">Max {cap} per user</p>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleQuantityChange(ticket.id, -1)}
-                              disabled={!ticketQuantities[ticket.id]}
+                              disabled={!qty || isSalesClosed || ticket.available === 0}
                               className="h-8 w-8 p-0 border-[rgba(100,200,255,0.3)]"
                             >
                               <Minus className="h-4 w-4" />
                             </Button>
-                            <span className="w-8 text-center font-semibold text-white">{ticketQuantities[ticket.id] || 0}</span>
+                            <span className="w-8 text-center font-semibold text-white">
+                              {qty}
+                            </span>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleQuantityChange(ticket.id, 1)}
+                              disabled={isSalesClosed || ticket.available === 0 || qty >= cap}
                               className="h-8 w-8 p-0 border-[rgba(100,200,255,0.3)]"
                             >
                               <Plus className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
+                        {ticket.available === 0 && (
+                          <p className="text-[rgba(255,255,255,0.6)] text-xs mt-2">Sold out</p>
+                        )}
+                        {ticket.available > 0 && Number.isFinite(cap) && cap < Infinity && qty >= cap && (
+                          <p className="text-[rgba(255,255,255,0.6)] text-xs mt-2">
+                            You’ve reached the max per-user limit.
+                          </p>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="space-y-3 mb-6 p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
@@ -939,29 +1196,29 @@ const EventDetailNew = () => {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-[rgba(255,255,255,0.75)]">Subtotal</span>
-                      <span className="font-semibold text-white">₹{totalAmount.toLocaleString()}</span>
+                      <span className="font-semibold text-white">{formatCurrency(totalAmount)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-[rgba(255,255,255,0.75)]">Booking Fee</span>
-                      <span className="font-semibold text-white">₹{(totalAmount * 0.05).toLocaleString()}</span>
+                      <span className="font-semibold text-white">{formatCurrency(totalAmount * 0.05)}</span>
                     </div>
                     <div className="pt-3 border-t border-[rgba(100,200,255,0.2)] flex justify-between">
                       <span className="font-semibold text-white">Total Amount</span>
-                      <span className="text-xl font-bold text-[#D60024]">₹{(totalAmount * 1.05).toLocaleString()}</span>
+                      <span className="text-xl font-bold text-[#D60024]">{formatCurrency(totalAmount * 1.05)}</span>
                     </div>
                   </div>
 
                   <Button
                     onClick={handleBookNow}
-                    disabled={totalTickets === 0}
+                    disabled={totalTickets === 0 || isSalesClosed || isSoldOut}
                     className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all text-base py-6"
                   >
                     <Ticket className="h-5 w-5 mr-2" />
-                    Book Now
+                    {bookingDisabledReason || "Book Now"}
                   </Button>
 
                   <p className="text-xs text-center text-[rgba(255,255,255,0.5)] mt-4">
-                    Secure payment • Instant confirmation
+                    {bookingDisabledReason ? "Booking is unavailable for this event." : "Secure payment • Instant confirmation"}
                   </p>
                 </CardContent>
               </Card>
@@ -976,9 +1233,23 @@ const EventDetailNew = () => {
                     </div>
                     <span className="text-sm text-[rgba(255,255,255,0.65)]">{event.reviews} reviews</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-[rgba(255,255,255,0.75)]">
-                    <TrendingUp className="h-4 w-4 text-[#22c55e]" />
-                    <span>Trending in {event.category}</span>
+                  <div className="space-y-2 text-sm text-[rgba(255,255,255,0.8)]">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-[#22c55e]" />
+                      <span>Trending in {event.category}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Total revenue</span>
+                      <span className="font-semibold">{formatCurrency(event.revenue)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Tickets sold</span>
+                      <span className="font-semibold">{event.ticketsSold ?? "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Confirmed bookings</span>
+                      <span className="font-semibold">{event.confirmedBookings ?? event.attendees ?? "—"}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

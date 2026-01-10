@@ -36,6 +36,12 @@ const CreateEvent = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  // Map URL type query to backend enum values
+  const eventTypeMapping = {
+    "guest-list": "GUESTLIST",
+    "exclusive": "EXCLUSIVE",
+    "non-exclusive": "NON_EXCLUSIVE",
+  };
   const { addEvent, events, updateEvent } = useEvents();
   const [currentStep, setCurrentStep] = useState(1);
   const [eventType, setEventType] = useState("one-time");

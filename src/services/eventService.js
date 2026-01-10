@@ -852,6 +852,11 @@ export async function updateEventStep6(eventId, updateData) {
   if (updateData.sponsors !== undefined) {
     payload.sponsors = updateData.sponsors;
   }
+
+  // Publish status (explicitly allow setting to DRAFT or PUBLISHED)
+  if (updateData.publishStatus) {
+    payload.publishStatus = updateData.publishStatus;
+  }
   
   // Check if there's anything to update
   if (Object.keys(payload).length === 0) {
