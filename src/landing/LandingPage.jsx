@@ -124,7 +124,7 @@ const LandingPage = () => {
                 Lock tickets in seconds and enjoy real-time updates right up to showtime.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/events">
+                <Link to="/browse-events">
                   <Button size="lg" variant="hero" className="text-base px-7">
                     Browse Events
                     <ArrowRight className="h-5 w-5 ml-2" />
@@ -218,7 +218,7 @@ const LandingPage = () => {
                 <p className="text-sm uppercase tracking-[0.18em] text-slate-400">Discover</p>
                 <h2 className="text-3xl font-bold">Pick your vibe</h2>
               </div>
-              <Link to="/events">
+              <Link to="/browse-events">
                 <Button variant="outline" className="border-white/20 text-white hover:bg-white hover:text-slate-900">
                   View all events
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -261,7 +261,7 @@ const LandingPage = () => {
                 <h2 className="text-3xl font-bold">Featured events</h2>
                 <p className="text-slate-300/80">Handpicked experiences trending near you.</p>
               </div>
-              <Link to="/events">
+              <Link to="/browse-events">
                 <Button variant="accent" className="bg-amber-400 text-slate-900 hover:bg-amber-300">
                   Browse all
                 </Button>
@@ -384,7 +384,7 @@ const LandingPage = () => {
                   Host an Event
                 </Button>
               </Link>
-              <Link to="/events">
+              <Link to="/browse-events">
                 <Button
                   size="lg"
                   variant="outline"

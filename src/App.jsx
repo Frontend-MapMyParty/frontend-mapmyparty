@@ -26,6 +26,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
 import LiveEventPage from "./pages/LiveEventPage";
 import ReceptionDetail from "./pages/ReceptionDetail";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Policies from "./pages/Policies";
 
 const queryClient = new QueryClient();
 
@@ -39,9 +42,13 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/my-bookings" element={<Navigate to="/dashboard/bookings" replace />} />
-            <Route path="/events" element={<Events />} />
+            {/* <Route path="/events" element={<Events />} /> */}
+            <Route path="/browse-events" element={<BrowseEvents showPublicHeader />} />
             <Route path="/events/:id" element={<EventDetail />} />
             <Route path="/events/:id/overview" element={<EventOverviewPage />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Policies />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/google/callback" element={<GoogleCallback />} />
             

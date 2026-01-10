@@ -130,7 +130,7 @@ const Header = ({
         {(!resolvedIsAuthenticated || forceMainHeader) && (
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[rgba(255,255,255,0.65)]">
             <Link
-              to="/events"
+              to="/browse-events"
               className="hover:text-white transition-colors duration-200"
             >
               Browse Events
