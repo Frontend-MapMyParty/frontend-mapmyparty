@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
-  ChevronLeft, Calendar, MapPin, Clock, Users, Share2, Heart, 
+  ChevronLeft, ChevronDown, Calendar, MapPin, Clock, Users, Share2, Heart, 
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram, 
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
   Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles,
@@ -40,6 +40,9 @@ const EventDetailNew = () => {
   const [signupForm, setSignupForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [isSessionAuthed, setIsSessionAuthed] = useState(isAuthedSync());
   const [sessionUser, setSessionUser] = useState(null);
+  const [advisoryModalOpen, setAdvisoryModalOpen] = useState(false);
+  const [tcOpen, setTcOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
 
   const hasSponsors = useMemo(
     () => Array.isArray(event?.sponsors) && event.sponsors.length > 0 && (event?.isSponsored ?? true),
@@ -50,6 +53,12 @@ const EventDetailNew = () => {
     if (!hasSponsors) return [];
     return [...event.sponsors].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   }, [event?.sponsors, hasSponsors]);
+
+  const primarySponsor = useMemo(() => (hasSponsors ? sponsorsSorted[0] : null), [hasSponsors, sponsorsSorted]);
+  const secondarySponsors = useMemo(
+    () => (hasSponsors && sponsorsSorted.length > 1 ? sponsorsSorted.slice(1) : []),
+    [hasSponsors, sponsorsSorted]
+  );
 
   const formatAdvisory = (raw) => {
     if (!raw) return null;
@@ -77,6 +86,36 @@ const EventDetailNew = () => {
       return items.length ? items.join(", ") : null;
     }
     return String(raw);
+  };
+
+  const buildAdvisoryItems = (raw) => {
+    if (!raw) return [];
+    // Already an array of strings
+    if (Array.isArray(raw) && raw.every((i) => typeof i === "string")) return raw.filter(Boolean);
+
+    // Object with booleans/customAdvisories
+    if (typeof raw === "object") {
+      const list = [];
+      Object.entries(raw).forEach(([key, val]) => {
+        if (key === "customAdvisories" && Array.isArray(val)) {
+          val.forEach((c) => c && list.push(c));
+          return;
+        }
+        if (val === true) {
+          const label = key
+            .replace(/([A-Z])/g, " $1")
+            .replace(/_/g, " ")
+            .trim();
+          list.push(label.charAt(0).toUpperCase() + label.slice(1));
+        }
+      });
+      return list;
+    }
+
+    // Fallback to formatted string split by comma
+    const formatted = formatAdvisory(raw);
+    if (!formatted) return [];
+    return formatted.split(",").map((i) => i.trim()).filter(Boolean);
   };
 
   const normalizeEvent = (raw = {}) => {
@@ -142,6 +181,8 @@ const EventDetailNew = () => {
     const reviewsCount = Array.isArray(data.reviews)
       ? data.reviews.length
       : data._count?.reviews || data.reviews || 0;
+
+    const advisoryItems = buildAdvisoryItems(data.advisory?.warnings || data.advisory || data.advisories);
 
     return {
       id: data.id || data._id,
@@ -220,10 +261,13 @@ const EventDetailNew = () => {
       accessibility: data.accessibility || "Not specified",
       reviews: reviewsCount,
       advisory: formatAdvisory(data.advisory?.warnings || data.advisory || data.advisories),
+      advisoryItems,
       terms: data.TC?.terms || data.terms || "",
+      termsHtml: data.TC?.content || "",
+      termsUpdated: data.TC?.lastUpdated || "",
       reviewsList: Array.isArray(data.reviews)
         ? data.reviews.map((r) => ({
-            id: r.id || r._id,
+            user: r.user?.name || "Guest",
             rating: r.rating || 0,
             comment: r.comment || "",
             userName: r.user?.name || "Guest",
@@ -639,55 +683,71 @@ const EventDetailNew = () => {
 
         {/* Event Info Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-wrap gap-2 mb-3">
-              {event.type && (
-                <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
-                  {event.type}
-                </Badge>
-              )}
-              {event.eventStatus && (
-                <Badge
-                  className={`px-3 py-1 ${
-                    event.eventStatus?.toUpperCase() === "COMPLETED"
-                      ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30"
-                      : "bg-amber-500/20 text-amber-100 border border-amber-300/30"
-                  }`}
-                >
-                  {event.eventStatus}
-                </Badge>
-              )}
-              {event.publishStatus && (
-                <Badge className="bg-sky-500/20 text-sky-100 border border-sky-300/30 px-3 py-1">
-                  {event.publishStatus}
-                </Badge>
-              )}
-              {event.subCategory && (
-                <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
-                  {event.subCategory}
-                </Badge>
-              )}
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {event.subCategory && (
+                  <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
+                    {event.subCategory}
+                  </Badge>
+                )}
+              </div>
+              {/* <Badge className="bg-[#D60024] text-white mb-4 px-3 py-1">{event.category}</Badge> */}
+              <h1 className="text-4xl md:text-6xl font-bold text-white">{event.title}</h1>
+              <div className="flex flex-wrap gap-4 md:gap-6 text-white/90">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-[#60a5fa]" />
+                  <span>{formatDate(event.startDate)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-[#60a5fa]" />
+                  <span>{formatTime(event.startDate)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-[#60a5fa]" />
+                  <span>{event.location}</span>
+                </div>
+              </div>
             </div>
-            <Badge className="bg-[#D60024] text-white mb-4 px-3 py-1">{event.category}</Badge>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">{event.title}</h1>
-            <div className="flex flex-wrap gap-4 md:gap-6 text-white/90">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-[#60a5fa]" />
-                <span>{formatDate(event.startDate)}</span>
+
+            {hasSponsors && (
+              <div className="flex flex-col items-end gap-2 text-right">
+                {primarySponsor && (
+                  <div className="flex items-center gap-3 text-white/85">
+                    <span className="text-[12px] uppercase tracking-[0.15em] text-white/80 drop-shadow-sm">
+                      powered by
+                    </span>
+                    <div
+                      className="h-14 w-14 flex items-center justify-center overflow-hidden rounded-full bg-black/25 backdrop-blur-sm border border-white/10"
+                      title={primarySponsor.website || primarySponsor.name}
+                    >
+                      <img
+                        src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
+                        alt={primarySponsor.name}
+                        className="h-full w-full object-contain drop-shadow-lg"
+                      />
+                    </div>
+                  </div>
+                )}
+                {secondarySponsors.length > 0 && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {secondarySponsors.map((s) => (
+                      <div
+                        key={s.id}
+                        className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-full bg-black/25 backdrop-blur-sm border border-white/10"
+                        title={s.name}
+                      >
+                        <img
+                          src={s.logo || SPONSOR_PLACEHOLDER}
+                          alt={s.name}
+                          className="h-full w-full object-contain drop-shadow-md"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-[#60a5fa]" />
-                <span>{formatTime(event.startDate)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-[#60a5fa]" />
-                <span>{event.location}</span>
-              </div>
-              {/* <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-[#60a5fa]" />
-                <span>{event.attendees?.toLocaleString()} attending</span>
-              </div> */}
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -725,80 +785,150 @@ const EventDetailNew = () => {
 
             {/* About Tab */}
             {activeTab === "about" && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
-                  <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Info className="h-6 w-6 text-[#D60024]" />
-                    About This Event
-                  </h2>
-                  <p className="text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-line mb-6">
-                    {event.about}
-                  </p>
-                  
-                  <h3 className="text-xl font-bold text-white mb-3">Event Highlights</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {event.highlights.map((highlight, index) => (
-                      <div key={index} className="flex items-center gap-2 text-[rgba(255,255,255,0.85)]">
-                        <Check className="h-5 w-5 text-[#22c55e] flex-shrink-0" />
-                        <span>{highlight}</span>
+              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.04)] rounded-xl">
+                <CardContent className="p-6 md:p-8 space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                      <Info className="h-6 w-6 text-[#D60024]" />
+                      About This Event
+                    </h2>
+                    <p className="text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-line">
+                      {event.about}
+                    </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Event Guide</h3>
+                        <p className="text-sm text-white/70">Key advisories and notes for attendees</p>
                       </div>
-                    ))}
-                    {event.highlights.length === 0 && (
-                      <p className="text-[rgba(255,255,255,0.65)]">Highlights will be shared soon.</p>
+                      {event.advisoryItems?.length > 3 && (
+                        <button
+                          className="text-sm font-semibold text-[#93c5fd] hover:text-white transition"
+                          onClick={() => setAdvisoryModalOpen(true)}
+                        >
+                          See all 
+                        </button>
+                      )}
+                    </div>
+
+                    {event.advisoryItems?.length ? (
+                      <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1">
+                        {event.advisoryItems.slice(0, 4).map((item, idx) => (
+                          <div
+                            key={`advisory-preview-${idx}`}
+                            className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-white/5 via-white/5 to-white/0 border border-white/10 backdrop-blur-sm hover:border-[#60a5fa]/40 hover:bg-white/10 transition shadow-[0_10px_30px_rgba(0,0,0,0.25)] flex-shrink-0"
+                          >
+                            <div className="h-10 w-10 rounded-xl bg-[#0f172a] border border-white/10 flex items-center justify-center text-[#60a5fa]">
+                              <AlertTriangle className="h-5 w-5 drop-shadow" />
+                            </div>
+                            <div className="text-white font-semibold text-sm whitespace-nowrap">{item}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/60">No advisories provided.</p>
                     )}
-                  </div>
-
-                  <div className="mt-6 pt-6 border-t border-[rgba(100,200,255,0.2)] grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-[rgba(255,255,255,0.65)] text-sm mb-1">Age Restriction</p>
-                      <p className="text-white font-semibold">{event.ageRestriction}</p>
-                    </div>
-                    <div>
-                      <p className="text-[rgba(255,255,255,0.65)] text-sm mb-1">Dress Code</p>
-                      <p className="text-white font-semibold">{event.dresscode}</p>
-                    </div>
-                    <div>
-                      <p className="text-[rgba(255,255,255,0.65)] text-sm mb-1">Parking</p>
-                      <p className="text-white font-semibold">{event.parking}</p>
-                    </div>
-                    <div>
-                      <p className="text-[rgba(255,255,255,0.65)] text-sm mb-1">Accessibility</p>
-                      <p className="text-white font-semibold">{event.accessibility}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
-                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
-                        <AlertTriangle className="h-4 w-4 text-amber-300" />
-                        Advisory
-                      </div>
-                      <p className="text-white/85 text-sm leading-relaxed">
-                        {event.advisory || "No advisories listed."}
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
-                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
-                        <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                        Terms
-                      </div>
-                      <p className="text-white/85 text-sm leading-relaxed whitespace-pre-line">
-                        {event.terms || "Terms will be shared at checkout."}
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5">
-                      <div className="flex items-center gap-2 text-sm text-white/70 mb-2">
-                        <Megaphone className="h-4 w-4 text-sky-300" />
-                        Organizer Note
-                      </div>
-                      <p className="text-white/85 text-sm leading-relaxed">
-                        {event.organizerNote || "No additional notes from the organizer."}
-                      </p>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* Standalone T&C and FAQ accordions (documentation style) */}
+            <div className="space-y-4">
+              <div className="w-full">
+                <button
+                  className="w-full flex items-center justify-between gap-2 text-left px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/25 transition"
+                  onClick={() => setTcOpen((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2 text-white font-semibold text-sm tracking-wide">
+                    <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                    Terms & Conditions
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {tcOpen && (
+                  <div className="pl-4 border-l border-white/10 mt-3 space-y-3">
+                    {event.termsHtml ? (
+                      <div
+                        className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
+                        dangerouslySetInnerHTML={{ __html: event.termsHtml }}
+                      />
+                    ) : event.terms ? (
+                      <p className="text-white/80 whitespace-pre-line text-sm">{event.terms}</p>
+                    ) : (
+                      <p className="text-white/60 text-sm">No terms provided.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {Array.isArray(event.questions) && event.questions.length > 0 && (
+                <div className="w-full">
+                  <button
+                    className="w-full flex items-center justify-between gap-2 text-left px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/25 transition"
+                    onClick={() => setFaqOpen((prev) => !prev)}
+                  >
+                    <span className="flex items-center gap-2 text-white font-semibold text-sm tracking-wide">
+                      <Megaphone className="h-4 w-4 text-sky-300" />
+                      Frequently Asked Questions
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {faqOpen && (
+                    <div className="mt-3 space-y-3 pl-4 border-l border-white/10">
+                      {event.questions.map((qa, idx) => (
+                        <div
+                          key={`faq-${idx}`}
+                          className="space-y-1"
+                        >
+                          <p className="text-white font-semibold text-sm">{qa.question}</p>
+                          {qa.answer ? (
+                            <p className="text-white/75 text-sm leading-relaxed">{qa.answer}</p>
+                          ) : (
+                            <p className="text-white/50 text-xs">No answer provided.</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Advisory Modal */}
+            <Dialog open={advisoryModalOpen} onOpenChange={setAdvisoryModalOpen}>
+              <DialogContent className="max-w-xl border-white/10 bg-[#0b1224]/95 text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl">Event Guide</DialogTitle>
+                  <DialogDescription className="text-white/70">
+                    All advisories and notes for this event.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                  {event?.advisoryItems?.length ? (
+                    event.advisoryItems.map((item, idx) => (
+                      <div
+                        key={`advisory-modal-${idx}`}
+                        className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/5 border border-white/10"
+                      >
+                        <div className="h-10 w-10 rounded-lg bg-[#0f172a] border border-white/10 flex items-center justify-center text-[#60a5fa]">
+                          <AlertTriangle className="h-5 w-5" />
+                        </div>
+                        <div className="text-white font-medium text-sm">{item}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-white/60">No advisories provided.</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Gallery Tab */}
             {activeTab === "gallery" && (
@@ -1079,7 +1209,7 @@ const EventDetailNew = () => {
             )}
 
             {/* Reviews */}
-            {event.reviewsList?.length > 0 && (
+            {/* {event.reviewsList?.length > 0 && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
                 <CardContent className="p-6 md:p-8 space-y-4">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -1114,7 +1244,7 @@ const EventDetailNew = () => {
                   </div>
                 </CardContent>
               </Card>
-            )}
+            )} */}
           </div>
 
           {/* Right Column - Booking Section */}

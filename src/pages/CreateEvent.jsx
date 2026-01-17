@@ -107,6 +107,16 @@ const CreateEvent = () => {
   const eventCacheRef = useRef(null);
   const sponsorsLoadedRef = useRef(false);
   const artistsLoadedRef = useRef(false);
+  const originalAdditionalRef = useRef(null);
+  const currentAdditionalRef = useRef(null);
+
+  const normalizeAdditionalFromState = () => ({
+    tc: (termsAndConditions || "").trim(),
+    advisory: { ...advisory },
+    customAdvisories: [...customAdvisories],
+    questions: [...customQuestions],
+    organizerNote: (organizerNote || "").trim(),
+  });
 
   const hourOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
   const minuteOptions = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
@@ -233,7 +243,7 @@ const CreateEvent = () => {
   });
   const [ticketPrice, setTicketPrice] = useState("49");
   const [artists, setArtists] = useState([{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]);
-  const [advisory, setAdvisory] = useState({
+  const initialAdvisoryState = {
     smokingAllowed: false,
     drinkingAllowed: false,
     petsAllowed: false,
@@ -248,7 +258,9 @@ const CreateEvent = () => {
     onsitePayments: false,
     securityCheck: false,
     cloakroom: false,
-  });
+  };
+
+  const [advisory, setAdvisory] = useState(initialAdvisoryState);
   const [customAdvisories, setCustomAdvisories] = useState([]);
   const [newCustomAdvisory, setNewCustomAdvisory] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -432,6 +444,99 @@ const CreateEvent = () => {
     if (!eventToEdit) return;
     eventCacheRef.current = eventToEdit;
 
+    const pickVenueName = (venueObj) => {
+      if (!venueObj) return "";
+      const raw = venueObj.name || venueObj.venueName || "";
+      if (raw && raw.toLowerCase() !== "location tbd") return raw;
+      const fromFull = venueObj.fullAddress ? venueObj.fullAddress.split(",")[0]?.trim() : "";
+      return fromFull || raw;
+    };
+
+    const normalizeAdditional = (data) => {
+      const tcData = data?.TC || data?.tc;
+      const tcContent =
+        typeof tcData === "string" ? tcData : tcData?.content ? tcData.content : "";
+
+      const advisoryData = data?.advisory || {};
+      const normalizedAdvisory = { ...initialAdvisoryState };
+      Object.keys(normalizedAdvisory).forEach((key) => {
+        if (advisoryData[key]) normalizedAdvisory[key] = true;
+      });
+      const customList = Array.isArray(advisoryData.customAdvisories) ? advisoryData.customAdvisories : [];
+
+      const questionsData = Array.isArray(data?.questions) ? data.questions : [];
+      const note = data?.organizerNote || "";
+
+      return {
+        tc: tcContent || "",
+        advisory: normalizedAdvisory,
+        customAdvisories: customList,
+        questions: questionsData,
+        organizerNote: note,
+      };
+    };
+
+    const setAdditionalFromEvent = (data) => {
+      const tcData = data?.TC || data?.tc;
+      if (tcData) {
+        if (typeof tcData === "string") {
+          setTermsAndConditions(tcData);
+        } else if (tcData?.content) {
+          setTermsAndConditions(tcData.content);
+        }
+      } else {
+        setTermsAndConditions("");
+      }
+
+      const advisoryData = data?.advisory || {};
+      const normalizedAdvisory = { ...initialAdvisoryState };
+      Object.keys(normalizedAdvisory).forEach((key) => {
+        if (advisoryData[key]) normalizedAdvisory[key] = true;
+      });
+      setAdvisory(normalizedAdvisory);
+      const customList = Array.isArray(advisoryData.customAdvisories) ? advisoryData.customAdvisories : [];
+      setCustomAdvisories(customList);
+
+      const questionsData = Array.isArray(data?.questions) ? data.questions : [];
+      setCustomQuestions(questionsData);
+      setOrganizerNote(data?.organizerNote || "");
+
+      // Capture original additional info for change detection once
+      if (!originalAdditionalRef.current) {
+        originalAdditionalRef.current = normalizeAdditional(data || {});
+      }
+
+      // Keep current snapshot in sync for later comparisons
+      currentAdditionalRef.current = normalizeAdditional(data || {});
+    };
+
+    const hydrateGallery = (images) => {
+      if (!Array.isArray(images)) {
+        setExistingGalleryUrls([]);
+        setGalleryImages([]);
+        setGalleryImageIds({});
+        return;
+      }
+
+      const galleryImagesData = images.filter((img) => img.type === "EVENT_GALLERY");
+      const validGalleryImages = galleryImagesData.filter((img) => !deletedImageIds.has(img.id));
+
+      if (validGalleryImages.length > 0) {
+        const imageUrls = validGalleryImages.map((img) => img.url);
+        const imageIdMap = {};
+        validGalleryImages.forEach((img) => {
+          imageIdMap[img.url] = img.id;
+        });
+        setExistingGalleryUrls(imageUrls);
+        setGalleryImages(imageUrls);
+        setGalleryImageIds(imageIdMap);
+      } else {
+        setExistingGalleryUrls([]);
+        setGalleryImages([]);
+        setGalleryImageIds({});
+      }
+    };
+
     const start = eventToEdit.startDate ? new Date(eventToEdit.startDate) : null;
     const end = eventToEdit.endDate ? new Date(eventToEdit.endDate) : null;
     const toDateStr = (d) => (d ? d.toISOString().slice(0, 10) : "");
@@ -447,6 +552,8 @@ const CreateEvent = () => {
     setMainCategory(eventToEdit.category || "");
     setSelectedCategories([eventToEdit.subCategory || eventToEdit.subcategory || ""]);
     setCoverImage(eventToEdit.flyerImage || eventToEdit.image || eventToEdit.flyer);
+    hydrateGallery(eventToEdit.images);
+    setAdditionalFromEvent(eventToEdit);
     const startDateStr = toDateStr(start);
     const startTimeStr = toTimeStr(start);
     const endDateStr = toDateStr(end);
@@ -471,10 +578,11 @@ const CreateEvent = () => {
     // Sponsors (Step 5)
     if (Array.isArray(eventToEdit.sponsors) && eventToEdit.sponsors.length > 0) {
       const normalizedSponsors = eventToEdit.sponsors.map((s, idx) => flattenSponsor(s, idx));
+      const normalizedForCompare = normalizeSponsors(normalizedSponsors);
       setSponsors(normalizedSponsors);
-      setOriginalSponsors(normalizedSponsors);
-      setIsSponsored(true);
-      setOriginalIsSponsored(true);
+      setOriginalSponsors(normalizedForCompare);
+      setIsSponsored(normalizedForCompare.length > 0);
+      setOriginalIsSponsored(normalizedForCompare.length > 0);
       sponsorsLoadedRef.current = true;
     } else {
       setSponsors([emptySponsor]);
@@ -500,14 +608,13 @@ const CreateEvent = () => {
       : null;
     if (firstVenue) {
       setVenueId(firstVenue.id || firstVenue._id || venueId);
-      setVenueName(firstVenue.name || firstVenue.venueName || "");
+      setVenueName(pickVenueName(firstVenue));
       setCity(firstVenue.city || "");
       setState(firstVenue.state || "");
       setCountry(eventToEdit.country || "India");
       setPostalCode(eventToEdit.postalCode || "");
       setVenueContact(eventToEdit.venueContact || "");
       setVenueEmail(eventToEdit.venueEmail || "");
-      setOrganizerNote(eventToEdit.organizerNote || "");
       setFullAddress(firstVenue.fullAddress || firstVenue.address || "");
     } else if (eventToEdit.location) {
       const locationParts = eventToEdit.location.split(", ");
@@ -515,6 +622,28 @@ const CreateEvent = () => {
       if (locationParts.length > 1) setCity(locationParts[1]);
       if (locationParts.length > 2) setState(locationParts[2]);
     }
+
+    const tcData = eventToEdit.TC || eventToEdit.tc;
+    if (tcData) {
+      if (typeof tcData === "string") {
+        setTermsAndConditions(tcData);
+      } else if (tcData?.content) {
+        setTermsAndConditions(tcData.content);
+      }
+    }
+
+    const advisoryData = eventToEdit.advisory || {};
+    const normalizedAdvisory = { ...initialAdvisoryState };
+    Object.keys(normalizedAdvisory).forEach((key) => {
+      if (advisoryData[key]) normalizedAdvisory[key] = true;
+    });
+    setAdvisory(normalizedAdvisory);
+    const customList = Array.isArray(advisoryData.customAdvisories) ? advisoryData.customAdvisories : [];
+    setCustomAdvisories(customList);
+
+    const questionsData = Array.isArray(eventToEdit.questions) ? eventToEdit.questions : [];
+    setCustomQuestions(questionsData);
+    setOrganizerNote(eventToEdit.organizerNote || "");
 
     if (eventToEdit.type) {
       setSelectedEventTypeCategory(eventToEdit.type);
@@ -542,6 +671,55 @@ const CreateEvent = () => {
       setOriginalArtists(normalizedArtists);
     } else {
       setOriginalArtists([]);
+    }
+
+    // If images or description/venue were not present in the cached event, fetch full event details (by slug if available)
+    if (((!eventToEdit.images || eventToEdit.images.length === 0) || !eventToEdit.description || !eventToEdit.venues?.length) && (eventToEdit.slug || eventToEdit.id || eventToEdit._id)) {
+      (async () => {
+        try {
+          const fetchUrl = eventToEdit.slug
+            ? `api/event/slug/${eventToEdit.slug}`
+            : `api/event/${eventToEdit.id || eventToEdit._id}`;
+          const response = await apiFetch(fetchUrl, { method: "GET" });
+          const eventData = response.data?.event || response.data || response.event || response;
+          eventCacheRef.current = eventData;
+
+          if (eventData?.flyerImage) {
+            setCoverImage(eventData.flyerImage);
+          }
+          if (eventData?.description) {
+            setEventDescription(eventData.description);
+          }
+          if (!sponsorsLoadedRef.current && Array.isArray(eventData?.sponsors) && eventData.sponsors.length > 0) {
+            const normalizedSponsors = eventData.sponsors.map((s, idx) => flattenSponsor(s, idx));
+            const normalizedForCompare = normalizeSponsors(normalizedSponsors);
+            setSponsors(normalizedSponsors);
+            setOriginalSponsors(normalizedForCompare);
+            setIsSponsored(normalizedForCompare.length > 0);
+            setOriginalIsSponsored(normalizedForCompare.length > 0);
+            sponsorsLoadedRef.current = true;
+          }
+          if (Array.isArray(eventData?.venues) && eventData.venues.length > 0) {
+            const v = eventData.venues[0];
+            setVenueId(v.id || v._id || venueId);
+            setVenueName(pickVenueName(v));
+            setCity(v.city || city);
+            setState(v.state || state);
+            setCountry(v.country || country);
+            setPostalCode(v.postalCode || postalCode);
+            setVenueContact(v.contact || venueContact);
+            setVenueEmail(v.email || venueEmail);
+            setFullAddress(v.fullAddress || fullAddress);
+          }
+          if (eventData?.id || eventData?._id) {
+            setBackendEventId(eventData.id || eventData._id);
+          }
+          hydrateGallery(eventData?.images);
+          setAdditionalFromEvent(eventData);
+        } catch (err) {
+          console.error("Failed to fetch full event details for gallery hydration:", err);
+        }
+      })();
     }
   }, [editId, events, location.state, backendEventId, ticketPrice]);
 
@@ -1392,6 +1570,13 @@ const CreateEvent = () => {
       const cleanedSponsors = normalizeSponsors(sponsors);
       const hasChanges = sponsorsChanged(cleanedSponsors);
 
+      // In edit mode, if sponsors are loaded and nothing changed (including toggle), skip API
+      if (isEditMode && sponsorsLoadedRef.current && isSponsored === originalIsSponsored && !hasChanges) {
+        toast.info("No changes to update");
+        setCurrentStep(currentStep + 1);
+        return;
+      }
+
       // If toggle is off, clear sponsors only if previously set, otherwise skip
       if (!isSponsored) {
         if (!hasChanges) {
@@ -1453,6 +1638,9 @@ const CreateEvent = () => {
 
         if (!backendEventId) {
           toast.error("Event ID not found. Please go back to Step 1.");
+          setSponsorSaving(false);
+          setShowLoading(false);
+          setLoadingMessage("");
           return;
         }
 
@@ -1582,8 +1770,71 @@ const CreateEvent = () => {
     }
 
     if (currentStep === 7) {
-      // Additional info collected; move to review
-      setCurrentStep(currentStep + 1);
+      // Persist Additional Info before moving to Review
+      const currentNormalized = normalizeAdditionalFromState();
+      if (
+        isEditMode &&
+        originalAdditionalRef.current &&
+        JSON.stringify(currentNormalized) === JSON.stringify(originalAdditionalRef.current)
+      ) {
+        toast.info("No changes to update");
+        setCurrentStep(currentStep + 1);
+        return;
+      }
+      try {
+        setIsSubmitting(true);
+        setLoadingMessage("Saving additional info...");
+        setShowLoading(true);
+
+        if (!backendEventId) {
+          toast.error("Event ID not found. Please complete previous steps.");
+          setIsSubmitting(false);
+          setShowLoading(false);
+          return;
+        }
+
+        const tcData = termsAndConditions
+          ? {
+              content: termsAndConditions,
+              lastUpdated: new Date().toISOString(),
+            }
+          : null;
+
+        const advisoryData = {};
+        Object.keys(advisory).forEach((key) => {
+          if (advisory[key] && key !== "other") {
+            advisoryData[key] = true;
+          }
+        });
+        if (customAdvisories.length > 0) {
+          advisoryData.customAdvisories = customAdvisories;
+        }
+        const advisoryJson = Object.keys(advisoryData).length > 0 ? advisoryData : null;
+
+        const questionsJson = customQuestions.length > 0 ? customQuestions : null;
+
+        const updateData = {
+          TC: tcData,
+          advisory: advisoryJson,
+          questions: questionsJson,
+          organizerNote: organizerNote,
+          publishStatus: publishState || "DRAFT",
+        };
+
+        await updateEventStep6(backendEventId, updateData);
+        // Refresh original snapshot to avoid re-saving unchanged data on subsequent clicks
+        originalAdditionalRef.current = normalizeAdditionalFromState();
+        currentAdditionalRef.current = originalAdditionalRef.current;
+        toast.success("Additional info saved");
+        setCurrentStep(currentStep + 1);
+      } catch (error) {
+        console.error("Error saving additional info:", error);
+        toast.error(error.message || "Failed to save additional info. Please try again.");
+        return;
+      } finally {
+        setIsSubmitting(false);
+        setShowLoading(false);
+      }
       return;
     }
 
@@ -1912,6 +2163,12 @@ const CreateEvent = () => {
         logoUrl: (s.logoUrl || s.logo || "").trim(),
         websiteUrl: (s.websiteUrl || s.website || "").trim(),
         isPrimary: Boolean(s.isPrimary),
+      }))
+      .map((s) => ({
+        name: s.name,
+        ...(s.logoUrl ? { logoUrl: s.logoUrl } : {}),
+        ...(s.websiteUrl ? { websiteUrl: s.websiteUrl } : {}),
+        isPrimary: s.isPrimary,
       }))
       .filter((s) => s.name || s.logoUrl || s.websiteUrl);
 
@@ -3291,7 +3548,8 @@ const CreateEvent = () => {
                           </div>
 
                           <Dialog open={advisoryDialogOpen} onOpenChange={setAdvisoryDialogOpen}>
-                            <DialogContent className="max-w-4xl border-white/15 bg-[#0b1224]/95 text-white shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+                            <DialogContent className="max-w-4xl border-white/15 bg-[#0b1224]/95 text-white shadow-[0_30px_120px_rgba(0,0,0,0.65)] max-h-[90vh] overflow-hidden p-0">
+                            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5">
                               <DialogHeader>
                                 <DialogTitle className="text-2xl">Choose advisories</DialogTitle>
                                 <DialogDescription className="text-white/70">
@@ -3360,14 +3618,14 @@ const CreateEvent = () => {
                                   </div>
 
                                   {showEmojiPicker && (
-                                    <div className="rounded-xl border border-white/15 bg-white/5 p-3 space-y-2">
+                                    <div className="rounded-xl border border-white/15 bg-[#0f172a] p-3 space-y-2 max-h-60 overflow-y-auto">
                                       <p className="text-xs uppercase tracking-[0.08em] text-white/60">Emoji</p>
                                       <div className="grid grid-cols-8 gap-2 text-lg">
                                         {emojiPalette.map((emoji, idx) => (
                                           <button
                                             key={`emoji-${idx}`}
                                             type="button"
-                                            className="h-10 w-10 rounded-lg border border-white/10 bg-[#0f172a] hover:border-white/30 hover:bg-white/10 transition"
+                                            className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 transition"
                                             onClick={() => setNewCustomAdvisory((prev) => `${prev}${emoji}`)}
                                           >
                                             {emoji}
@@ -3420,10 +3678,10 @@ const CreateEvent = () => {
                                   </Button>
                                 </div>
                               </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-
-                          {hasSelections ? (
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        {hasSelections ? (
                             <div className="flex flex-wrap gap-2">
                               {selectedBuiltIns.map((item) => (
                                 <button
@@ -3548,10 +3806,52 @@ const CreateEvent = () => {
               {/* Step 8: Review & Publish */}
               {currentStep === 8 && (() => {
                 const statusBadge = (filled) => (
-                  <Badge className={filled ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30' : 'bg-white/10 text-white/70 border-white/15'}>
+                  <Badge className={filled ? 'bg-emerald-500/20 text-emerald-100 border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.25)]' : 'bg-white/10 text-white/70 border-white/15'}>
                     {filled ? 'Filled' : 'Missing'}
                   </Badge>
                 );
+
+                const advisoryEntries =
+                  customAdvisories.length > 0
+                    ? customAdvisories
+                    : Object.entries(advisory || {})
+                        .filter(([, val]) => val)
+                        .map(([key]) => key.replace(/([A-Z])/g, ' $1').trim());
+
+                const questionsEntries = customQuestions.map((q, i) => ({
+                  title: q.question,
+                  answer: q.answer,
+                  index: i + 1,
+                }));
+
+                const additionalInfoCards = [
+                  {
+                    title: 'Terms & Conditions',
+                    filled: Boolean(termsAndConditions?.trim()),
+                    content: termsAndConditions?.trim() || 'Not provided',
+                    isHtml: true,
+                  },
+                  {
+                    title: 'Advisories',
+                    filled: Object.values(advisory || {}).some(Boolean) || customAdvisories.length > 0,
+                    content: advisoryEntries,
+                    type: 'advisory-list',
+                    isHtml: false,
+                  },
+                  {
+                    title: 'Custom Questions for Attendees',
+                    filled: customQuestions.length > 0,
+                    content: questionsEntries,
+                    type: 'questions-list',
+                    isHtml: false,
+                  },
+                  {
+                    title: 'Organizer Notes (Private)',
+                    filled: Boolean(organizerNote?.trim()),
+                    content: organizerNote?.trim() || 'Not provided',
+                    isHtml: false,
+                  },
+                ];
 
                 const summaryItems = [
                   { label: 'Event Title', value: eventTitle },
@@ -3570,9 +3870,12 @@ const CreateEvent = () => {
                 ];
 
                 return (
-                  <div className="space-y-6">
-                    <div className="p-4 rounded-xl border border-white/10 bg-white/5">
-                      <h3 className="text-lg font-semibold mb-1">Review before publishing</h3>
+                  <div className="space-y-6 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0c1324] p-4 md:p-6 rounded-2xl border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
+                    <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.7)]" />
+                        <h3 className="text-lg font-semibold">Review before publishing</h3>
+                      </div>
                       <p className="text-sm text-white/70">Check what’s filled and what’s missing. You can go back to edit anything.</p>
                     </div>
 
@@ -3705,6 +4008,55 @@ const CreateEvent = () => {
                         ) : (
                           <p className="text-sm text-white/60">No gallery images uploaded</p>
                         )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
+                      <CardHeader>
+                        <CardTitle className="text-base">Additional Info</CardTitle>
+                        <p className="text-xs text-white/60">What attendees see and internal notes</p>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {additionalInfoCards.map((info, i) => (
+                          <div key={i} className="flex gap-3 border border-white/10 rounded-lg p-3 bg-white/5 hover:border-white/20 transition">
+                            <div className="flex-1 space-y-1">
+                              <p className="text-[11px] uppercase tracking-[0.12em] text-white/60">{info.title}</p>
+                              {info.filled ? (
+                                info.type === 'advisory-list' ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {info.content.map((chip, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm text-emerald-50"
+                                      >
+                                        {chip}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : info.type === 'questions-list' ? (
+                                  <ol className="list-decimal list-inside space-y-1 text-sm text-white">
+                                    {info.content.map((q) => (
+                                      <li key={q.index} className="pl-1">
+                                        <span className="font-semibold">{q.title}</span>
+                                        {q.answer ? <span className="text-white/70"> — {q.answer}</span> : null}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                ) : info.isHtml ? (
+                                  <div
+                                    className="text-sm text-white prose prose-invert prose-sm max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: info.content }}
+                                  />
+                                ) : (
+                                  <p className="text-sm whitespace-pre-line text-white">{info.content}</p>
+                                )
+                              ) : (
+                                <p className="text-sm text-white/50 italic">Not provided</p>
+                              )}
+                            </div>
+                            <div className="self-start">{statusBadge(info.filled)}</div>
+                          </div>
+                        ))}
                       </CardContent>
                     </Card>
                   </div>

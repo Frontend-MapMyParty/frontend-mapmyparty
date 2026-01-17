@@ -1,4 +1,4 @@
-export const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || "https://server2-e4si.onrender.com/api/").replace(/\/$/, "");
+export const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || "http://localhost:9000/api/").replace(/\/$/, "");
 
 export function buildUrl(path = "") {
   let cleanPath = String(path).replace(/^\/+/, "");
