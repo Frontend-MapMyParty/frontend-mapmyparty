@@ -43,6 +43,35 @@ const EventDetailNew = () => {
   const [advisoryModalOpen, setAdvisoryModalOpen] = useState(false);
   const [tcOpen, setTcOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const hasFaq = Array.isArray(event?.questions) && event.questions.length > 0;
+
+  const renderTermsContent = () => {
+    if (event?.termsHtml) {
+      return (
+        <div
+          className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
+          dangerouslySetInnerHTML={{ __html: event.termsHtml }}
+        />
+      );
+    }
+
+    const termsLines = event?.terms
+      ?.split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (termsLines?.length) {
+      return (
+        <ul className="space-y-2 pl-5 list-disc text-white/85 text-sm leading-relaxed">
+          {termsLines.map((line, idx) => (
+            <li key={`term-line-${idx}`}>{line}</li>
+          ))}
+        </ul>
+      );
+    }
+
+    return <p className="text-white/60 text-sm">No terms provided.</p>;
+  };
 
   const hasSponsors = useMemo(
     () => Array.isArray(event?.sponsors) && event.sponsors.length > 0 && (event?.isSponsored ?? true),
@@ -831,74 +860,78 @@ const EventDetailNew = () => {
                       <p className="text-sm text-white/60">No advisories provided.</p>
                     )}
                   </div>
+
+                  {event.organizerNote?.trim?.() && (
+                    <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[#60a5fa]/30 bg-gradient-to-r from-[#0b172b]/85 via-[#0f223a]/85 to-[#0b172b]/70 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.45)] backdrop-blur">
+                      <div className="h-12 w-12 rounded-xl bg-[#102541] border border-[#60a5fa]/40 flex items-center justify-center text-[#93c5fd]">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#c7d7ff]">Organizer Note</p>
+                        <p className="text-sm text-white/90 leading-relaxed whitespace-pre-line">
+                          {event.organizerNote}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Standalone T&C and FAQ accordions (documentation style) */}
+            {/* FAQ then T&C accordions */}
             <div className="space-y-4">
-              <div className="w-full">
+              <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_50px_rgba(0,0,0,0.4)] overflow-hidden">
                 <button
-                  className="w-full flex items-center justify-between gap-2 text-left px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/25 transition"
-                  onClick={() => setTcOpen((prev) => !prev)}
+                  className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.05] transition"
+                  onClick={() => setFaqOpen((prev) => !prev)}
                 >
-                  <span className="flex items-center gap-2 text-white font-semibold text-sm tracking-wide">
-                    <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                    Terms & Conditions
+                  <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
+                    <Megaphone className="h-5 w-5 text-sky-300" />
+                    Frequently Asked Questions
                   </span>
                   <ChevronDown
-                    className={`h-4 w-4 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
                   />
                 </button>
-                {tcOpen && (
-                  <div className="pl-4 border-l border-white/10 mt-3 space-y-3">
-                    {event.termsHtml ? (
-                      <div
-                        className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
-                        dangerouslySetInnerHTML={{ __html: event.termsHtml }}
-                      />
-                    ) : event.terms ? (
-                      <p className="text-white/80 whitespace-pre-line text-sm">{event.terms}</p>
+                {faqOpen && (
+                  <div className="border-t border-white/10 divide-y divide-white/5">
+                    {hasFaq ? (
+                      event.questions.map((qa, idx) => (
+                        <div key={`faq-${idx}`} className="px-5 py-4">
+                          <p className="text-white font-semibold text-sm md:text-base mb-1">{qa.question}</p>
+                          {qa.answer ? (
+                            <p className="text-white/80 text-sm leading-relaxed">{qa.answer}</p>
+                          ) : (
+                            <p className="text-white/50 text-xs">No answer provided.</p>
+                          )}
+                        </div>
+                      ))
                     ) : (
-                      <p className="text-white/60 text-sm">No terms provided.</p>
+                      <div className="px-5 py-4 text-sm text-white/60">No FAQs added yet.</div>
                     )}
                   </div>
                 )}
               </div>
 
-              {Array.isArray(event.questions) && event.questions.length > 0 && (
-                <div className="w-full">
-                  <button
-                    className="w-full flex items-center justify-between gap-2 text-left px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/25 transition"
-                    onClick={() => setFaqOpen((prev) => !prev)}
-                  >
-                    <span className="flex items-center gap-2 text-white font-semibold text-sm tracking-wide">
-                      <Megaphone className="h-4 w-4 text-sky-300" />
-                      Frequently Asked Questions
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {faqOpen && (
-                    <div className="mt-3 space-y-3 pl-4 border-l border-white/10">
-                      {event.questions.map((qa, idx) => (
-                        <div
-                          key={`faq-${idx}`}
-                          className="space-y-1"
-                        >
-                          <p className="text-white font-semibold text-sm">{qa.question}</p>
-                          {qa.answer ? (
-                            <p className="text-white/75 text-sm leading-relaxed">{qa.answer}</p>
-                          ) : (
-                            <p className="text-white/50 text-xs">No answer provided.</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.06] transition"
+                  onClick={() => setTcOpen((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
+                    <ShieldCheck className="h-5 w-5 text-emerald-300" />
+                    Terms & Conditions
+                  </span>
+                  <ChevronDown
+                    className={`h-5 w-5 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {tcOpen && (
+                  <div className="border-t border-white/10 px-5 py-4 bg-white/[0.015]">
+                    {renderTermsContent()}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Advisory Modal */}
@@ -1354,7 +1387,7 @@ const EventDetailNew = () => {
               </Card>
 
               {/* Event Stats */}
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl mt-4">
+              {/* <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl mt-4">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -1382,7 +1415,7 @@ const EventDetailNew = () => {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </div>
