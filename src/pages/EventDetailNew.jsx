@@ -44,6 +44,8 @@ const EventDetailNew = () => {
   const [tcOpen, setTcOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const hasFaq = Array.isArray(event?.questions) && event.questions.length > 0;
+  const artistsCount = Array.isArray(event?.artists) ? event.artists.length : 0;
+  const showArtistsTab = artistsCount > 1;
 
   const renderTermsContent = () => {
     if (event?.termsHtml) {
@@ -88,6 +90,9 @@ const EventDetailNew = () => {
     () => (hasSponsors && sponsorsSorted.length > 1 ? sponsorsSorted.slice(1) : []),
     [hasSponsors, sponsorsSorted]
   );
+
+  const getArtistImage = (artist) =>
+    artist.image || artist.photo || artist.avatar || artist.profileImage || FALLBACK_IMAGE;
 
   const formatAdvisory = (raw) => {
     if (!raw) return null;
@@ -793,7 +798,7 @@ const EventDetailNew = () => {
                 "gallery",
                 "location",
                 "organizer",
-                event.artists?.length ? "artists" : null,
+                showArtistsTab ? "artists" : null,
                 hasSponsors ? "sponsors" : null,
               ]
                 .filter(Boolean)
@@ -874,8 +879,52 @@ const EventDetailNew = () => {
                       </div>
                     </div>
                   )}
+
                 </CardContent>
               </Card>
+            )}
+
+            {activeTab === "about" && artistsCount === 1 && event.artists?.length === 1 && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_14px_50px_rgba(0,0,0,0.35)] p-5 md:p-6 space-y-4">
+                <h3 className="text-xl font-bold text-white">Artist</h3>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={getArtistImage(event.artists[0])}
+                    alt={event.artists[0].name}
+                    className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border border-white/10 shadow-lg"
+                  />
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-white">{event.artists[0].name}</p>
+                    {(event.artists[0].role || event.artists[0].genre || event.artists[0].gender) && (
+                      <p className="text-sm text-white/70 capitalize">
+                        {event.artists[0].role || event.artists[0].genre || event.artists[0].gender?.toLowerCase()}
+                      </p>
+                    )}
+                    <div className="flex gap-3 text-xs font-medium">
+                      {event.artists[0].instagramLink && (
+                        <a
+                          href={event.artists[0].instagramLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#93c5fd] hover:text-white"
+                        >
+                          Instagram
+                        </a>
+                      )}
+                      {event.artists[0].spotifyLink && (
+                        <a
+                          href={event.artists[0].spotifyLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#22c55e] hover:text-white"
+                        >
+                          Spotify
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* FAQ then T&C accordions */}
@@ -1187,52 +1236,50 @@ const EventDetailNew = () => {
 
             {/* Artists Tab */}
             {activeTab === "artists" && event.artists?.length > 0 && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(15,23,42,0.9)] to-[rgba(30,41,59,0.7)] rounded-xl">
+                <CardContent className="p-6 md:p-8 space-y-6">
+                  <div className="flex items-center gap-2">
                     <Sparkles className="h-6 w-6 text-[#D60024]" />
-                    Lineup & Artists
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h2 className="text-2xl font-bold text-white">Lineup & Artists</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {event.artists.map((artist) => (
                       <div
-                        key={artist.id}
-                        className="p-4 rounded-lg border border-[rgba(100,200,255,0.2)] bg-white/5 flex gap-4 items-center"
+                        key={artist.id || artist.name}
+                        className="flex gap-4 items-center rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.35)] hover:border-white/20 transition"
                       >
                         <img
-                          src={artist.image || artist.photo || FALLBACK_IMAGE}
+                          src={getArtistImage(artist)}
                           alt={artist.name}
-                          className="w-16 h-16 rounded-full object-cover border border-white/10"
+                          className="w-16 h-16 rounded-2xl object-cover border border-white/10"
                         />
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="text-white font-semibold">{artist.name}</p>
-                            {artist.gender && (
-                              <span className="text-xs text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
-                                {artist.gender}
-                              </span>
+                          <p className="text-white font-semibold text-base">{artist.name}</p>
+                          {(artist.role || artist.genre || artist.gender) && (
+                            <p className="text-xs text-white/60 capitalize">{artist.role || artist.genre || artist.gender?.toLowerCase()}</p>
+                          )}
+                          <div className="flex gap-3 text-xs font-medium">
+                            {artist.instagramLink && (
+                              <a
+                                href={artist.instagramLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#93c5fd] hover:text-white"
+                              >
+                                Instagram
+                              </a>
+                            )}
+                            {artist.spotifyLink && (
+                              <a
+                                href={artist.spotifyLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[#22c55e] hover:text-white"
+                              >
+                                Spotify
+                              </a>
                             )}
                           </div>
-                          {artist.instagramLink && (
-                            <a
-                              href={artist.instagramLink}
-                              className="text-xs text-[#60a5fa] hover:underline"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Instagram
-                            </a>
-                          )}
-                          {artist.spotifyLink && (
-                            <a
-                              href={artist.spotifyLink}
-                              className="text-xs text-[#22c55e] hover:underline block"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Spotify
-                            </a>
-                          )}
                         </div>
                       </div>
                     ))}

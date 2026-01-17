@@ -242,7 +242,7 @@ const CreateEvent = () => {
     endTime: "",
   });
   const [ticketPrice, setTicketPrice] = useState("49");
-  const [artists, setArtists] = useState([{ name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]);
+  const [artists, setArtists] = useState([{ name: "", photo: "", image: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }]);
   const initialAdvisoryState = {
     smokingAllowed: false,
     drinkingAllowed: false,
@@ -1679,12 +1679,6 @@ const CreateEvent = () => {
       const normalizedCurrentArtists = normalizeArtists(artists);
       const hasArtistChanges = artistsChanged(normalizedCurrentArtists);
 
-      if (isEditMode && !hasArtistChanges) {
-        toast.info("No changes to update");
-        setCurrentStep(currentStep + 1);
-        return;
-      }
-
       // Call API for Step 6 - Create Artists (only new ones)
       try {
         setIsSubmitting(true);
@@ -1704,6 +1698,7 @@ const CreateEvent = () => {
           .filter(artist => artist.name.trim() !== "")
           .map(artist => ({
             ...artist,
+            image: artist.photo || artist.image || "",
             eventId: backendEventId,
           }));
         
@@ -1726,8 +1721,9 @@ const CreateEvent = () => {
             
             const artistPayload = {
               ...artist,
-              instagramLink: artist.instagram || null,  // Map instagram to instagramLink
-              spotifyLink: artist.spotify || null,     // Also fix spotify for consistency
+              image: artist.image || artist.photo || null,
+              instagramLink: artist.instagram || artist.instagramLink || null,  // Map instagram to instagramLink
+              spotifyLink: artist.spotify || artist.spotifyLink || null,     // Also fix spotify for consistency
               eventId: backendEventId,
             };
             
@@ -1746,7 +1742,21 @@ const CreateEvent = () => {
           }
         }
         
-        toast.success(`${artistResponses.length} artist(s) added successfully!`);
+        // Persist artists to event record (including updated images/links)
+        const persistPayload = validArtists.map((artist) => ({
+          name: artist.name,
+          gender: artist.gender,
+          image: artist.image || artist.photo || null,
+          instagramLink: artist.instagram || artist.instagramLink || null,
+          spotifyLink: artist.spotify || artist.spotifyLink || null,
+        }));
+
+        try {
+          await updateEventStep6(backendEventId, { artists: persistPayload });
+        } catch (err) {
+          console.error("Failed to persist artists on updateEventStep6:", err);
+        }
+
         console.log("Step 6 API Response:", artistResponses);
         
         // Move to next step after successful API call
@@ -2139,6 +2149,7 @@ const CreateEvent = () => {
 
       const newArtists = [...artists];
       newArtists[index].photo = imageUrl;
+      newArtists[index].image = imageUrl;
       setArtists(newArtists);
 
       toast.success("Artist photo uploaded successfully!");
@@ -2183,14 +2194,18 @@ const CreateEvent = () => {
 
   const normalizeArtists = (list) =>
     (list || [])
-      .map((a) => ({
-        name: (a.name || "").trim(),
-        photo: (a.photo || a.image || "").trim(),
-        instagram: (a.instagram || a.instagramLink || "").trim(),
-        spotify: (a.spotify || a.spotifyLink || "").trim(),
-        gender: a.gender || "PREFER_NOT_TO_SAY",
-      }))
-      .filter((a) => a.name || a.instagram || a.spotify || a.photo);
+      .map((a) => {
+        const image = (a.photo || a.image || "").trim();
+        return {
+          name: (a.name || "").trim(),
+          image,
+          photo: image,
+          instagramLink: (a.instagram || a.instagramLink || "").trim(),
+          spotifyLink: (a.spotify || a.spotifyLink || "").trim(),
+          gender: a.gender || "PREFER_NOT_TO_SAY",
+        };
+      })
+      .filter((a) => a.name || a.instagramLink || a.spotifyLink || a.image);
 
   const sponsorsChanged = (normalizedList = null) => {
     const filtered = normalizedList ?? normalizeSponsors(sponsors);
@@ -3339,7 +3354,7 @@ const CreateEvent = () => {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setArtists([...artists, { name: "", photo: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }])}
+                      onClick={() => setArtists([...artists, { name: "", photo: "", image: "", instagram: "", spotify: "", gender: "PREFER_NOT_TO_SAY" }])}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Artist
