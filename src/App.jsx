@@ -85,6 +85,13 @@ const App = () => {
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
+
+             <Route path="/organizer/profile" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+
             <Route path="/organizer/myevents" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />

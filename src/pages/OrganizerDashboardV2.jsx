@@ -31,6 +31,8 @@ import {
   Building2,
   CheckCircle2,
   Globe,
+  Camera,
+  Upload,
 } from "lucide-react";
 import FinancialReporting from "./FinancialReporting";
 import OrganizerDash from "./OrganizerDash";
@@ -41,7 +43,7 @@ import Reception from "./Reception";
 
 // Profile Content Component
 const OrganizerProfileContent = ({ user }) => {
-  const buildInitialData = (payload = {}) => ({
+  const buildInitialData = (payload = {}, owner = {}) => ({
     id: payload.id || "organizer-uuid",
     name: payload.name || "Awesome Events",
     description: payload.description || "We organize the best events in town!",
@@ -60,6 +62,10 @@ const OrganizerProfileContent = ({ user }) => {
     reddit: payload.reddit || "u/awesomeevents",
     x: payload.x || "https://twitter.com/awesomeevents",
     snapchat: payload.snapchat || "awesomeevents",
+    ownerName: owner.name || payload.ownerName || "—",
+    ownerEmail: owner.email || payload.ownerEmail || "",
+    ownerPhone: owner.phone || payload.contact || payload.ownerPhone || "",
+    ownerAvatar: owner.avatar || "",
     counts: {
       events: payload?._count?.events ?? 25,
       images: payload?._count?.images ?? 50,
@@ -80,9 +86,17 @@ const OrganizerProfileContent = ({ user }) => {
     },
   });
 
-  const [profileData, setProfileData] = useState(() => buildInitialData(user));
-  const [editData, setEditData] = useState(() => buildInitialData(user));
-  const [bankDraft, setBankDraft] = useState(() => buildInitialData(user).bankDetails);
+  const [profileData, setProfileData] = useState(() => buildInitialData(user?.organizer || {}, user));
+  const [editData, setEditData] = useState(() => buildInitialData(user?.organizer || {}, user));
+  const [bankDraft, setBankDraft] = useState(() => buildInitialData(user?.organizer || {}, user).bankDetails);
+  const [owner, setOwner] = useState(() => user || {});
+  const [ownerDraft, setOwnerDraft] = useState(() => user || {});
+  const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
+  const [isOwnerAvatarPickerOpen, setIsOwnerAvatarPickerOpen] = useState(false);
+  const [isOwnerCameraOpen, setIsOwnerCameraOpen] = useState(false);
+  const [ownerPendingAvatar, setOwnerPendingAvatar] = useState(null);
+  const [ownerCapturedPhoto, setOwnerCapturedPhoto] = useState(null);
+  const [isOwnerSaving, setIsOwnerSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isBankPanelOpen, setIsBankPanelOpen] = useState(false);
   const [isBankEditing, setIsBankEditing] = useState(false);
@@ -91,19 +105,36 @@ const OrganizerProfileContent = ({ user }) => {
   const [isBankLoading, setIsBankLoading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  const ownerVideoRef = useRef(null);
+  const ownerCanvasRef = useRef(null);
+  const ownerFileInputRef = useRef(null);
+
   useEffect(() => {
-    const fresh = buildInitialData(user);
+    const fresh = buildInitialData(user?.organizer || {}, user);
     setProfileData(fresh);
     setEditData(fresh);
     setBankDraft(fresh.bankDetails);
+    setOwner(user || {});
+    setOwnerDraft(user || {});
   }, [user]);
 
-  const fetchOrganizerProfile = useCallback(async () => {
+  const fetchProfileData = useCallback(async () => {
     setLoadingProfile(true);
     try {
-      const res = await apiFetch("organizer/me/profile", { method: "GET" });
-      const data = res?.data || res || {};
-      const normalized = buildInitialData(data);
+      // Fetch authenticated user (owner) plus organizer snapshot
+      const authRes = await apiFetch("auth/me", { method: "GET" });
+      const authData = authRes?.data || authRes || {};
+      const ownerData = authData.user || {};
+      setOwner(ownerData);
+      setOwnerDraft(ownerData);
+
+      let organizerPayload = authData.organizer;
+      if (!organizerPayload) {
+        const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
+        organizerPayload = orgRes?.data || orgRes || {};
+      }
+
+      const normalized = buildInitialData(organizerPayload, ownerData);
       setProfileData(normalized);
       setEditData(normalized);
       setBankDraft(normalized.bankDetails);
@@ -115,8 +146,8 @@ const OrganizerProfileContent = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    fetchOrganizerProfile();
-  }, [fetchOrganizerProfile]);
+    fetchProfileData();
+  }, [fetchProfileData]);
 
   const formatDate = (value) => {
     try {
@@ -155,7 +186,7 @@ const OrganizerProfileContent = ({ user }) => {
         body: JSON.stringify(payload),
       });
       const data = res?.data || res || {};
-      const normalized = buildInitialData(data);
+      const normalized = buildInitialData(data, owner);
       setProfileData(normalized);
       setEditData(normalized);
       setBankDraft(normalized.bankDetails);
@@ -227,6 +258,159 @@ const OrganizerProfileContent = ({ user }) => {
     setIsBankPanelOpen(false);
   };
 
+  useEffect(() => {
+    if (!isOwnerCameraOpen) {
+      stopOwnerCameraStream();
+      setOwnerCapturedPhoto(null);
+    }
+  }, [isOwnerCameraOpen]);
+
+  const ownerAvatarOptions = [
+    {
+      id: "owner-avatar-1",
+      label: "Acoustic Dreamer",
+      url: "https://api.dicebear.com/7.x/adventurer/svg?seed=Acoustic+Dreamer",
+    },
+    {
+      id: "owner-avatar-2",
+      label: "Festival Vibes",
+      url: "https://api.dicebear.com/7.x/bottts/svg?seed=Festival+Vibes",
+    },
+    {
+      id: "owner-avatar-3",
+      label: "City Explorer",
+      url: "https://api.dicebear.com/7.x/micah/svg?seed=City+Explorer",
+    },
+    {
+      id: "owner-avatar-4",
+      label: "Night Groove",
+      url: "https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=Night+Groove",
+    },
+  ];
+
+  const openOwnerModal = useCallback(() => {
+    setOwnerDraft(owner || {});
+    setIsOwnerModalOpen(true);
+  }, [owner]);
+
+  const handleOwnerFieldChange = (field, value) => {
+    setOwnerDraft(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveOwner = async () => {
+    setIsOwnerSaving(true);
+    try {
+      const payload = {
+        name: ownerDraft.name,
+        email: ownerDraft.email,
+        phone: ownerDraft.phone,
+        avatar: ownerDraft.avatar,
+        whatsAppNotification: ownerDraft.whatsAppNotification
+      };
+      await apiFetch("/user/profile", {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      setOwner(ownerDraft);
+      setIsOwnerModalOpen(false);
+    } catch (error) {
+      console.error("Failed to update owner:", error);
+    } finally {
+      setIsOwnerSaving(false);
+    }
+  };
+
+  const handleCancelOwner = () => {
+    setIsOwnerModalOpen(false);
+    setIsOwnerAvatarPickerOpen(false);
+    setIsOwnerCameraOpen(false);
+    stopOwnerCameraStream();
+    setOwnerPendingAvatar(null);
+    setOwnerCapturedPhoto(null);
+    setOwnerDraft(owner || {});
+  };
+
+  const openOwnerAvatarPicker = () => {
+    setOwnerPendingAvatar(ownerDraft.avatar || owner.avatar || "");
+    setIsOwnerAvatarPickerOpen(true);
+  };
+
+  const handleOwnerFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === "string") {
+        setOwnerPendingAvatar(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startOwnerCamera = async () => {
+    try {
+      setOwnerCapturedPhoto(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (ownerVideoRef.current) {
+        ownerVideoRef.current.srcObject = stream;
+        await ownerVideoRef.current.play();
+      }
+    } catch (err) {
+      console.error("Camera access denied", err);
+    }
+  };
+
+  const clearOwnerCameraStream = () => {
+    const video = ownerVideoRef.current;
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+    }
+  };
+
+  const stopOwnerCameraStream = () => {
+    clearOwnerCameraStream();
+    setOwnerCapturedPhoto(null);
+  };
+
+  const captureOwnerPhoto = () => {
+    if (!ownerVideoRef.current || !ownerCanvasRef.current) return;
+    const video = ownerVideoRef.current;
+    const canvas = ownerCanvasRef.current;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/png");
+    setOwnerCapturedPhoto(dataUrl);
+    clearOwnerCameraStream();
+  };
+
+  const handleOwnerAvatarUseCamera = async () => {
+    setIsOwnerCameraOpen(true);
+    await startOwnerCamera();
+  };
+
+  const handleOwnerAvatarApply = (value) => {
+    setOwnerDraft((prev) => ({ ...prev, avatar: value }));
+    setOwnerPendingAvatar(value);
+    setIsOwnerAvatarPickerOpen(false);
+    setIsOwnerCameraOpen(false);
+    stopOwnerCameraStream();
+  };
+
+  const closeOwnerAvatarPicker = () => {
+    setIsOwnerAvatarPickerOpen(false);
+    setOwnerPendingAvatar(null);
+  };
+
+  const closeOwnerCamera = () => {
+    setIsOwnerCameraOpen(false);
+    stopOwnerCameraStream();
+    setOwnerCapturedPhoto(null);
+  };
+
   return (
     <div className="space-y-6 text-white">
       {/* Header */}
@@ -251,61 +435,335 @@ const OrganizerProfileContent = ({ user }) => {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-white hover:bg-white/15 transition"
             >
               <Edit2 className="w-4 h-4" />
-              Edit Profile
+              Edit Organization
             </button>
           )}
         </div>
       </div>
 
+      {/* Owner edit modal */}
+      {isOwnerModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-2xl max-h-[88vh] rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d1222] via-[#0b101d] to-[#0a0d18] shadow-[0_25px_80px_-30px_rgba(0,0,0,0.8)] ring-1 ring-white/5 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5/40 backdrop-blur-sm rounded-t-2xl">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">Owner</p>
+                <h3 className="text-xl font-semibold text-white">Edit Owner Details</h3>
+              </div>
+              <button onClick={handleCancelOwner} className="text-white/60 hover:text-white rounded-full p-2 hover:bg-white/10 transition">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-5 flex-1 overflow-y-auto custom-scrollbar">
+              <div className="grid grid-cols-1 gap-5">
+                <div className="space-y-2">
+                  <label className="text-sm text-white/70">Name</label>
+                  <input
+                    type="text"
+                    value={ownerDraft.name || ""}
+                    onChange={(e) => handleOwnerFieldChange("name", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 focus:outline-none transition"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-white/70">Email</label>
+                  <input
+                    type="email"
+                    value={ownerDraft.email || ""}
+                    onChange={(e) => handleOwnerFieldChange("email", e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 focus:outline-none transition"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-white/70">Phone</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={ownerDraft.phone || ""}
+                      onChange={(e) => handleOwnerFieldChange("phone", e.target.value)}
+                      className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 focus:outline-none transition"
+                      placeholder="+1234567890"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-white/70">Avatar</label>
+                  <div className="flex items-center gap-3 flex-wrap rounded-xl border border-white/10 bg-white/5/70 px-3 py-3">
+                    <div className="h-12 w-12 rounded-full overflow-hidden border border-white/10 bg-white/10 flex items-center justify-center text-sm font-semibold shadow-inner shrink-0">
+                      {ownerDraft.avatar ? (
+                        <img src={ownerDraft.avatar} alt="Owner avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-white/70">{(ownerDraft.name || ownerDraft.email || "O").slice(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-wrap items-center gap-2 min-w-[260px]">
+                      <button
+                        type="button"
+                        onClick={openOwnerAvatarPicker}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/15 text-white hover:bg-white/15 transition font-semibold"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Choose avatar
+                      </button>
+                      <input
+                        type="url"
+                        value={ownerDraft.avatar || ""}
+                        onChange={(e) => handleOwnerFieldChange("avatar", e.target.value)}
+                        className="flex-1 min-w-[240px] px-4 py-2.5 rounded-lg bg-white/10 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-emerald-400/60 focus:border-emerald-400/50 focus:outline-none transition"
+                        placeholder="https://..."
+                      />
+                      <p className="text-xs text-white/50 w-full leading-relaxed">Upload, capture, or paste a URL for the owner avatar.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="whatsapp-toggle"
+                    type="checkbox"
+                    checked={!!ownerDraft.whatsAppNotification}
+                    onChange={(e) => handleOwnerFieldChange("whatsAppNotification", e.target.checked)}
+                    className="h-4 w-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/50"
+                  />
+                  <label htmlFor="whatsapp-toggle" className="text-sm text-white/80">
+                    Enable WhatsApp notifications
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-white/10 flex items-center gap-3 bg-white/5/40 backdrop-blur-sm rounded-b-2xl">
+              <button
+                onClick={handleSaveOwner}
+                disabled={isOwnerSaving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/40 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isOwnerSaving ? (
+                  <span className="h-4 w-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {isOwnerSaving ? "Saving..." : "Save Owner"}
+              </button>
+              <button
+                onClick={handleCancelOwner}
+                className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Owner avatar picker modal */}
+      {isOwnerAvatarPickerOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-[#0b1220] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">Owner</p>
+                <h3 className="text-xl font-semibold text-white">Choose Your Avatar</h3>
+              </div>
+              <button onClick={closeOwnerAvatarPicker} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {ownerAvatarOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setOwnerPendingAvatar(option.url)}
+                    className={`group flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 transition-all hover:bg-white/10 ${
+                      ownerPendingAvatar === option.url ? "border-emerald-400/60 ring-2 ring-emerald-400/40" : ""
+                    }`}
+                  >
+                    <div className="h-20 w-20 rounded-full overflow-hidden border border-white/15 bg-white/10">
+                      <img src={option.url} alt={option.label} className="h-full w-full object-cover" />
+                    </div>
+                    <span className="text-sm font-semibold text-white group-hover:text-emerald-200">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => ownerFileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/10 border border-white/15 text-white hover:bg-white/15 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload from device
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOwnerAvatarUseCamera}
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-dashed border-white/15 text-white hover:bg-white/10 transition"
+                >
+                  <Camera className="w-4 h-4" />
+                  Use camera
+                </button>
+                <input
+                  ref={ownerFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleOwnerFileChange}
+                />
+              </div>
+
+              {(ownerPendingAvatar || ownerCapturedPhoto) && (
+                <div className="space-y-2 border border-white/10 rounded-lg p-4 bg-white/5">
+                  <p className="text-sm text-white/70">Preview &amp; confirm</p>
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 rounded-full overflow-hidden border border-white/10 bg-white/10">
+                      <img
+                        src={ownerCapturedPhoto || ownerPendingAvatar || ownerDraft.avatar || owner.avatar || ""}
+                        alt="Selected avatar preview"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOwnerPendingAvatar(null);
+                          setOwnerCapturedPhoto(null);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOwnerAvatarApply(ownerCapturedPhoto || ownerPendingAvatar)}
+                        className="px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                      >
+                        Use this avatar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Owner camera modal */}
+      {isOwnerCameraOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-[#0b1220] border border-white/10 rounded-2xl w-full max-w-xl shadow-2xl shadow-black/60">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">Owner</p>
+                <h3 className="text-xl font-semibold text-white">Capture with Camera</h3>
+              </div>
+              <button onClick={closeOwnerCamera} className="text-white/60 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              {!ownerCapturedPhoto ? (
+                <>
+                  <div className="relative w-full">
+                    <video ref={ownerVideoRef} className="w-full rounded-xl border border-white/10" autoPlay muted />
+                  </div>
+                  <canvas ref={ownerCanvasRef} className="hidden" />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={closeOwnerCamera}
+                      className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={captureOwnerPhoto}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                    >
+                      Capture
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <img src={ownerCapturedPhoto} alt="Captured" className="w-full rounded-xl border border-white/10 object-contain max-h-96" />
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={startOwnerCamera}
+                      className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                    >
+                      Retake
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleOwnerAvatarApply(ownerCapturedPhoto);
+                        closeOwnerCamera();
+                      }}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition"
+                    >
+                      Save photo
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile Card */}
-      <div className="bg-white/5 rounded-2xl border border-white/10 shadow-lg shadow-black/30 overflow-hidden backdrop-blur">
+      <div className="bg-[#0f1628] rounded-2xl border border-white/10 shadow-lg shadow-black/30 overflow-hidden backdrop-blur">
         {/* Profile Header Section */}
-        <div className="relative bg-gradient-to-r from-[#f43f5e] via-[#ec4899] to-[#6366f1] px-8 py-10 border-b border-white/10 overflow-hidden">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_20%_20%,white,transparent_35%)]" />
-          <div className="relative flex items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-4xl shadow-lg border border-white/30 overflow-hidden">
+        <div className="relative px-8 py-8 border-b border-white/10 bg-gradient-to-r from-[#0b1220] via-[#0f172a] to-[#111827]">
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_15%_30%,#ffffff,transparent_35%)]" />
+          <div className="relative flex flex-col gap-6">
+            <div className="flex items-center gap-5 flex-wrap">
+              <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center text-white font-bold text-3xl shadow-inner border border-white/10 overflow-hidden">
                 {editData.logo ? (
                   <img src={editData.logo} alt={editData.name} className="w-full h-full object-cover" />
                 ) : (
                   (editData.name || "U").charAt(0).toUpperCase()
                 )}
               </div>
-              <div className="text-white space-y-1">
+              <div className="text-white space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-3xl font-bold">{editData.name}</h2>
+                  <h2 className="text-2xl font-semibold">{editData.name}</h2>
                   {editData.isVerified && (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-50 text-xs font-semibold border border-emerald-300/40">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-100 text-xs font-semibold border border-emerald-500/30">
                       <BadgeCheck className="w-4 h-4" />
                       Verified
                     </span>
                   )}
                 </div>
-                {/* <p className="text-white/80 text-sm">{editData.description}</p> */}
-                <div className="flex items-center gap-3 text-white/70 text-xs flex-wrap">
-                  <Mail className="w-4 h-4" />
-                  <span>{editData.email}</span>
-                  <span className="h-1 w-1 rounded-full bg-white/40" />
-                  <Phone className="w-4 h-4" />
-                  <span>{editData.contact}</span>
-                </div>
+                <p className="text-white/70 text-sm leading-relaxed max-w-2xl">{editData.description}</p>
               </div>
             </div>
-            <div className="hidden md:flex flex-col items-end gap-3 text-sm text-white/80">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-4 text-white/70 text-sm">
+              <span className="inline-flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                {editData.email}
+              </span>
+              <span className="h-1 w-1 rounded-full bg-white/20" />
+              <span className="inline-flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                {editData.contact}
+              </span>
+              <span className="h-1 w-1 rounded-full bg-white/20" />
+              <span className="inline-flex items-center gap-2">
                 <MapPin className="w-4 h-4" />
-                <span>{editData.state}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>Joined {formatDate(editData.createdAt)}</span>
-              </div>
+                {editData.state}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Profile Details */}
-        <div className="p-8 space-y-6 bg-[#0b1220]/80">
+        <div className="p-8 space-y-6 bg-[#0b1220]">
           {loadingProfile ? (
             <div className="text-white/70 text-sm">Loading organizer profile…</div>
           ) : !isEditing ? (
@@ -314,18 +772,18 @@ const OrganizerProfileContent = ({ user }) => {
               {/* Snapshot */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {[
-                  { label: "Events", value: editData.counts.events, color: "from-sky-500/50 to-blue-600/50" },
-                  { label: "Images", value: editData.counts.images, color: "from-purple-500/50 to-pink-500/50" },
-                  { label: "Payouts", value: editData.counts.payouts, color: "from-emerald-500/50 to-teal-500/50" },
-                  { label: "Tours", value: editData.counts.tours, color: "from-amber-500/50 to-orange-500/50" },
-                  { label: "Reviews", value: editData.counts.reviews, color: "from-indigo-500/50 to-violet-500/50" },
+                  { label: "Events", value: editData.counts.events, accent: "text-sky-200", border: "border-sky-500/30" },
+                  { label: "Images", value: editData.counts.images, accent: "text-purple-200", border: "border-purple-500/30" },
+                  { label: "Payouts", value: editData.counts.payouts, accent: "text-emerald-200", border: "border-emerald-500/30" },
+                  { label: "Tours", value: editData.counts.tours, accent: "text-amber-200", border: "border-amber-500/30" },
+                  { label: "Reviews", value: editData.counts.reviews, accent: "text-indigo-200", border: "border-indigo-500/30" },
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className={`rounded-xl border border-white/10 bg-gradient-to-br ${stat.color} p-3 shadow-lg shadow-black/30`}
+                    className={`rounded-xl border ${stat.border} bg-white/5 p-3 shadow-lg shadow-black/20`}
                   >
                     <p className="text-xs uppercase tracking-wide text-white/70">{stat.label}</p>
-                    <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                    <p className={`text-2xl font-bold mt-1 ${stat.accent}`}>{stat.value}</p>
                   </div>
                 ))}
               </div>
@@ -334,7 +792,6 @@ const OrganizerProfileContent = ({ user }) => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Contact &amp; Reach</h3>
-                  {/* <span className="text-xs text-white/50">Owner: {editData.ownerId}</span> */}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
@@ -378,13 +835,43 @@ const OrganizerProfileContent = ({ user }) => {
 
               {/* About */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">About Organizer</h3>
-                  <span className="text-xs text-white/50">Updated {formatDate(editData.updatedAt)}</span>
-                </div>
+                <h3 className="text-lg font-semibold">About Organizer</h3>
                 <p className="text-white/80 leading-relaxed bg-white/5 border border-white/10 p-4 rounded-xl">
                   {editData.description}
                 </p>
+              </div>
+
+              {/* Owner Snapshot */}
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold overflow-hidden">
+                    {owner?.avatar ? (
+                      <img src={owner.avatar} alt={owner.name} className="w-full h-full object-cover" />
+                    ) : (
+                      (owner?.name || "O").charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Owner</p>
+                    <p className="text-base font-semibold text-white">{owner?.name || "—"}</p>
+                    <p className="text-xs text-white/60">{owner?.email}</p>
+                  </div>
+                </div>
+                <div className="text-sm text-white/70 flex flex-wrap gap-3">
+                  {owner?.phone && (
+                    <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+                      <Phone className="w-4 h-4" />
+                      {owner.phone}
+                    </span>
+                  )}
+                  <button
+                    onClick={openOwnerModal}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit Owner
+                  </button>
+                </div>
               </div>
 
               {/* Socials */}
@@ -759,12 +1246,18 @@ const OrganizerDashboardV2 = () => {
     else if (path.startsWith("/organizer/live")) setActiveTab("live");
     else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
     else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
+    else if (path.startsWith("/organizer/profile")) setActiveTab("profile");
     else setActiveTab("dashboard");
   }, [location.pathname]);
 
   const handleNav = (id) => {
     setActiveTab(id);
-    const base = id === "dashboard" ? "/organizer/dashboard" : `/organizer/${id}`;
+    const base =
+      id === "dashboard"
+        ? "/organizer/dashboard"
+        : id === "profile"
+        ? "/organizer/profile"
+        : `/organizer/${id}`;
     navigate(base);
   };
 
@@ -840,8 +1333,8 @@ const OrganizerDashboardV2 = () => {
                 <div className="rounded-xl border border-white/10 bg-[#0f1628]/95 backdrop-blur-md shadow-xl shadow-black/30 p-2 space-y-2">
                   <button
                     onClick={() => {
-                      setActiveTab("profile");
                       setFooterMenuOpen(false);
+                      handleNav("profile");
                     }}
                     className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition"
                   >
