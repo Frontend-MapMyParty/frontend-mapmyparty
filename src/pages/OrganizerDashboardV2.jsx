@@ -891,7 +891,9 @@ const OrganizerDashboardV2 = () => {
           </div>
         </main>
       </div>
+
     </div>
+    
   );
 }
 

@@ -45,6 +45,7 @@ const Dashboard = () => {
 
     return {
       id: event.id || event._id,
+      slug: event.slug || event.eventSlug || event.eventId || event.id || event._id,
       title: event.title || event.eventTitle || "Event",
       date: startDate || endDate,
       endDate,
@@ -89,6 +90,7 @@ const Dashboard = () => {
 
     return {
       id: item.id || item._id,
+      slug: evt.slug || evt.eventSlug || evt.eventId || evt.id || evt._id,
       title: evt.title || "Event",
       date: startDate || evt.endDate,
       bookingDate: item.createdAt || item.bookingDate || startDate || evt.createdAt,
@@ -355,7 +357,7 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="flex gap-2 pt-1">
-                    <Link to={`/events/${nextEvent.id}`} className="flex-1">
+                    <Link to={`/events/${nextEvent.slug || nextEvent.id}`} className="flex-1">
                       <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
                         View Details
                       </Button>
@@ -434,7 +436,7 @@ const Dashboard = () => {
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
               {upcomingEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="group flex-shrink-0 w-80">
+                <Link key={event.id} to={`/events/${event.slug || event.id}`} className="group flex-shrink-0 w-80">
                   <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] hover:border-[#60a5fa]/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(100,180,255,0.3)]">
                     {/* Image Section */}
                     <div className="relative h-52 overflow-hidden bg-[rgba(255,255,255,0.05)]">
@@ -502,7 +504,7 @@ const Dashboard = () => {
 
                       {/* Quick Book Button */}
                       <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-bold transition-all duration-300 text-sm">
-                        Book Now
+                        View Details
                       </Button>
                     </div>
                   </div>
@@ -556,7 +558,7 @@ const Dashboard = () => {
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
               {bookedEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.id}`} className="group flex-shrink-0 w-80">
+                <Link key={event.id} to={`/events/${event.slug || event.id}`} className="group flex-shrink-0 w-80">
                   <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] hover:border-[rgba(100,200,255,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.35)]">
                     {/* Image Section */}
                     <div className="relative h-48 overflow-hidden bg-[rgba(255,255,255,0.05)]">
@@ -737,7 +739,7 @@ const Dashboard = () => {
                 <div className="flex flex-col flex-1">
                   <div className="space-y-3 flex-1">
                     {upcomingEvents.slice(0, 4).map((event, idx) => (
-                      <Link key={`cal-${event.id}`} to={`/events/${event.id}`} className="block group">
+                      <Link key={`cal-${event.id}`} to={`/events/${event.slug || event.id}`} className="block group">
                         <div className="flex items-start p-3 bg-gradient-to-r from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-lg hover:from-[rgba(59,130,246,0.15)] hover:to-[rgba(214,0,36,0.1)] transition-all border border-[rgba(100,200,255,0.15)] hover:border-[#60a5fa]/60 group-hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]">
                           <div className="bg-gradient-to-br from-[rgba(59,130,246,0.3)] via-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.15)] p-2 rounded-lg mr-3 text-center min-w-[60px] border border-[#60a5fa]/40 group-hover:from-[rgba(59,130,246,0.5)] group-hover:to-[rgba(214,0,36,0.3)] transition-all">
                             <div className="text-[#60a5fa] text-xs font-bold uppercase">

@@ -474,7 +474,7 @@ const NewUserDashboard = () => {
               {/* Location Selector */}
               <Dialog open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
                 <DialogTrigger asChild>
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     className="h-11 px-4 rounded-full border border-[rgba(100,200,255,0.25)] bg-[rgba(59,130,246,0.08)] hover:bg-[rgba(59,130,246,0.16)] text-white flex items-center gap-2 shadow-sm hover:shadow-[0_10px_30px_-12px_rgba(96,165,250,0.6)]"
                   >
@@ -485,7 +485,7 @@ const NewUserDashboard = () => {
                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] text-[rgba(255,255,255,0.7)]">
                       India
                     </span>
-                  </Button>
+                  </Button> */}
                 </DialogTrigger>
                 <DialogContent className="max-w-[900px] w-[92vw] md:w-[90vw] bg-[#0b0e16] border border-[rgba(100,200,255,0.2)] text-white shadow-[0_18px_48px_-22px_rgba(0,0,0,0.65)] rounded-2xl p-6 space-y-6 max-h-[75vh] overflow-y-auto">
                   <div className="flex items-start justify-between gap-3">

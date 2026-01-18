@@ -2,10 +2,11 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Index from "./pages/Index";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetailNew";
+import PaymentCheckout from "./pages/PaymentCheckout";
 import Auth from "./pages/Auth";
 import GoogleCallback from "./pages/GoogleCallback";
 import UserDashboard from "./pages/NewUserDashboard";
@@ -29,8 +30,18 @@ import ReceptionDetail from "./pages/ReceptionDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Policies from "./pages/Policies";
+import Footer from "./components/Footer";
 
 const queryClient = new QueryClient();
+
+const PublicShell = () => (
+  <div className="min-h-screen flex flex-col bg-[#040712] text-white">
+    <div className="flex-1">
+      <Outlet />
+    </div>
+    <Footer />
+  </div>
+);
 
 const App = () => {
   return (
@@ -40,17 +51,20 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/my-bookings" element={<Navigate to="/dashboard/bookings" replace />} />
-            {/* <Route path="/events" element={<Events />} /> */}
-            <Route path="/browse-events" element={<BrowseEvents showPublicHeader />} />
-            <Route path="/events/:id" element={<EventDetail />} />
-            <Route path="/events/:id/overview" element={<EventOverviewPage />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/policies" element={<Policies />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/auth/google/callback" element={<GoogleCallback />} />
+            <Route element={<PublicShell />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/my-bookings" element={<Navigate to="/dashboard/bookings" replace />} />
+              {/* <Route path="/events" element={<Events />} /> */}
+              <Route path="/browse-events" element={<BrowseEvents showPublicHeader />} />
+              <Route path="/events/:id" element={<EventDetail />} />
+              <Route path="/events/:id/checkout" element={<PaymentCheckout />} />
+              <Route path="/events/:id/overview" element={<EventOverviewPage />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/policies" element={<Policies />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/google/callback" element={<GoogleCallback />} />
+            </Route>
             
             {/* Protected User Dashboard Routes */}
             <Route path="/dashboard" element={

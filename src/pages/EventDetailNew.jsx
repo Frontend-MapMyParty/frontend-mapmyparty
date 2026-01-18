@@ -43,9 +43,66 @@ const EventDetailNew = () => {
   const [advisoryModalOpen, setAdvisoryModalOpen] = useState(false);
   const [tcOpen, setTcOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
-  const hasFaq = Array.isArray(event?.questions) && event.questions.length > 0;
+  const normalizedFaqs = useMemo(() => {
+    if (Array.isArray(event?.faqs) && event.faqs.length > 0) return event.faqs;
+    if (Array.isArray(event?.questions) && event.questions.length > 0) return event.questions;
+    return [];
+  }, [event?.faqs, event?.questions]);
+
+  const normalizedTerms = useMemo(() => {
+    if (Array.isArray(event?.termsAndConditions) && event.termsAndConditions.length > 0) {
+      return event.termsAndConditions;
+    }
+    if (event?.TC?.content) {
+      return [event.TC];
+    }
+    return [];
+  }, [event?.termsAndConditions, event?.TC]);
+
+  const showFaqTc = useMemo(() => {
+    const hasFaq = normalizedFaqs.length > 0;
+    const hasTerms = normalizedTerms.length > 0;
+    return hasFaq || hasTerms;
+  }, [normalizedFaqs, normalizedTerms]);
+
   const artistsCount = Array.isArray(event?.artists) ? event.artists.length : 0;
   const showArtistsTab = artistsCount > 1;
+
+  const visibleTabs = useMemo(() => {
+    const base = ["about", "gallery", "location", "organizer"];
+    if (showArtistsTab) base.push("artists");
+    return base;
+  }, [showArtistsTab]);
+
+  const rotatingTabs = useMemo(() => {
+    return visibleTabs;
+  }, [visibleTabs]);
+
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [visibleTabs, activeTab]);
+
+  useEffect(() => {
+    if (rotatingTabs.length <= 1) return undefined;
+    const interval = setInterval(() => {
+      setActiveTab((prev) => {
+        const idx = rotatingTabs.indexOf(prev);
+        const next = rotatingTabs[(idx + 1) % rotatingTabs.length];
+        return next;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [rotatingTabs]);
+
+  const tabAnimationStyle = useMemo(() => ({ animation: "tabFadeSlide 0.6s ease" }), []);
+  const tabAnimationCss = useMemo(
+    () =>
+      `@keyframes tabFadeSlide {0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}`,
+    []
+  );
 
   const renderTermsContent = () => {
     if (event?.termsHtml) {
@@ -74,6 +131,91 @@ const EventDetailNew = () => {
 
     return <p className="text-white/60 text-sm">No terms provided.</p>;
   };
+
+  const renderFaqTc = () => (
+    <div className="space-y-4">
+      {normalizedFaqs.length > 0 && (
+        <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_50px_rgba(0,0,0,0.4)] overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.05] transition"
+            onClick={() => setFaqOpen((prev) => !prev)}
+          >
+            <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
+              <Megaphone className="h-5 w-5 text-sky-300" />
+              Frequently Asked Questions
+            </span>
+            <ChevronDown
+              className={`h-5 w-5 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {faqOpen && (
+            <div className="border-t border-white/10 divide-y divide-white/5">
+              {normalizedFaqs.map((qa, idx) => (
+                <div key={`faq-${idx}`} className="px-5 py-4">
+                  <p className="text-white font-semibold text-sm md:text-base mb-1">{qa.question}</p>
+                  {qa.answer ? (
+                    <p className="text-white/80 text-sm leading-relaxed">{qa.answer}</p>
+                  ) : (
+                    <p className="text-white/50 text-xs">No answer provided.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.06] transition"
+          onClick={() => setTcOpen((prev) => !prev)}
+        >
+          <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
+            <ShieldCheck className="h-5 w-5 text-emerald-300" />
+            Terms & Conditions
+          </span>
+          <ChevronDown
+            className={`h-5 w-5 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        {tcOpen && (
+          <div className="border-t border-white/10 px-5 py-4 bg-white/[0.015]">
+            {normalizedTerms.length > 0 ? (
+              normalizedTerms.map((t, idx) => (
+                <div key={`term-${idx}`} className="mb-4 last:mb-0">
+                  {t.content ? (
+                    <div
+                      className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
+                      dangerouslySetInnerHTML={{ __html: t.content }}
+                    />
+                  ) : (
+                    renderTermsContent()
+                  )}
+                  {t.lastUpdated && (
+                    <p className="text-[11px] text-white/50 mt-2">Last updated: {new Date(t.lastUpdated).toLocaleDateString()}</p>
+                  )}
+                </div>
+              ))
+            ) : (
+              renderTermsContent()
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderFaqTcBlock = () => (
+    <div className="mt-4 space-y-4" style={tabAnimationStyle}>
+      {showFaqTc ? (
+        renderFaqTc()
+      ) : (
+        <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_45px_rgba(0,0,0,0.4)] p-5">
+          <p className="text-sm text-white/60">No FAQs or terms provided for this event.</p>
+        </div>
+      )}
+    </div>
+  );
 
   const hasSponsors = useMemo(
     () => Array.isArray(event?.sponsors) && event.sponsors.length > 0 && (event?.isSponsored ?? true),
@@ -297,8 +439,8 @@ const EventDetailNew = () => {
       advisory: formatAdvisory(data.advisory?.warnings || data.advisory || data.advisories),
       advisoryItems,
       terms: data.TC?.terms || data.terms || "",
-      termsHtml: data.TC?.content || "",
-      termsUpdated: data.TC?.lastUpdated || "",
+      termsHtml: data.TC?.content || data.termsHtml || "",
+      termsUpdated: data.TC?.lastUpdated || data.termsUpdated || "",
       reviewsList: Array.isArray(data.reviews)
         ? data.reviews.map((r) => ({
             user: r.user?.name || "Guest",
@@ -541,14 +683,75 @@ const EventDetailNew = () => {
       toast.error("Please select at least one ticket");
       return;
     }
-    const authed = await ensureSession();
-    if (authed) {
-      await bookTickets();
-    } else {
-      setAuthModalOpen(true);
-      toast.message("Almost there!", {
-        description: "Sign in to complete your booking in seconds.",
+
+    const selectedTickets = event.tickets
+      .map((ticket) => ({
+        ...ticket,
+        quantity: ticketQuantities[ticket.id] || 0,
+      }))
+      .filter((t) => t.quantity > 0);
+
+    const profileRaw = sessionStorage.getItem("userProfile");
+    const profile = profileRaw ? JSON.parse(profileRaw) : {};
+    const user = {
+      ...profile,
+      ...sessionUser,
+    };
+
+    const userDetails = {
+      fullName: user.fullName || user.name,
+      email: user.email,
+      phone: user.phone || user.contact,
+      addressLine1: user.addressLine1 || user.address,
+      addressLine2: user.addressLine2 || "",
+      state: user.state,
+      city: user.city,
+      pincode: user.pincode,
+    };
+
+    const missingRequired =
+      !userDetails.fullName || !userDetails.email || !userDetails.phone || !userDetails.addressLine1;
+    if (missingRequired) {
+      toast.error("Please complete your profile (name, email, phone, address) before booking.");
+      return;
+    }
+
+    const payload = {
+      eventId: event.id || event.eventId || id,
+      tickets: selectedTickets.map((t) => ({ ticketId: t.id, quantity: t.quantity })),
+      userDetails,
+    };
+
+    try {
+      setBookingLoading(true);
+      const res = await apiFetch("/api/booking/", {
+        method: "POST",
+        body: JSON.stringify(payload),
       });
+      const booking = res?.data || res;
+      if (!booking?.success) {
+        throw new Error(booking?.message || "Booking failed");
+      }
+
+      navigate(`/events/${id}/checkout`, {
+        state: {
+          eventSummary: {
+            id,
+            title: event.title || event.eventTitle || event.name || "Event",
+            date: event.startDate,
+            time: event.time,
+            venue: event.venue,
+            address: event.address,
+            banner: event.flyerImage || event.coverImage || FALLBACK_IMAGE,
+          },
+          tickets: selectedTickets,
+          bookingData: booking.data,
+        },
+      });
+    } catch (err) {
+      toast.error(err?.message || "Unable to create booking. Please try again.");
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -668,6 +871,7 @@ const EventDetailNew = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] text-white">
+      <style>{tabAnimationCss}</style>
       {/* Hero Section */}
       <div className="relative h-[60vh] md:h-[70vh] overflow-hidden">
         <img
@@ -745,37 +949,40 @@ const EventDetailNew = () => {
             </div>
 
             {hasSponsors && (
-              <div className="flex flex-col items-end gap-2 text-right">
+              <div className="flex flex-col items-end gap-3 text-right">
                 {primarySponsor && (
-                  <div className="flex items-center gap-3 text-white/85">
-                    <span className="text-[12px] uppercase tracking-[0.15em] text-white/80 drop-shadow-sm">
-                      powered by
-                    </span>
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.45)] hover:border-white/25 transition-all">
                     <div
-                      className="h-14 w-14 flex items-center justify-center overflow-hidden rounded-full bg-black/25 backdrop-blur-sm border border-white/10"
-                      title={primarySponsor.website || primarySponsor.name}
+                      className="h-16 w-16 md:h-20 md:w-20 flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-white/15 via-black/30 to-black/20 border border-white/20 ring-2 ring-white/20 shadow-[0_15px_45px_rgba(0,0,0,0.55)] hover:scale-105 transition-transform"
+                      title={primarySponsor.name}
+                      aria-label={primarySponsor.name}
                     >
                       <img
                         src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
                         alt={primarySponsor.name}
-                        className="h-full w-full object-contain drop-shadow-lg"
+                        className="h-full w-full object-contain drop-shadow-[0_8px_25px_rgba(0,0,0,0.45)]"
                       />
                     </div>
+                    <span className="text-[11px] md:text-[12px] uppercase tracking-[0.2em] text-white/85 drop-shadow-sm">
+                      powered by
+                    </span>
                   </div>
                 )}
                 {secondarySponsors.length > 0 && (
-                  <div className="flex flex-wrap justify-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-3">
                     {secondarySponsors.map((s) => (
-                      <div
-                        key={s.id}
-                        className="h-9 w-9 flex items-center justify-center overflow-hidden rounded-full bg-black/25 backdrop-blur-sm border border-white/10"
-                        title={s.name}
-                      >
-                        <img
-                          src={s.logo || SPONSOR_PLACEHOLDER}
-                          alt={s.name}
-                          className="h-full w-full object-contain drop-shadow-md"
-                        />
+                      <div key={s.id} className="flex flex-col items-center gap-1">
+                        <div
+                          className="h-12 w-12 flex items-center justify-center overflow-hidden rounded-full bg-black/35 backdrop-blur-sm border border-white/15 hover:border-white/30 hover:scale-105 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+                          title={s.name}
+                          aria-label={s.name}
+                        >
+                          <img
+                            src={s.logo || SPONSOR_PLACEHOLDER}
+                            alt={s.name}
+                            className="h-full w-full object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -793,16 +1000,7 @@ const EventDetailNew = () => {
           <div className="lg:col-span-2 space-y-8">
             {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-[rgba(100,200,255,0.2)]">
-              {[
-                "about",
-                "gallery",
-                "location",
-                "organizer",
-                showArtistsTab ? "artists" : null,
-                hasSponsors ? "sponsors" : null,
-              ]
-                .filter(Boolean)
-                .map((tab) => (
+              {visibleTabs.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -820,7 +1018,7 @@ const EventDetailNew = () => {
             {/* About Tab */}
             {activeTab === "about" && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.04)] rounded-xl">
-                <CardContent className="p-6 md:p-8 space-y-6">
+                <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
                       <Info className="h-6 w-6 text-[#D60024]" />
@@ -883,7 +1081,6 @@ const EventDetailNew = () => {
                 </CardContent>
               </Card>
             )}
-
             {activeTab === "about" && artistsCount === 1 && event.artists?.length === 1 && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_14px_50px_rgba(0,0,0,0.35)] p-5 md:p-6 space-y-4">
                 <h3 className="text-xl font-bold text-white">Artist</h3>
@@ -926,63 +1123,7 @@ const EventDetailNew = () => {
                 </div>
               </div>
             )}
-
-            {/* FAQ then T&C accordions */}
-            <div className="space-y-4">
-              <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_50px_rgba(0,0,0,0.4)] overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.05] transition"
-                  onClick={() => setFaqOpen((prev) => !prev)}
-                >
-                  <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
-                    <Megaphone className="h-5 w-5 text-sky-300" />
-                    Frequently Asked Questions
-                  </span>
-                  <ChevronDown
-                    className={`h-5 w-5 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {faqOpen && (
-                  <div className="border-t border-white/10 divide-y divide-white/5">
-                    {hasFaq ? (
-                      event.questions.map((qa, idx) => (
-                        <div key={`faq-${idx}`} className="px-5 py-4">
-                          <p className="text-white font-semibold text-sm md:text-base mb-1">{qa.question}</p>
-                          {qa.answer ? (
-                            <p className="text-white/80 text-sm leading-relaxed">{qa.answer}</p>
-                          ) : (
-                            <p className="text-white/50 text-xs">No answer provided.</p>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="px-5 py-4 text-sm text-white/60">No FAQs added yet.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.06] transition"
-                  onClick={() => setTcOpen((prev) => !prev)}
-                >
-                  <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
-                    <ShieldCheck className="h-5 w-5 text-emerald-300" />
-                    Terms & Conditions
-                  </span>
-                  <ChevronDown
-                    className={`h-5 w-5 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {tcOpen && (
-                  <div className="border-t border-white/10 px-5 py-4 bg-white/[0.015]">
-                    {renderTermsContent()}
-                  </div>
-                )}
-              </div>
-            </div>
-
+            {activeTab === "about" && renderFaqTcBlock()}
             {/* Advisory Modal */}
             <Dialog open={advisoryModalOpen} onOpenChange={setAdvisoryModalOpen}>
               <DialogContent className="max-w-xl border-white/10 bg-[#0b1224]/95 text-white">
@@ -1015,7 +1156,7 @@ const EventDetailNew = () => {
             {/* Gallery Tab */}
             {activeTab === "gallery" && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
+                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <ImageIcon className="h-6 w-6 text-[#D60024]" />
                     Event Gallery
@@ -1041,11 +1182,12 @@ const EventDetailNew = () => {
                 </CardContent>
               </Card>
             )}
+            {activeTab === "gallery" && renderFaqTcBlock()}
 
             {/* Location Tab */}
             {activeTab === "location" && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
+                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <Navigation className="h-6 w-6 text-[#D60024]" />
                     Location & Venue
@@ -1092,11 +1234,12 @@ const EventDetailNew = () => {
                 </CardContent>
               </Card>
             )}
+            {activeTab === "location" && renderFaqTcBlock()}
 
             {/* Organizer Tab */}
             {activeTab === "organizer" && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
+                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <User className="h-6 w-6 text-[#D60024]" />
                     Organized By
@@ -1164,80 +1307,11 @@ const EventDetailNew = () => {
                 </CardContent>
               </Card>
             )}
+            {activeTab === "organizer" && renderFaqTcBlock()}
 
-            {/* Sponsors Tab */}
-            {activeTab === "sponsors" && hasSponsors && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.08)] rounded-xl">
-                <CardContent className="p-6 md:p-8">
-                  <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-[#D60024]/15 border border-[#D60024]/30 text-[#D60024]">
-                        <Medal className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-white">Sponsors</h2>
-                        <p className="text-[rgba(255,255,255,0.7)] text-sm">
-                          Proud partners making this experience possible
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className="bg-white/10 text-white border border-white/20">
-                      {sponsorsSorted.length} {sponsorsSorted.length === 1 ? "Sponsor" : "Sponsors"}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {sponsorsSorted.map((sponsor) => (
-                      <div
-                        key={sponsor.id}
-                        className={`p-5 rounded-xl border backdrop-blur-sm bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] transition-all duration-200 shadow-[0_10px_40px_rgba(0,0,0,0.35)] ${
-                          sponsor.isPrimary
-                            ? "border-[#D60024]/50 ring-1 ring-[#D60024]/60"
-                            : "border-[rgba(100,200,255,0.2)]"
-                        }`}
-                      >
-                        <div className="flex items-start gap-4">
-                          <img
-                            src={sponsor.logo || SPONSOR_PLACEHOLDER}
-                            alt={sponsor.name}
-                            className="w-16 h-16 rounded-lg object-cover border border-[rgba(255,255,255,0.1)] bg-black/30"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <h3 className="text-lg font-semibold text-white">{sponsor.name}</h3>
-                              {sponsor.isPrimary && (
-                                <Badge className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white border-0">
-                                  Primary Sponsor
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-[rgba(255,255,255,0.75)] text-sm leading-relaxed line-clamp-3">
-                              {sponsor.description || "Key partner supporting this event."}
-                            </p>
-                            {sponsor.website && (
-                              <a
-                                href={sponsor.website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 mt-3 text-[#60a5fa] hover:underline text-sm font-medium"
-                              >
-                                <Globe className="h-4 w-4" />
-                                Visit Website
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Artists Tab */}
             {activeTab === "artists" && event.artists?.length > 0 && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(15,23,42,0.9)] to-[rgba(30,41,59,0.7)] rounded-xl">
-                <CardContent className="p-6 md:p-8 space-y-6">
+                <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-6 w-6 text-[#D60024]" />
                     <h2 className="text-2xl font-bold text-white">Lineup & Artists</h2>
@@ -1399,22 +1473,10 @@ const EventDetailNew = () => {
                     })}
                   </div>
 
-                  <div className="space-y-3 mb-6 p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[rgba(255,255,255,0.75)]">Total Tickets</span>
-                      <span className="font-semibold text-white">{totalTickets}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[rgba(255,255,255,0.75)]">Subtotal</span>
-                      <span className="font-semibold text-white">{formatCurrency(totalAmount)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-[rgba(255,255,255,0.75)]">Booking Fee</span>
-                      <span className="font-semibold text-white">{formatCurrency(totalAmount * 0.05)}</span>
-                    </div>
-                    <div className="pt-3 border-t border-[rgba(100,200,255,0.2)] flex justify-between">
-                      <span className="font-semibold text-white">Total Amount</span>
-                      <span className="text-xl font-bold text-[#D60024]">{formatCurrency(totalAmount * 1.05)}</span>
+                  <div className="space-y-3 mb-4 p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-[rgba(255,255,255,0.75)]">Tickets selected</span>
+                      <span className="font-semibold text-white text-base">{totalTickets}</span>
                     </div>
                   </div>
 

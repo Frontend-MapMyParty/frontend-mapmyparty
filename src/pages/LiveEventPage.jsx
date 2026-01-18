@@ -19,6 +19,7 @@ import {
   Download,
   Users,
 } from "lucide-react";
+import Footer from "@/components/Footer";
 import { getLiveEventSamples, formatDate, formatDateTime } from "@/data/liveEventsSample";
 
 const number = (v) => new Intl.NumberFormat("en-IN").format(v || 0);
@@ -100,7 +101,7 @@ const LiveEventPage = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
       {/* Sidebar */}
       <aside
         className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
@@ -157,7 +158,7 @@ const LiveEventPage = () => {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 lg:p-6 space-y-6">
             {/* Hero */}
@@ -457,6 +458,7 @@ const LiveEventPage = () => {
             </div>
           </div>
         </main>
+        <Footer />
       </div>
     </div>
   );

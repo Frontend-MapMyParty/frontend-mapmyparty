@@ -395,9 +395,9 @@ export default function BrowseEvents({ showPublicHeader = false }) {
               <Sparkles className="h-5 w-5 text-[#D60024]" />
               <h2 className="text-2xl font-bold text-white">Browse by category</h2>
             </div>
-            <p className="text-[rgba(255,255,255,0.65)] text-sm">
+            {/* <p className="text-[rgba(255,255,255,0.65)] text-sm">
               {totalCountLabel} • Only published events from the live API
-            </p>
+            </p> */}
           </div>
 
           <div className="space-y-8">
@@ -454,19 +454,19 @@ export default function BrowseEvents({ showPublicHeader = false }) {
                                 <span className="line-clamp-1">{getEventLocation(event)}</span>
                               </div>
                               <div className="flex flex-wrap gap-2 text-[10px] text-white/80">
-                                {event.category && (
+                                {/* {event.category && (
                                   <Badge className="bg-white/10 text-white border-white/10 px-2 py-0">
                                     {event.category}
                                   </Badge>
-                                )}
+                                )} */}
                                 {event.subCategory && (
                                   <Badge className="bg-white/10 text-white border-white/10 px-2 py-0">
                                     {event.subCategory}
                                   </Badge>
                                 )}
-                                {(event.eventStatus || event.publishStatus) && (
+                                {(event.eventStatus) && (
                                   <Badge className="bg-[#60a5fa]/20 text-[#bfdbfe] border-[#60a5fa]/30 px-2 py-0">
-                                    {[event.eventStatus, event.publishStatus].filter(Boolean).join(" • ")}
+                                    {[event.eventStatus].filter(Boolean)}
                                   </Badge>
                                 )}
                               </div>

@@ -1,112 +1,90 @@
  import { Calendar, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const navLinks = [
+  { label: "Browse Events", to: "/browse-events" },
+  { label: "About", to: "/about" },
+  { label: "Contact", to: "/contact" },
+  { label: "Policies", to: "/policies" },
+];
+
+const socials = [
+  { icon: Facebook, href: "https://facebook.com", label: "Facebook" },
+  { icon: Twitter, href: "https://twitter.com", label: "Twitter" },
+  { icon: Instagram, href: "https://instagram.com", label: "Instagram" },
+  { icon: Linkedin, href: "https://linkedin.com", label: "LinkedIn" },
+];
+
 const Footer = () => {
   return (
-    <footer className="border-t border-border bg-muted/30">
-      <div className="container py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 font-bold text-xl">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span>Map MyParty</span>
+    <footer className="bg-[#090d1a] text-white border-t border-white/10 mt-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D60024] to-[#ff4d67] flex items-center justify-center shadow-[0_10px_35px_rgba(214,0,36,0.35)]">
+              <Calendar className="w-6 h-6 text-white" />
             </div>
-            <p className="text-sm text-muted-foreground">
-              Your premier platform for discovering and managing amazing events.
-            </p>
+            <div className="space-y-1">
+              <p className="text-lg font-semibold">Map MyParty</p>
+              <p className="text-sm text-white/70 max-w-xs leading-relaxed">
+                Discover, manage, and celebrate events with a smooth, modern experience.
+              </p>
+            </div>
           </div>
 
-          {/* Events */}
-          <div>
-            <h3 className="font-semibold mb-4">Events</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link to="/events" className="hover:text-primary transition-colors">
-                  Browse Events
-                </Link>
-              </li>
-              <li>
-                <Link to="/events?category=music" className="hover:text-primary transition-colors">
-                  Music
-                </Link>
-              </li>
-              <li>
-                <Link to="/events?category=conference" className="hover:text-primary transition-colors">
-                  Conferences
-                </Link>
-              </li>
-              <li>
-                <Link to="/events?category=food" className="hover:text-primary transition-colors">
-                  Food & Drink
-                </Link>
-              </li>
-            </ul>
-          </div>
+          <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-6 text-sm">
+            <div className="space-y-3">
+              <p className="font-semibold text-white">Explore</p>
+              <div className="space-y-2 text-white/70">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.to}
+                    to={link.to}
+                    className="block hover:text-white transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
 
-          {/* Company */}
-          <div>
-            <h3 className="font-semibold mb-4">Company</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link to="/about" className="hover:text-primary transition-colors">
-                  About Us
+            <div className="space-y-3">
+              <p className="font-semibold text-white">Support</p>
+              <div className="space-y-2 text-white/70">
+                <Link to="/contact" className="block hover:text-white transition-colors">
+                  Help & Support
                 </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="hover:text-primary transition-colors">
-                  Contact
+                <Link to="/policies" className="block hover:text-white transition-colors">
+                  Terms & Privacy
                 </Link>
-              </li>
-              <li>
-                <Link to="/careers" className="hover:text-primary transition-colors">
-                  Careers
-                </Link>
-              </li>
-              <li>
-                <Link to="/policies" className="hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
+              </div>
+            </div>
 
-          {/* Social */}
-          <div>
-            <h3 className="font-semibold mb-4">Follow Us</h3>
-            <div className="flex gap-3">
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                <Facebook className="w-4 h-4" />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                <Twitter className="w-4 h-4" />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                <Instagram className="w-4 h-4" />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                <Linkedin className="w-4 h-4" />
-              </a>
+            <div className="space-y-3">
+              <p className="font-semibold text-white">Connect</p>
+              <div className="flex gap-3">
+                {socials.map(({ icon: Icon, href, label }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    aria-label={label}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-10 h-10 rounded-full border border-white/15 bg-white/5 flex items-center justify-center hover:border-white/40 hover:bg-white/10 transition"
+                  >
+                    <Icon className="w-4 h-4" />
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} EventHub. All rights reserved.</p>
+        <div className="pt-6 border-t border-white/10 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-0 md:justify-between text-xs text-white/60">
+          <p>© {new Date().getFullYear()} Map MyParty. All rights reserved.</p>
+          <p className="text-white/50">
+            Built for seamless event discovery and management.
+          </p>
         </div>
       </div>
     </footer>

@@ -11,7 +11,6 @@ import {
   Star,
 } from "lucide-react";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import EventCard from "@/components/EventCard";
 import heroImage from "@/assets/hero-image.jpg";
@@ -398,7 +397,6 @@ const LandingPage = () => {
         </section>
       </main>
 
-      <Footer />
     </div>
   );
 };

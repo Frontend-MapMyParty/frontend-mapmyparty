@@ -272,8 +272,8 @@ const Header = ({
           <nav className="container py-4 flex flex-col gap-4">
             {isAttendee && (
               <>
-                <Link
-                  to="/events"
+                 <Link
+                  to="/browse-events"
                   className="text-sm font-medium hover:text-primary transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
