@@ -169,9 +169,10 @@ const OrganizerProfileContent = ({ user }) => {
     if (isSaving) return;
     setIsSaving(true);
     try {
-      const payload = {
+      const allowed = {
         name: editData.name,
         description: editData.description,
+        gstNumber: editData.gstNumber,
         instagram: editData.instagram,
         linkedin: editData.linkedin,
         facebook: editData.facebook,
@@ -181,6 +182,11 @@ const OrganizerProfileContent = ({ user }) => {
         contact: editData.contact,
         email: editData.email,
       };
+      const payload = Object.fromEntries(
+        Object.entries(allowed).filter(
+          ([, v]) => v !== undefined && v !== null && String(v).trim() !== ""
+        )
+      );
       const res = await apiFetch("organizer/me/profile", {
         method: "PATCH",
         body: JSON.stringify(payload),

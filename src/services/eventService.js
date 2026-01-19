@@ -234,6 +234,9 @@ export async function updateEventStep1(eventId, eventData) {
     formData.append("description", eventData.description || "");
     formData.append("category", eventData.mainCategory);
     formData.append("subCategory", eventData.subcategory);
+    if (eventData.eventType) {
+      formData.append("type", eventData.eventType);
+    }
     
     if (eventData.flyerImage) {
       formData.append("flyerImage", eventData.flyerImage);
@@ -262,6 +265,7 @@ export async function updateEventStep1(eventId, eventData) {
       description: eventData.description || "",
       category: eventData.mainCategory,
       subCategory: eventData.subcategory,
+      ...(eventData.eventType ? { type: eventData.eventType } : {}),
     };
 
     console.log("📤 Sending JSON only:", JSON.stringify(jsonData, null, 2));

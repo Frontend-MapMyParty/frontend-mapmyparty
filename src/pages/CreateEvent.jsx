@@ -33,7 +33,7 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, uploadTempImage, createEventStep1, persistFlyerUrl, persistGalleryUrls } from "@/services/eventService";
+import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, uploadTempImage, createEventStep1, persistFlyerUrl, persistGalleryUrls } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
 import { Calendar } from "@/components/ui/calendar";
@@ -1050,47 +1050,99 @@ const CreateEvent = () => {
         if (hasExistingDraft) {
           // UPDATE existing event (user went back to step 1)
           console.log("🔄 Updating existing draft event:", backendEventId);
-          console.log("📝 Text fields changed?", textFieldsChanged);
+          const hasAnyChanges = textFieldsChanged || imagesChanged;
+          console.log("📝 Text fields changed?", textFieldsChanged, "🖼️ Images changed?", imagesChanged);
           
           try {
-            // Only update text fields; images already handled via direct uploads
-            if (textFieldsChanged) {
-              console.log("📝 Text fields changed - using PATCH /api/event/update-event/:id");
-              
-              const eventData = {
-                title: eventTitle,
-                description: eventDescription,
-                category: mainCategory,
-                subCategory: selectedCategories[0] || "",
-              };
-              
-              // Add type if it exists
-              if (currentEventType) {
-                eventData.type = currentEventType;
-              }
-              
-              console.log("📤 Sending update payload:", eventData);
-              
-              response = await apiFetch(`api/event/update-event/${backendEventId}`, {
-                method: 'PATCH',
-                body: JSON.stringify(eventData),
-              });
-              
-              toast.success("Event details updated successfully!");
-              
-              // Reset flag after successful update
-              setTextFieldsChanged(false);
-            } else {
-              // No text changes detected
-              console.log("ℹ️ No text field changes detected in Step 1");
+            if (!hasAnyChanges) {
+              console.log("ℹ️ No field or image changes detected in Step 1");
               toast.info("No changes to update");
               setCurrentStep(currentStep + 1);
               return;
             }
+
+            // Upload media first (backend /update-event is JSON-only)
+            if (imagesChanged) {
+              if (coverImageFile) {
+                try {
+                  const coverResp = await uploadFlyerImage(backendEventId, coverImageFile);
+                  const coverData = coverResp.data || coverResp;
+                  const imageUrl = coverData.flyerImage || coverData.url;
+                  if (imageUrl) setCoverImage(imageUrl);
+                } catch (err) {
+                  console.error("❌ Failed to upload flyer image during edit:", err);
+                  toast.error(err?.message || "Failed to upload cover image");
+                  return;
+                }
+              }
+
+              if (galleryImageFiles.length > 0) {
+                try {
+                  const galleryResp = await uploadGalleryImages(backendEventId, galleryImageFiles);
+                  const respData = galleryResp.data || galleryResp;
+                  const galleryImagesData = Array.isArray(respData.images)
+                    ? respData.images
+                    : Array.isArray(respData.galleryImages)
+                      ? respData.galleryImages
+                      : [];
+
+                  const newImageUrls = galleryImagesData
+                    .filter((img) => (img.type ? img.type === "EVENT_GALLERY" : true))
+                    .map((img) => img.url || img);
+
+                  const newImageIdMap = {};
+                  galleryImagesData.forEach((img) => {
+                    const url = img.url || img;
+                    const id = img.id || img._id;
+                    if (url && id) newImageIdMap[url] = id;
+                  });
+
+                  const updatedGallery = [...existingGalleryUrls, ...newImageUrls];
+                  setExistingGalleryUrls(updatedGallery);
+                  setGalleryImages(updatedGallery);
+                  setGalleryImageIds((prev) => ({ ...prev, ...newImageIdMap }));
+                } catch (err) {
+                  console.error("❌ Failed to upload gallery images during edit:", err);
+                  toast.error(err?.message || "Failed to upload gallery images");
+                  return;
+                }
+              }
+
+              // Clear pending files after uploads
+              setImagesChanged(false);
+              setGalleryImageFiles([]);
+              setCoverImageFile(null);
+            }
+
+            // If only images changed, advance without JSON update
+            if (!textFieldsChanged) {
+              console.log("ℹ️ Only image changes detected; skipping update-event payload");
+              setCurrentStep(currentStep + 1);
+              return;
+            }
+
+            const eventData = {
+              eventTitle,
+              description: eventDescription,
+              mainCategory,
+              subcategory: selectedCategories[0] || "",
+              ...(currentEventType ? { eventType: currentEventType } : {}),
+            };
+
+            console.log("📤 Sending JSON update payload via updateEventStep1", eventData);
+
+            response = await updateEventStep1(backendEventId, eventData);
             
+            toast.success("Event details updated successfully!");
+            
+            // Reset change flags after successful update
+            setTextFieldsChanged(false);
+            setImagesChanged(false);
+            setGalleryImageFiles([]);
+            setCoverImageFile(null);
           } catch (updateError) {
             console.error("⚠️ Update failed:", updateError);
-            toast.error("Failed to update event. Please try again.");
+            toast.error(updateError?.message || "Failed to update event. Please try again.");
             return;
           }
         } else {
