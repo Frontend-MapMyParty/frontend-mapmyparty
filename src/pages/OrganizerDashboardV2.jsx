@@ -47,6 +47,7 @@ const OrganizerProfileContent = ({ user }) => {
     id: payload.id || "organizer-uuid",
     name: payload.name || "Awesome Events",
     description: payload.description || "We organize the best events in town!",
+    gstNumber: payload.gstNumber || "",
     logo: payload.logo || "",
     state: payload.state || "California",
     address: payload.address || "123 Main St, Los Angeles, CA",
@@ -839,6 +840,24 @@ const OrganizerProfileContent = ({ user }) => {
                 </div>
               </div>
 
+              {/* GST */}
+              {editData.gstNumber && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Tax Information</h3>
+                  </div>
+                  <div className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0 border border-emerald-500/30">
+                      <BadgeCheck className="w-5 h-5 text-emerald-100" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-white/50">GST Number</p>
+                      <p className="text-base font-semibold text-white mt-1">{editData.gstNumber}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* About */}
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">About Organizer</h3>
@@ -963,24 +982,17 @@ const OrganizerProfileContent = ({ user }) => {
                     value={editData.contact}
                     onChange={(e) => handleInputChange("contact", e.target.value)}
                     className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                    placeholder="+1234567890"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-white/80">State</label>
+                  <label className="block text-sm font-medium text-white/80">GST Number</label>
                   <input
                     type="text"
-                    value={editData.state}
-                    onChange={(e) => handleInputChange("state", e.target.value)}
+                    value={editData.gstNumber}
+                    onChange={(e) => handleInputChange("gstNumber", e.target.value)}
                     className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="block text-sm font-medium text-white/80">Address</label>
-                  <input
-                    type="text"
-                    value={editData.address}
-                    onChange={(e) => handleInputChange("address", e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                    placeholder="22AAAAA0000A1Z5"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
@@ -989,6 +1001,7 @@ const OrganizerProfileContent = ({ user }) => {
                     value={editData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
                     className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none min-h-[120px]"
+                    maxLength={2000}
                   />
                 </div>
               </div>
@@ -1168,8 +1181,21 @@ const OrganizerDashboardV2 = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [footerMenuOpen, setFooterMenuOpen] = useState(false);
+  const footerMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Close footer menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (footerMenuRef.current && !footerMenuRef.current.contains(e.target)) {
+        setFooterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Note: Authentication is handled by ProtectedRoute wrapper
   // No need for redundant auth check here
@@ -1309,9 +1335,8 @@ const OrganizerDashboardV2 = () => {
         {/* Sidebar Footer with profile + logout */}
         <div className="mt-auto p-4 border-t border-white/10">
           <div
+            ref={footerMenuRef}
             className="relative bg-gradient-to-br from-white/5 via-white/0 to-blue-500/5 border border-white/10 rounded-xl p-3 shadow-lg shadow-black/20"
-            onMouseEnter={() => setFooterMenuOpen(true)}
-            onMouseLeave={() => setFooterMenuOpen(false)}
           >
             <button
               onClick={() => setFooterMenuOpen((v) => !v)}
