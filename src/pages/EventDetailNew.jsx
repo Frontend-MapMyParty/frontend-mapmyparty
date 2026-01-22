@@ -872,123 +872,112 @@ const EventDetailNew = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] text-white">
       <style>{tabAnimationCss}</style>
-      {/* Hero Section */}
-      <div className="relative h-[60vh] md:h-[70vh] overflow-hidden">
-        <img
-          src={event.image}
-          alt={event.title}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
-        
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="absolute top-6 left-6 bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
-        >
-          <ChevronLeft className="h-5 w-5 mr-1" />
-          Back
-        </Button>
 
-        {/* Action Buttons */}
-        <div className="absolute top-6 right-6 flex gap-2">
-          {/* <Button
-            variant="ghost"
-            onClick={() => navigate(`/events/${event.id}/overview`)}
-            className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
-            title="View Overview"
-          >
-            <BookOpen className="h-5 w-5" />
-          </Button> */}
-          {/* <Button
-            variant="ghost"
-            onClick={() => setIsLiked(!isLiked)}
-            className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
-            title={isLiked ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            <Heart className={`h-5 w-5 ${isLiked ? 'fill-[#D60024] text-[#D60024]' : ''}`} />
-          </Button> */}
-          <Button
-            variant="ghost"
-            onClick={handleShare}
-            className="bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 border border-[rgba(100,200,255,0.3)]"
-            title="Share event"
-          >
-            <Share2 className="h-5 w-5" />
-          </Button>
-        </div>
+      {/* Hero Section - compact split image/details */}
+      <div className="relative overflow-hidden pt-4 md:pt-6">
+        <div className="w-full relative px-3 md:px-6">
+          <div className="grid lg:grid-cols-[0.65fr,0.35fr] gap-0 items-stretch">
+            {/* Left: Hero Image full bleed */}
+            <div className="relative overflow-hidden min-h-[520px] h-full rounded-none lg:rounded-none bg-[#0a0c18]">
+              <img
+                src={event.image}
+                alt={event.title}
+                className="w-full h-full object-contain"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
 
-        {/* Event Info Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10">
-          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="absolute top-4 left-4 flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate(-1)}
+                  className="bg-black/55 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md"
+                >
+                  <ChevronLeft className="h-5 w-5 mr-1" />
+                  Back
+                </Button>
+              </div>
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={handleShare}
+                  className="bg-black/55 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md"
+                  title="Share event"
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
                 {event.subCategory && (
-                  <Badge className="bg-white/15 text-white border border-white/25 px-3 py-1">
+                  <Badge className="bg-[#D60024]/85 text-white border border-[#ff8da8]/40 px-3 py-1 rounded-full">
                     {event.subCategory}
                   </Badge>
                 )}
-              </div>
-              {/* <Badge className="bg-[#D60024] text-white mb-4 px-3 py-1">{event.category}</Badge> */}
-              <h1 className="text-4xl md:text-6xl font-bold text-white">{event.title}</h1>
-              <div className="flex flex-wrap gap-4 md:gap-6 text-white/90">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-[#60a5fa]" />
-                  <span>{formatDate(event.startDate)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-[#60a5fa]" />
-                  <span>{formatTime(event.startDate)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-[#60a5fa]" />
-                  <span>{event.location}</span>
-                </div>
+                {event.category && (
+                  <Badge className="bg-white/15 text-white border border-white/20 px-3 py-1 rounded-full">
+                    {event.category}
+                  </Badge>
+                )}
+                {primarySponsor && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg ml-auto">
+                    <img
+                      src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
+                      alt={primarySponsor.name}
+                      className="h-10 w-10 object-contain rounded-full bg-white/10 p-1"
+                    />
+                    <span className="text-[11px] uppercase tracking-[0.15em] text-white/80">Powered by</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {hasSponsors && (
-              <div className="flex flex-col items-end gap-3 text-right">
-                {primarySponsor && (
-                  <div className="flex items-center gap-3 px-3 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.45)] hover:border-white/25 transition-all">
-                    <div
-                      className="h-16 w-16 md:h-20 md:w-20 flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-white/15 via-black/30 to-black/20 border border-white/20 ring-2 ring-white/20 shadow-[0_15px_45px_rgba(0,0,0,0.55)] hover:scale-105 transition-transform"
-                      title={primarySponsor.name}
-                      aria-label={primarySponsor.name}
-                    >
-                      <img
-                        src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
-                        alt={primarySponsor.name}
-                        className="h-full w-full object-contain drop-shadow-[0_8px_25px_rgba(0,0,0,0.45)]"
-                      />
-                    </div>
-                    <span className="text-[11px] md:text-[12px] uppercase tracking-[0.2em] text-white/85 drop-shadow-sm">
-                      powered by
-                    </span>
+            {/* Right: Compact Details */}
+            <div className="relative bg-[linear-gradient(135deg,rgba(13,17,30,0.94),rgba(10,10,16,0.92))] backdrop-blur-xl shadow-[0_30px_90px_rgba(0,0,0,0.7)] p-7 md:p-10 space-y-7 rounded-none lg:rounded-none lg:border-l border-white/10 flex flex-col justify-center">
+              <div className="space-y-4 text-center lg:text-left">
+                <h1 className="text-4xl md:text-5xl font-extrabold leading-tight drop-shadow-[0_8px_24px_rgba(255,77,103,0.25)] text-white">{event.title}</h1>
+                <div className="w-20 h-1 rounded-full bg-gradient-to-r from-[#D60024] via-[#ff4d67] to-[#5ba2ff] mx-auto lg:mx-0" />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="rounded-2xl border border-[#5ba2ff]/35 bg-[#0f1a2e]/80 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
+                  <Calendar className="h-10 w-10 text-[#5ba2ff] p-2 rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/35" />
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/55">Date & Time</p>
+                    <p className="text-white font-semibold">{formatDate(event.startDate)}</p>
+                    <p className="text-white/75 text-sm">{formatTime(event.startDate)}</p>
                   </div>
-                )}
-                {secondarySponsors.length > 0 && (
-                  <div className="flex flex-wrap justify-end gap-3">
+                </div>
+                <div className="rounded-2xl border border-[#5ba2ff]/35 bg-[#0f1a2e]/80 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
+                  <MapPin className="h-10 w-10 text-[#5ba2ff] p-2 rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/35" />
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/55">Venue</p>
+                    <p className="text-white font-semibold">{event.venue}</p>
+                    <p className="text-white/75 text-sm line-clamp-2">{event.address}</p>
+                  </div>
+                </div>
+              </div>
+
+              {secondarySponsors.length > 0 && (
+                <div className="space-y-2 text-center lg:text-left">
+                  <p className="text-xs uppercase tracking-[0.15em] text-white/55">Partners</p>
+                  <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
                     {secondarySponsors.map((s) => (
-                      <div key={s.id} className="flex flex-col items-center gap-1">
-                        <div
-                          className="h-12 w-12 flex items-center justify-center overflow-hidden rounded-full bg-black/35 backdrop-blur-sm border border-white/15 hover:border-white/30 hover:scale-105 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
-                          title={s.name}
-                          aria-label={s.name}
-                        >
-                          <img
-                            src={s.logo || SPONSOR_PLACEHOLDER}
-                            alt={s.name}
-                            className="h-full w-full object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
-                          />
-                        </div>
+                      <div
+                        key={s.id}
+                        className="h-12 w-12 flex items-center justify-center rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/30 p-2 shadow-inner"
+                        title={s.name}
+                      >
+                        <img
+                          src={s.logo || SPONSOR_PLACEHOLDER}
+                          alt={s.name}
+                          className="h-full w-full object-contain"
+                        />
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

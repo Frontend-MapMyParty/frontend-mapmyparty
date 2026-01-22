@@ -2664,7 +2664,7 @@ const CreateEvent = () => {
             style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
           >
             <CardHeader
-              className="border-b border-white/10 bg-transparent"
+              className="border-b border-white/10 bg-transparent pb-5"
               style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
             >
               <CardTitle className="text-xl text-white flex items-center gap-2">
@@ -2674,7 +2674,7 @@ const CreateEvent = () => {
                 {steps[currentStep - 1].title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6 text-gray-100">
+            <CardContent className="space-y-6 text-gray-100 pt-7">
               {/* Step 1: Event Details + Images */}
               {currentStep === 1 && (
                 <div className="space-y-8">
@@ -3938,13 +3938,13 @@ const CreateEvent = () => {
 
                 return (
                   <div className="space-y-6 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0c1324] p-4 md:p-6 rounded-2xl border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
-                    <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col gap-2">
+                    {/* <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.7)]" />
                         <h3 className="text-lg font-semibold">Review before publishing</h3>
                       </div>
                       <p className="text-sm text-white/70">Check what’s filled and what’s missing. You can go back to edit anything.</p>
-                    </div>
+                    </div> */}
 
                     <div className="flex flex-wrap items-center gap-3 border border-white/10 bg-white/5 rounded-xl p-4">
                       <div className="space-y-1">
