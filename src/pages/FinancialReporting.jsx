@@ -17,11 +17,20 @@ import {
   Loader2,
   RefreshCw,
   AlertTriangle,
+  Globe2,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "@/config/api";
 
 const formatINR = (value) => `₹${(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+const formatNumber = (value, fallback = "0") => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return fallback;
+  return Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+};
+const toTitleCase = (str = "") => str.replace(/_/g, " ").replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+const sumValues = (arr = [], key = "value") => arr.reduce((acc, cur) => acc + (Number(cur?.[key]) || 0), 0);
 
 const glassCard = "bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md shadow-lg shadow-black/20";
 
@@ -36,6 +45,53 @@ const buildQuery = (path, params = {}) => {
 const unwrap = (res) => res?.data ?? res?.result ?? res;
 
 const palette = ["#ef4444", "#22c55e", "#3b82f6", "#a855f7", "#06b6d4", "#f97316"];
+
+const normalizeBreakdown = (raw) => {
+  const source = unwrap(raw);
+  const breakdown = source?.breakdown || source?.data || source || {};
+  if (Array.isArray(breakdown)) return breakdown;
+  return Object.entries(breakdown || {}).map(([label, val]) => ({
+    label: toTitleCase(label),
+    value: typeof val === "object" ? val.value ?? val.count ?? val.ticketsSold ?? 0 : val ?? 0,
+  }));
+};
+
+const normalizeTicketTypes = (raw) => {
+  const obj = unwrap(raw) || {};
+  const base = obj.breakdown || obj.data || obj || {};
+  return Object.entries(base || {}).map(([label, val]) => ({
+    label: toTitleCase(label),
+    count: val.ticketCount ?? val.count ?? 0,
+    value: val.ticketsSold ?? val.soldQuantity ?? val.value ?? 0,
+  }));
+};
+
+const normalizeGeography = (raw) => {
+  const geo = unwrap(raw)?.geography || unwrap(raw)?.breakdown || unwrap(raw)?.data || unwrap(raw) || {};
+  const states = geo.states || {};
+  const cities = geo.cities || geo.city || {};
+  const stateArr = Object.entries(states).map(([label, value]) => ({ label: toTitleCase(label), value }));
+  const cityArr = Object.entries(cities).map(([label, value]) => ({ label: toTitleCase(label), value }));
+  return [...stateArr, ...cityArr].sort((a, b) => (b.value || 0) - (a.value || 0));
+};
+
+const normalizeTrend = (raw) => {
+  const list = unwrap(raw) || [];
+  if (Array.isArray(list)) {
+    return list.map((row, idx) => ({
+      label: row.label || row.date || `Day ${idx + 1}`,
+      revenue: row.amount ?? row.revenue ?? row.total ?? 0,
+      bookings: row.count ?? row.bookings ?? 0,
+    }));
+  }
+  const revenue = list.revenue || [];
+  const bookings = list.bookings || [];
+  return revenue.map((row, idx) => ({
+    label: row.date || row.label || `Day ${idx + 1}`,
+    revenue: row.amount ?? row.revenue ?? row.total ?? 0,
+    bookings: bookings[idx]?.count ?? bookings[idx]?.bookings ?? 0,
+  }));
+};
 
 const SimplePieChart = ({ data, size = 200 }) => {
   if (!data?.length) return null;
@@ -127,12 +183,20 @@ const FinancialReporting = () => {
   const [endDate, setEndDate] = useState("");
 
   const [summary, setSummary] = useState({});
+  const [analytics, setAnalytics] = useState(null);
   const [revenueTrend, setRevenueTrend] = useState([]);
   const [eventTypeMix, setEventTypeMix] = useState([]);
   const [topEvents, setTopEvents] = useState([]);
+  const [breakdowns, setBreakdowns] = useState({ status: [], category: [], ticketType: [], bookingStatus: [], geography: [] });
   const [payouts, setPayouts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [gstSplit, setGstSplit] = useState([]);
+  const [refunds, setRefunds] = useState([]);
+  const [eventOptions, setEventOptions] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState("");
+  const [eventTickets, setEventTickets] = useState([]);
+  const [eventTimeline, setEventTimeline] = useState([]);
+  const [eventOverview, setEventOverview] = useState(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -162,21 +226,25 @@ const FinancialReporting = () => {
     setLoading(true);
     setError("");
     const mainPeriod = computedPeriod;
-    const periodForAnalytics = mainPeriod === "custom" ? "custom" : mainPeriod;
+    const periodForAnalytics = mainPeriod === "custom" ? "custom" : mainPeriod === "all" ? "year" : mainPeriod;
     const periodForOthers = mainPeriod === "custom" ? "month" : mainPeriod; // backend for trends/top/breakdown: day|week|month|year|all
+    const trendPeriod = periodForOthers === "all" ? "year" : periodForOthers;
     const commonAnalytics = { period: periodForAnalytics, startDate, endDate };
     const commonOthers = { period: periodForOthers, startDate, endDate };
     try {
       const results = await Promise.allSettled([
         apiFetch(buildQuery("organizer/me/statistics", commonAnalytics), { method: "GET" }),
         apiFetch(buildQuery("organizer/me/analytics", commonAnalytics), { method: "GET" }),
-        apiFetch(buildQuery("organizer/me/analytics/trends", { ...commonOthers, metric: "revenue" }), { method: "GET" }),
+        apiFetch(buildQuery("organizer/me/analytics/trends", { ...commonOthers, period: trendPeriod, metric: "revenue" }), {
+          method: "GET",
+        }),
         apiFetch(buildQuery("organizer/me/analytics/top-events", { ...commonOthers, sortBy: "revenue", limit: 5 }), {
           method: "GET",
         }),
-        apiFetch(buildQuery("organizer/me/analytics/breakdown", { ...commonOthers, type: "category" }), {
-          method: "GET",
-        }),
+        apiFetch(buildQuery("organizer/me/analytics/breakdown", { ...commonOthers, type: "status" }), { method: "GET" }),
+        apiFetch(buildQuery("organizer/me/analytics/breakdown", { ...commonOthers, type: "category" }), { method: "GET" }),
+        apiFetch(buildQuery("organizer/me/analytics/breakdown", { ...commonOthers, type: "geography" }), { method: "GET" }),
+        apiFetch(buildQuery("organizer/me/analytics/breakdown", { ...commonOthers, type: "ticketType" }), { method: "GET" }),
       ]);
 
       const pick = (idx) => (results[idx].status === "fulfilled" ? results[idx].value : null);
@@ -186,60 +254,105 @@ const FinancialReporting = () => {
         .map(({ i, r }) => ({ i, msg: r.reason?.message || r.reason?.errorMessage || "Request failed" }));
 
       const stats = unwrap(pick(0)) || {};
-      const analytics = unwrap(pick(1)) || {};
+      const analyticsRes = unwrap(pick(1)) || {};
       const trend = unwrap(pick(2)) || {};
       const top = unwrap(pick(3)) || [];
-      const categories = unwrap(pick(4)) || [];
+      const statusBreakdownRes = pick(4);
+      const categoryBreakdownRes = pick(5);
+      const geoBreakdownRes = pick(6);
+      const ticketTypeBreakdownRes = pick(7);
 
       const normalizedTop = top.items || top.events || top.topEvents || top || [];
 
       const revenue =
-        stats.grossSales ?? stats.totalRevenue ?? analytics.grossSales ?? analytics.totalRevenue ?? analytics.revenue;
+        stats?.data?.revenue?.overall ??
+        stats.grossSales ??
+        stats.totalRevenue ??
+        analyticsRes.grossSales ??
+        analyticsRes.totalRevenue ??
+        analyticsRes.revenue;
       const platformFees =
-        stats.platformFees ?? analytics.platformFees ?? analytics.feeTotal ?? analytics.platformFeeTotal;
-      const gstCollected = stats.gstCollected ?? stats.gstTotal ?? analytics.gstCollected ?? analytics.gstTotal;
-      const refunds = stats.refunds ?? analytics.refunds ?? analytics.refundTotal;
-      const ticketsSold = stats.ticketsSold ?? analytics.ticketsSold;
-      const avgTicketPrice = analytics.avgTicketPrice ?? stats.avgTicketPrice;
-      const successRate = stats.successRate ?? analytics.successRate;
+        stats?.data?.platformFees?.overall ??
+        stats.platformFees ??
+        analyticsRes.platformFees ??
+        analyticsRes.feeTotal ??
+        analyticsRes.platformFeeTotal;
+      const gstCollected =
+        stats?.data?.gstCollected?.overall ?? stats.gstCollected ?? stats.gstTotal ?? analyticsRes.gstCollected ?? analyticsRes.gstTotal;
+      const refundsVal = stats?.data?.refunds?.overall ?? stats.refunds ?? analyticsRes.refunds ?? analyticsRes.refundTotal;
+      const ticketsSold = stats?.data?.ticketSales?.overall ?? stats.ticketsSold ?? analyticsRes.ticketsSold;
+      const avgTicketPrice = analyticsRes.averageTicketPrice ?? analyticsRes.avgTicketPrice ?? stats.avgTicketPrice;
+      const successRate = stats.successRate ?? analyticsRes.successRate;
+
+      const payoutsList = analyticsRes.payouts || stats.payouts || [];
+      const refundsNumeric = typeof refundsVal === "number" ? refundsVal : Object.values(analyticsRes.refunds || {}).reduce((acc, val) => acc + (val.amountCents ?? val.amount ?? 0), 0) / 100;
 
       setSummary({
-        grossSales: revenue || 0,
-        platformFees: platformFees || 0,
-        gstCollected: gstCollected || 0,
-        refunds: refunds || 0,
+        grossSales: Number(revenue) || 0,
+        platformFees: Number(platformFees) || 0,
+        gstCollected: Number(gstCollected) || 0,
+        refunds: refundsNumeric || 0,
         payoutsCompleted:
-          analytics.payoutsCompleted ??
-          analytics.payouts?.find?.((p) => (p.status || "").toUpperCase() === "COMPLETED")?.amount ??
+          analyticsRes.payoutsCompleted ??
+          payoutsList.find?.((p) => (p.status || "").toUpperCase() === "COMPLETED")?.amount ??
           0,
         payoutsPending:
-          analytics.payoutsPending ??
-          analytics.payouts?.find?.((p) => (p.status || "").toUpperCase() === "PENDING")?.amount ??
+          analyticsRes.payoutsPending ??
+          payoutsList.find?.((p) => (p.status || "").toUpperCase() === "PENDING")?.amount ??
           0,
-        ticketsSold: ticketsSold || 0,
-        avgTicketPrice: avgTicketPrice || 0,
-        successRate: successRate || 0,
+        ticketsSold: Number(ticketsSold) || 0,
+        avgTicketPrice: Number(avgTicketPrice) || 0,
+        successRate: Number(successRate) || 0,
       });
 
-      setRevenueTrend(trend.timeline || trend.trend || trend.data || trend || []);
+      setAnalytics(analyticsRes);
+      setRevenueTrend(normalizeTrend(trend));
 
-      setTopEvents(normalizedTop);
-      setPayouts(analytics.payouts || stats.payouts || []);
-      setTransactions(analytics.transactions || analytics.activity || []);
+      setTopEvents(
+        normalizedTop.map((evt, idx) => ({
+          event: evt.event || evt,
+          revenue: evt.revenue ?? evt.net ?? evt.total ?? evt.amount ?? 0,
+          bookings: evt.bookings ?? evt.count ?? 0,
+          ticketsSold: evt.ticketsSold ?? evt.sold ?? 0,
+          id: evt.eventId || evt.id || evt.event?.id || idx,
+        }))
+      );
+      setEventOptions(
+        normalizedTop.map((evt, idx) => ({
+          event: evt.event || evt,
+          eventId: evt.eventId || evt.id || evt.event?.id || idx,
+        }))
+      );
+      setPayouts(analyticsRes.payouts || stats.payouts || []);
+      setTransactions(analyticsRes.transactions || analyticsRes.activity || []);
 
-      const gstData = stats.gstSplit || analytics.gstSplit || [];
+      const gstData = stats.gstSplit || analyticsRes.gstSplit || [];
       setGstSplit(Array.isArray(gstData) ? gstData : []);
 
-      const mixSource = categories.items || categories.breakdown || categories.data || categories;
+      setBreakdowns({
+        status: normalizeBreakdown(statusBreakdownRes || analyticsRes?.breakdown?.byStatus),
+        category: normalizeBreakdown(categoryBreakdownRes || analyticsRes?.breakdown?.byCategory),
+        ticketType: normalizeTicketTypes(ticketTypeBreakdownRes || analyticsRes?.breakdown?.byTicketType),
+        bookingStatus: normalizeBreakdown(analyticsRes?.breakdown?.byBookingStatus),
+        geography: normalizeGeography(geoBreakdownRes || analyticsRes?.geography),
+      });
+
+      const categoryMix = normalizeBreakdown(categoryBreakdownRes || analyticsRes?.breakdown?.byCategory);
       setEventTypeMix(
-        Array.isArray(mixSource)
-          ? mixSource.map((c, idx) => ({
-              name: c.label || c.category || c.name || `Type ${idx + 1}`,
-              value: c.value ?? c.percentage ?? c.total ?? 0,
-              color: palette[idx % palette.length],
-            }))
-          : []
+        categoryMix.map((c, idx) => ({
+          name: c.label || c.category || c.name || `Type ${idx + 1}`,
+          value: c.value ?? c.percentage ?? c.total ?? 0,
+          color: palette[idx % palette.length],
+        }))
       );
+
+      const refundsRaw = analyticsRes.refunds || {};
+      const refundArr = Object.entries(refundsRaw || {}).map(([label, val]) => ({
+        label: toTitleCase(label),
+        count: val.count ?? val.value ?? 0,
+        amount: (val.amountCents ?? val.amount ?? 0) / 100,
+      }));
+      setRefunds(refundArr);
       if (failures.length) {
         const first = failures[0]?.msg;
         setError(failures.length === results.length ? first || "Failed to load financial reporting" : `Partial load: ${first}`);
@@ -271,12 +384,26 @@ const FinancialReporting = () => {
     () =>
       (Array.isArray(revenueTrend) ? revenueTrend : []).map((row, idx) => ({
         label: row.label || row.date || `Period ${idx + 1}`,
-        gross: row.gross ?? row.revenue ?? row.total ?? 0,
+        gross: row.revenue ?? row.amount ?? row.gross ?? row.total ?? 0,
         payouts: row.payouts ?? row.paid ?? row.settled ?? 0,
         refunds: row.refunds ?? row.refund ?? 0,
+        bookings: row.bookings ?? row.count ?? 0,
       })),
     [revenueTrend]
   );
+
+  const safeBreakdowns = useMemo(
+    () => ({
+      status: Array.isArray(breakdowns?.status) ? breakdowns.status : [],
+      category: Array.isArray(breakdowns?.category) ? breakdowns.category : [],
+      ticketType: Array.isArray(breakdowns?.ticketType) ? breakdowns.ticketType : [],
+      bookingStatus: Array.isArray(breakdowns?.bookingStatus) ? breakdowns.bookingStatus : [],
+      geography: Array.isArray(breakdowns?.geography) ? breakdowns.geography : [],
+    }),
+    [breakdowns]
+  );
+
+  const maxBooking = useMemo(() => Math.max(...chartTrend.map((t) => t.bookings || 0), 1), [chartTrend]);
 
   return (
     <div className="min-h-screen text-white">
@@ -313,10 +440,11 @@ const FinancialReporting = () => {
         {/* Period Selector */}
         <div className="flex flex-wrap gap-2">
           {[
-            { value: "7days", label: "Weekly" },
-            { value: "30days", label: "Monthly" },
-            { value: "90days", label: "Quarterly" },
-            { value: "365days", label: "Yearly" },
+            { value: "day", label: "Daily" },
+            { value: "week", label: "Weekly" },
+            { value: "month", label: "Monthly" },
+            { value: "year", label: "Yearly" },
+            { value: "all", label: "All" },
           ].map((opt) => (
             <button
               key={opt.value}

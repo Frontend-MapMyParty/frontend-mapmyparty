@@ -98,9 +98,12 @@ const EventDetailNew = () => {
   }, [rotatingTabs]);
 
   const tabAnimationStyle = useMemo(() => ({ animation: "tabFadeSlide 0.6s ease" }), []);
-  const tabAnimationCss = useMemo(
+  const pageCss = useMemo(
     () =>
-      `@keyframes tabFadeSlide {0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}`,
+      `
+      @keyframes tabFadeSlide {0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}
+      @keyframes sponsorMarquee {0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+      `,
     []
   );
 
@@ -871,7 +874,7 @@ const EventDetailNew = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] text-white">
-      <style>{tabAnimationCss}</style>
+      <style>{pageCss}</style>
 
       {/* Hero Section - compact split image/details */}
       <div className="relative overflow-hidden pt-4 md:pt-6">
@@ -981,6 +984,47 @@ const EventDetailNew = () => {
           </div>
         </div>
       </div>
+
+      {hasSponsors && (
+        <div className="relative isolate border-y border-[#D60024]/25 bg-[linear-gradient(90deg,#13060e,#090912,#13060e)] shadow-[0_18px_60px_rgba(214,0,36,0.22)]">
+          <div className="absolute inset-y-0 left-0 w-20 pointer-events-none bg-gradient-to-r from-[#0a0a10] via-[#0a0a10]/75 to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-20 pointer-events-none bg-gradient-to-l from-[#0a0a10] via-[#0a0a10]/75 to-transparent" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-8 w-8 rounded-full bg-[#D60024]/20 border border-[#D60024]/50 flex items-center justify-center shadow-[0_0_20px_rgba(214,0,36,0.35)]">
+                <Sparkles className="h-4 w-4 text-[#ff6b8d]" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/55">Partners & Sponsors</p>
+                <p className="text-sm text-white/80">In proud collaboration</p>
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden">
+              <div className="flex items-center gap-6 min-w-max animate-[sponsorMarquee_22s_linear_infinite]">
+                {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
+                  <div
+                    key={`${s.id || s.name || "sponsor"}-${idx}`}
+                    className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-[0_10px_35px_rgba(0,0,0,0.35)]"
+                  >
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden">
+                      <img
+                        src={s.logo || SPONSOR_PLACEHOLDER}
+                        alt={s.name || "Sponsor"}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] uppercase tracking-[0.18em] text-[#ff8da8]">Sponsor</span>
+                      <span className="text-sm font-semibold text-white whitespace-nowrap">{s.name || "Sponsor"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
