@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -9,16 +9,147 @@ import {
   Flame,
   MapPin,
   Radio,
-  ScanLine,
-  Sparkles,
   Ticket,
   Users,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
-import { getLiveEventSamples, formatDate, formatDateTime } from "@/data/liveEventsSample";
+import { apiFetch } from "@/config/api";
+
+const formatDateTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
+
+const formatDate = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date));
+
+// Transform events to include computed ticket data
+const transformEvents = (events) =>
+  (events || []).map((event) => {
+    const ticketTypes = (event.tickets || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      price: t.price,
+      totalQty: t.totalQty || 0,
+      soldQty: t.soldQty || 0,
+      checkedIn: 0,
+    }));
+
+    return {
+      id: event.id,
+      title: event.title,
+      category: event.category,
+      subCategory: event.subCategory,
+      venue: event.venues?.[0]?.name || "Venue TBD",
+      city: event.venues?.[0]?.city || "",
+      state: event.venues?.[0]?.state || "",
+      startDate: event.startDate,
+      endDate: event.endDate,
+      eventStatus: event.eventStatus,
+      publishStatus: event.publishStatus,
+      tags: [event.category, event.subCategory].filter(Boolean),
+      ticketTypes,
+      organizer: event.organizer,
+      bookingsCount: event._count?.bookings || 0,
+      checkIns: { total: 0, last15m: 0 },
+    };
+  });
 
 const LiveEvents = () => {
   const navigate = useNavigate();
-  const { liveEvents, upcomingEvents } = useMemo(() => getLiveEventSamples(), []);
+  const [liveEvents, setLiveEvents] = useState([]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Refs to prevent duplicate calls and track mounted state
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const hasFetchedRef = useRef(false);
+
+  const fetchEvents = useCallback(async (isManualRefresh = false) => {
+    // Prevent duplicate simultaneous calls
+    if (isFetchingRef.current) {
+      console.log("[LiveEvents] Fetch already in progress, skipping...");
+      return;
+    }
+
+    isFetchingRef.current = true;
+
+    // Only show loading spinner on initial load or manual refresh
+    if (!hasFetchedRef.current || isManualRefresh) {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      // Fetch both ONGOING and UPCOMING events in parallel
+      const [liveResponse, upcomingResponse] = await Promise.all([
+        apiFetch("promoter/live-events?status=ONGOING"),
+        apiFetch("promoter/live-events?status=UPCOMING"),
+      ]);
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
+      const liveData = liveResponse.data || liveResponse;
+      const upcomingData = upcomingResponse.data || upcomingResponse;
+
+      setLiveEvents(transformEvents(liveData.events));
+
+      // Filter upcoming events to show only next 7 days
+      const now = new Date();
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const filteredUpcoming = (upcomingData.events || []).filter((event) => {
+        const startDate = new Date(event.startDate);
+        return startDate >= now && startDate <= sevenDaysFromNow;
+      });
+
+      setUpcomingEvents(transformEvents(filteredUpcoming));
+      hasFetchedRef.current = true;
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      console.error("Error fetching events:", err);
+      setError(err.message || "Failed to load events");
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Initial fetch
+    fetchEvents();
+
+    // Refresh every 30 seconds (background refresh, no loading spinner)
+    const interval = setInterval(() => {
+      fetchEvents(false);
+    }, 30000);
+
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
+    };
+  }, [fetchEvents]);
+
+  const handleManualRefresh = useCallback(() => {
+    fetchEvents(true);
+  }, [fetchEvents]);
 
   const aggregateLive = useMemo(() => {
     const totals = liveEvents.reduce(
@@ -50,7 +181,7 @@ const LiveEvents = () => {
     return { ...totals, occupancy, checkInRate };
   }, [liveEvents]);
 
-  const getEventTicketTotals = (event) => {
+  const getEventTicketTotals = useCallback((event) => {
     if (!event) return { total: 0, sold: 0, checkedIn: 0, remaining: 0 };
     const totals = event.ticketTypes.reduce(
       (acc, t) => {
@@ -62,7 +193,37 @@ const LiveEvents = () => {
       { total: 0, sold: 0, checkedIn: 0 }
     );
     return { ...totals, remaining: Math.max(totals.total - totals.sold, 0) };
-  };
+  }, []);
+
+  if (loading && liveEvents.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+          <p className="text-white/70">Loading live events...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && liveEvents.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-white text-lg">Failed to load events</p>
+          <p className="text-white/60">{error}</p>
+          <button
+            onClick={handleManualRefresh}
+            className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition text-white flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white">
@@ -82,6 +243,14 @@ const LiveEvents = () => {
               Monitor events happening today, guide check-ins, and prep for the coming week.
             </p>
           </div>
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm flex items-center gap-2 text-white/80"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -146,8 +315,6 @@ const LiveEvents = () => {
             </p>
             <p className="text-sm text-white/60 mt-1">seats left to sell</p>
           </div>
-
-          
         </div>
 
         {/* Live Events List */}
@@ -160,7 +327,7 @@ const LiveEvents = () => {
               <p className="text-sm text-white/60">Select a card to open the live board.</p>
             </div>
             <div className="hidden md:flex items-center gap-2 text-xs text-white/60">
-              <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Auto-syncing with bookings and check-ins
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Auto-syncing every 30s
             </div>
           </div>
 
@@ -187,7 +354,7 @@ const LiveEvents = () => {
                       <span className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-red-500/20 text-red-100 border border-red-400/30">
                         Live
                       </span>
-                      <p className="text-xs text-white/60">{event.id}</p>
+                      <p className="text-xs text-white/60">{event.category}</p>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-white/70">
                       <Calendar className="w-4 h-4" /> {formatDateTime(event.startDate)}
@@ -254,7 +421,7 @@ const LiveEvents = () => {
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-blue-300" /> Upcoming (next 7 days)
             </h2>
-            <span className="text-xs text-white/60">Based on events table (UPCOMING)</span>
+            <span className="text-xs text-white/60">From events API (UPCOMING)</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
             {upcomingEvents.length === 0 && (
@@ -276,7 +443,7 @@ const LiveEvents = () => {
                       <span className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-blue-500/15 text-blue-100 border border-blue-400/30">
                         Upcoming
                       </span>
-                      <p className="text-xs text-white/60">{event.id}</p>
+                      <p className="text-xs text-white/60">{event.category}</p>
                     </div>
                     <span className="text-xs text-white/70 flex items-center gap-1">
                       <Clock className="w-4 h-4" /> {formatDate(event.startDate)}

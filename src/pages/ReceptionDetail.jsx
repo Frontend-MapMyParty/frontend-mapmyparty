@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Shield,
@@ -16,7 +16,36 @@ import {
   ArrowLeft,
   Layers,
 } from "lucide-react";
-import { getLiveEventSamples, formatDateTime } from "@/data/liveEventsSample";
+import { apiFetch } from "@/config/api";
+import { formatDateTime } from "@/data/liveEventsSample";
+
+const transformEvent = (event) => {
+  if (!event) return null;
+  const ticketTypes = (event.tickets || []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    type: t.type,
+    price: t.price,
+    totalQty: t.totalQty || 0,
+    soldQty: t.soldQty || 0,
+    checkedIn: 0,
+  }));
+
+  return {
+    id: event.id,
+    title: event.title,
+    category: event.category,
+    subCategory: event.subCategory,
+    venue: event.venues?.[0]?.name || "Venue TBD",
+    city: event.venues?.[0]?.city || "",
+    state: event.venues?.[0]?.state || "",
+    startDate: event.startDate,
+    endDate: event.endDate,
+    eventStatus: event.eventStatus,
+    publishStatus: event.publishStatus,
+    ticketTypes,
+  };
+};
 
 const Stat = ({ label, value, hint, icon: Icon }) => (
   <div className="rounded-2xl bg-white/5 border border-white/10 p-4 shadow-lg shadow-black/25">
@@ -163,8 +192,54 @@ const TicketPanel = ({
 const ReceptionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { liveEvents } = useMemo(() => getLiveEventSamples(), []);
-  const event = useMemo(() => liveEvents.find((e) => e.id === id) || liveEvents[0], [id, liveEvents]);
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [loadingTicket, setLoadingTicket] = useState(false);
+
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const hasFetchedRef = useRef(false);
+
+  const fetchEventData = useCallback(async () => {
+    if (!id || isFetchingRef.current || hasFetchedRef.current) return;
+    isFetchingRef.current = true;
+    setLoading(true);
+    setError("");
+
+    try {
+      const [eventResponse, checkInsResponse] = await Promise.allSettled([
+        apiFetch(`event/${id}`),
+        apiFetch(`booking/event/${id}/check-ins?checkedIn=true&limit=1`),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      if (eventResponse.status === "fulfilled") {
+        const eventData = eventResponse.value.data || eventResponse.value;
+        setEvent(transformEvent(eventData));
+      } else {
+        throw new Error(eventResponse.reason?.message || "Failed to load event");
+      }
+
+      if (checkInsResponse.status === "fulfilled") {
+        const checkInsData = checkInsResponse.value.data || checkInsResponse.value;
+        const totalCheckedIn = checkInsData.pagination?.total || 0;
+        setAccepted(totalCheckedIn);
+      }
+
+      hasFetchedRef.current = true;
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      console.error("Error fetching reception data:", err);
+      setError(err.message || "Failed to load reception data");
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      isFetchingRef.current = false;
+    }
+  }, [id]);
 
   const ticketTotals = useMemo(() => {
     if (!event) return { total: 0, sold: 0, checkedIn: 0, types: 0 };
@@ -180,27 +255,65 @@ const ReceptionDetail = () => {
     );
   }, [event]);
 
-  const [accepted, setAccepted] = useState(ticketTotals.checkedIn);
+  const [accepted, setAccepted] = useState(0);
   const [rejected, setRejected] = useState(0);
   const [ticketInput, setTicketInput] = useState("");
   const [ticket, setTicket] = useState(null);
   const [decision, setDecision] = useState(null);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const [showReason, setShowReason] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    setAccepted(ticketTotals.checkedIn);
+    isMountedRef.current = true;
+    hasFetchedRef.current = false;
+    fetchEventData();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchEventData]);
+
+  useEffect(() => {
     setRejected(0);
     setTicket(null);
     setDecision(null);
     setMessage("");
-    setError("");
     setTicketInput("");
     setReason("");
-  }, [ticketTotals]);
+  }, [ticketTotals, id]);
+
+  if (loading && !event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-10 h-10 animate-spin text-emerald-300" />
+          <p className="text-sm text-white/70">Loading reception...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !event) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#05060c] via-[#0a0f1c] to-[#05060c] text-white">
+        <div className="text-center space-y-3">
+          <p className="text-lg">Failed to load reception</p>
+          <p className="text-sm text-white/60">{error}</p>
+          <button
+            onClick={() => {
+              hasFetchedRef.current = false;
+              fetchEventData();
+            }}
+            className="px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -218,73 +331,130 @@ const ReceptionDetail = () => {
     );
   }
 
-  const buildDemoTicket = (ticketId = "123456") => {
-    const primaryTicket = event.ticketTypes?.[0];
-    const attendees = [
-      { id: "AT-001", name: "John Anderson", email: "john.anderson@example.com", phone: "+91 98765 11122", type: primaryTicket?.name || "VIP Table" },
-      { id: "AT-002", name: "Sara Menon", email: "sara.menon@example.com", phone: "+91 98200 12345", type: primaryTicket?.name || "VIP Table" },
-    ];
-    const base = (primaryTicket?.price || 8500) * 2;
-    const fees = Math.round(base * 0.05);
-    return {
-      ticketId,
-      bookingId: "BKG-1842",
-      holder: "John Anderson",
-      email: "john.anderson@example.com",
-      phone: "+91 98765 11122",
-      ticketType: primaryTicket?.name || "VIP Table",
-      quantity: 2,
-      price: primaryTicket?.price || 8500,
-      attendees,
-      breakdown: { base, fees, total: base + fees },
-      eventTitle: event.title,
-      venue: `${event.venue}, ${event.city}`,
-      schedule: `${formatDateTime(event.startDate)} — ${formatDateTime(event.endDate)}`,
-      status: "Pending Check-in",
-    };
-  };
-
   const resetTicket = () => {
     setTicket(null);
     setDecision(null);
     setMessage("");
-    setError("");
     setReason("");
     setTicketInput("");
     setProcessing(false);
   };
 
-  const loadTicket = (ticketId) => {
-    if (ticketId === "123456") {
-      setTicket(buildDemoTicket(ticketId));
+  const buildTicketFromScan = (scanPayload) => {
+    const bookingItem = scanPayload?.bookingItem;
+    const booking = scanPayload?.booking;
+    const user = scanPayload?.user;
+    const ticketInfo = scanPayload?.ticket;
+    const eventInfo = scanPayload?.event || event;
+
+    if (!bookingItem || !ticketInfo || !eventInfo) return null;
+
+    const quantity = bookingItem.quantity || 1;
+    const price = bookingItem.ticketPrice || ticketInfo.price || 0;
+    const base = price * quantity;
+
+    return {
+      ticketId: bookingItem.id,
+      bookingItemId: bookingItem.id,
+      bookingId: booking?.id,
+      holder: user?.name || "Guest",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      ticketType: ticketInfo.name || ticketInfo.type || "Ticket",
+      quantity,
+      price,
+      attendees: [
+        {
+          id: user?.id || bookingItem.id,
+          name: user?.name || "Guest",
+          email: user?.email || "",
+          phone: user?.phone || "",
+          type: ticketInfo.name || ticketInfo.type || "Ticket",
+        },
+      ],
+      breakdown: { base, fees: 0, total: base },
+      eventTitle: eventInfo.title,
+      venue: `${eventInfo.venue || ""}, ${eventInfo.city || ""}`.replace(/^[,\s]+|[,\s]+$/g, ""),
+      schedule: `${formatDateTime(eventInfo.startDate)} — ${formatDateTime(eventInfo.endDate)}`,
+      status: bookingItem.checkedIn ? "Already Checked-in" : "Pending Check-in",
+      alreadyCheckedIn: bookingItem.checkedIn || false,
+    };
+  };
+
+  const verifyTicket = async (manualCode) => {
+    const normalizedCode = manualCode?.trim().toLowerCase();
+    if (!normalizedCode) return;
+    if (!/^[a-z0-9]{6,12}$/.test(normalizedCode)) {
+      setError("Enter a valid check-in code (e.g., 9sv9begy).");
+      return;
+    }
+    setProcessing(true);
+    setLoadingTicket(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await apiFetch("booking/scan-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualCheckInCode: normalizedCode }),
+      });
+      const data = response.data || response;
+      const nextTicket = buildTicketFromScan(data);
+      if (!nextTicket) {
+        throw new Error("Ticket details incomplete. Please verify again.");
+      }
+      setTicket(nextTicket);
       setDecision(null);
-      setMessage(`Loaded ticket #${ticketId} for John Anderson`);
-      setError("");
-      setProcessing(false);
-    } else {
-      setError("Ticket not found. Use demo ID 123456 for now.");
+      setMessage(`Loaded ticket ${nextTicket.ticketId}`);
+    } catch (err) {
+      console.error("Failed to verify ticket:", err);
+      setError(err.message || "Ticket not found.");
       setTicket(null);
       setDecision(null);
+    } finally {
       setProcessing(false);
+      setLoadingTicket(false);
     }
   };
 
   const handleScan = () => {
-    setProcessing(true);
-    setTimeout(() => loadTicket("123456"), 500);
+    if (!ticketInput.trim()) {
+      setError("Enter the manual check-in code before scanning.");
+      return;
+    }
+    verifyTicket(ticketInput.trim());
   };
 
   const handleSubmitId = (e) => {
     e.preventDefault();
-    setProcessing(true);
-    loadTicket(ticketInput.trim());
+    verifyTicket(ticketInput.trim());
   };
 
-  const handleAllow = () => {
-    if (!ticket || decision) return;
-    setDecision("allowed");
-    setAccepted((prev) => prev + 1);
-    setMessage(`Allowed ${ticket.holder}. Check-in completed.`);
+  const handleAllow = async () => {
+    if (!ticket || decision || ticket.alreadyCheckedIn) return;
+    setProcessing(true);
+    setError("");
+    try {
+      const response = await apiFetch("booking/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingItemId: ticket.bookingItemId }),
+      });
+      const data = response.data || response;
+      if (!data?.checkedIn) {
+        throw new Error("Check-in failed. Try again.");
+      }
+      setDecision("allowed");
+      setAccepted((prev) => prev + 1);
+      setMessage(`Allowed ${ticket.holder}. Check-in completed.`);
+      setTicket((prev) => (prev ? { ...prev, alreadyCheckedIn: true, status: "Checked-in" } : prev));
+    } catch (err) {
+      console.error("Check-in failed:", err);
+      setError(err.message || "Failed to check in ticket");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleRejectConfirm = () => {
@@ -353,7 +523,7 @@ const ReceptionDetail = () => {
                 <Sparkles className="w-4 h-4 text-emerald-300" /> Check-in desk
               </p>
               <h3 className="text-xl font-semibold">{event.title}</h3>
-              <p className="text-xs text-white/60">Select method: scan QR or enter ticket ID.</p>
+              <p className="text-xs text-white/60">Select method: verify QR or enter manual code.</p>
             </div>
             {message && <span className="text-xs text-emerald-300">{message}</span>}
           </div>
@@ -363,29 +533,28 @@ const ReceptionDetail = () => {
               <p className="text-sm font-semibold flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-cyan-300" /> QR Scan
               </p>
-              <p className="text-xs text-white/60 mt-1">Use scanner or simulate for demo.</p>
+              <p className="text-xs text-white/60 mt-1">Verify a QR scan or manual code (e.g., 9sv9begy).</p>
               <button
                 onClick={handleScan}
                 disabled={processing}
                 className="mt-3 w-full px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/30 to-emerald-500/30 border border-white/10 hover:border-emerald-300/40 transition disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-                Simulate QR Scan
+                {loadingTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                Verify Code
               </button>
             </div>
 
             <div className="rounded-xl border border-white/10 bg-black/30 p-4">
               <p className="text-sm font-semibold flex items-center gap-2">
-                <Ticket className="w-4 h-4 text-amber-300" /> Ticket ID (6 digits)
+                <Ticket className="w-4 h-4 text-amber-300" /> Manual Check-in Code
               </p>
-              <p className="text-xs text-white/60 mt-1">Demo works with 123456 for now.</p>
+              <p className="text-xs text-white/60 mt-1">Enter the code printed on the ticket.</p>
               <form onSubmit={handleSubmitId} className="mt-3 space-y-2">
                 <input
                   value={ticketInput}
                   onChange={(e) => setTicketInput(e.target.value)}
-                  maxLength={6}
-                  pattern="[0-9]{6}"
-                  placeholder="Enter 6-digit ticket ID"
+                  placeholder="Enter manual check-in code (e.g., 9sv9begy)"
+                  inputMode="text"
                   className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
                 />
                 <button
@@ -393,7 +562,7 @@ const ReceptionDetail = () => {
                   disabled={processing}
                   className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm disabled:opacity-60"
                 >
-                  Verify Ticket ID
+                  Verify Ticket
                 </button>
               </form>
             </div>
