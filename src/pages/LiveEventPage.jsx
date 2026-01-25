@@ -11,6 +11,7 @@ import {
   Layers,
   MapPin,
   Menu,
+  CupSoda,
   QrCode,
   Radio,
   Sparkles,
@@ -24,7 +25,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import Footer from "@/components/Footer";
+// import Footer from "@/components/Footer";
 import { apiFetch } from "@/config/api";
 import { useTicketAnalytics } from "@/hooks/useTicketAnalytics";
 
@@ -230,6 +231,7 @@ const LiveEventPage = () => {
     { id: "analytics", label: "Audience Analytics", icon: <Users className="w-6 h-6 mr-3" />, to: "/organizer/analytics" },
     { id: "live", label: "Live Events", icon: <Radio className="w-6 h-6 mr-3" />, to: "/organizer/live" },
     { id: "reception", label: "Reception", icon: <Shield className="w-6 h-6 mr-3" />, to: "/organizer/reception" },
+    { id: "food-beverages", label: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" />, to: "/organizer/food-beverages" },
     // { id: "financial", label: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" />, to: "/organizer/financial" },
   ];
 
@@ -239,6 +241,7 @@ const LiveEventPage = () => {
     else if (path.startsWith("/organizer/analytics")) setActiveTab("analytics");
     else if (path.startsWith("/organizer/live")) setActiveTab("live");
     else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
+    else if (path.startsWith("/organizer/food-beverages")) setActiveTab("food-beverages");
     else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
     else setActiveTab("dashboard");
   }, [location.pathname]);
@@ -290,10 +293,10 @@ const LiveEventPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
+    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
       {/* Sidebar */}
       <aside
-        className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
+        className={`${sidebarOpen ? "w-64" : "w-24"} flex-shrink-0 h-full lg:h-screen lg:sticky lg:top-0 bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
       >
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <h1 className={`text-2xl font-extrabold tracking-tight ${sidebarOpen ? "block" : "hidden"}`}>
@@ -308,7 +311,7 @@ const LiveEventPage = () => {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="flex-1 py-4">
           <div className="px-3 space-y-1">
             {navItems.map((item) => (
               <button
@@ -346,7 +349,7 @@ const LiveEventPage = () => {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden lg:h-screen">
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 lg:p-6 space-y-6">
             {/* Hero */}
@@ -667,7 +670,7 @@ const LiveEventPage = () => {
             </div>
           </div>
         </main>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </div>
   );
