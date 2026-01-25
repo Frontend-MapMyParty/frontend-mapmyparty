@@ -33,6 +33,7 @@ import {
   Globe,
   Camera,
   Upload,
+  CupSoda,
 } from "lucide-react";
 import FinancialReporting from "./FinancialReporting";
 import OrganizerDash from "./OrganizerDash";
@@ -40,6 +41,7 @@ import AudienceAnalytics from "./AudienceAnalytics";
 import MyEvents from "./MyEvents";
 import LiveEvents from "./LiveEvents";
 import Reception from "./Reception";
+import FoodBeverages from "./FoodBeverages";
 
 // Profile Content Component
 const OrganizerProfileContent = ({ user }) => {
@@ -1267,6 +1269,7 @@ const OrganizerDashboardV2 = () => {
     { id: "analytics", name: "Audience Analytics", icon: <Users className="w-6 h-6 mr-3" /> },
     { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
     { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
+    { id: "food-beverages", name: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" /> },
     { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
 
@@ -1277,6 +1280,7 @@ const OrganizerDashboardV2 = () => {
     else if (path.startsWith("/organizer/analytics")) setActiveTab("analytics");
     else if (path.startsWith("/organizer/live")) setActiveTab("live");
     else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
+    else if (path.startsWith("/organizer/food-beverages")) setActiveTab("food-beverages");
     else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
     else if (path.startsWith("/organizer/profile")) setActiveTab("profile");
     else setActiveTab("dashboard");
@@ -1410,6 +1414,7 @@ const OrganizerDashboardV2 = () => {
             {activeTab === "analytics" && <AudienceAnalytics />}
             {activeTab === "live" && <LiveEvents />}
             {activeTab === "reception" && <Reception />}
+            {activeTab === "food-beverages" && <FoodBeverages />}
             {activeTab === "financial" && <FinancialReporting />}
             {activeTab === "profile" && <OrganizerProfileContent user={user} />}
           </div>

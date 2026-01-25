@@ -632,7 +632,7 @@ const AudienceAnalytics = () => {
 
         {/* Breakdown + Demographics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur shadow-lg shadow-black/30 lg:col-span-2">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur shadow-lg shadow-black/30 lg:col-span-3">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <PieChartIcon className="w-5 h-5 text-sky-300" />
@@ -712,43 +712,6 @@ const AudienceAnalytics = () => {
                   )
                 )}
               </div>
-            </div>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur shadow-lg shadow-black/30 lg:h-[380px] flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Globe2 className="w-4 h-4" /> Geography
-              </h3>
-              <span className="text-xs text-white/60">{safeBreakdowns.geography.length} regions</span>
-            </div>
-            <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-              {safeBreakdowns.geography.length === 0 && <p className="text-xs text-white/60">No geo data.</p>}
-              {(() => {
-                const geoItems = safeBreakdowns.geography.slice(0, 10);
-                const maxGeo = Math.max(...geoItems.map((g) => g.value ?? g.percentage ?? 0), 1);
-                return geoItems.map((geo, idx) => {
-                  const val = geo.value ?? geo.percentage ?? 0;
-                  const width = Math.max(6, Math.min(100, (val / maxGeo) * 100));
-                  return (
-                    <div key={idx} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-pink-400 to-sky-400" />
-                          <span>{geo.label || geo.region || geo.name}</span>
-                        </div>
-                        <span className="text-white/70 text-xs">{formatPercent(val)}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-2 rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500"
-                          style={{ width: `${width}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
             </div>
           </div>
         </div>
