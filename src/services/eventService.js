@@ -1,32 +1,65 @@
 import { buildUrl, apiFetch } from "@/config/api";
 
 // -------- Cloudinary Signature + Upload Helpers (internal) --------
-async function getCloudinarySignature(folder) {
-  // Ensure folder starts with mapmyparty
-  const safeFolder = folder && folder.startsWith("mapmyparty") ? folder : "mapmyparty";
-  const url = buildUrl(`cloudinary/sign?folder=${encodeURIComponent(safeFolder)}`);
-  const res = await fetch(url, { method: "GET", credentials: "include" });
+const getAuthToken = () =>
+  sessionStorage.getItem("authToken") ||
+  sessionStorage.getItem("accessToken") ||
+  localStorage.getItem("authToken") ||
+  "";
+
+async function getCloudinarySignature(type, entityId) {
+  if (!type || !entityId) {
+    throw new Error("Upload signature requires both type and entityId");
+  }
+
+  const token = getAuthToken();
+  const url = buildUrl(`/api/cloudinary/sign?type=${encodeURIComponent(type)}&entityId=${encodeURIComponent(entityId)}`);
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {},
+  });
+
+  const json = await res.json().catch(() => ({}));
+
   if (res.status === 429) {
     throw new Error("Upload rate limit reached. Please try again in a few moments.");
   }
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    throw new Error(errJson.errorMessage || errJson.message || "Cloudinary not configured");
+
+  if (!res.ok || json.success === false) {
+    throw new Error(json.error || json.errorMessage || json.message || "Failed to get upload signature");
   }
-  return res.json();
+
+  const data = json.data || json;
+
+  return {
+    cloudName: data.cloud_name,
+    apiKey: data.api_key,
+    timestamp: data.timestamp,
+    signature: data.signature,
+    folder: data.folder,
+    allowedFormats: data.allowed_formats,
+    maxBytes: data.max_bytes,
+  };
 }
 
 /**
- * Upload a temp image to Cloudinary before an event exists.
- * Returns { url, publicId, raw } without persisting to backend.
+ * Upload an image to Cloudinary (client-side). Returns { url, publicId, raw } without persisting.
  */
-export async function uploadTempImage(file, folderSuffix = "drafts") {
+export async function uploadTempImage(file, type, entityId) {
   if (!file || !(file instanceof File)) {
     throw new Error("Valid image file is required");
   }
 
-  const folder = `mapmyparty/${folderSuffix}`;
-  const sig = await getCloudinarySignature(folder);
+  if (!type || !entityId) {
+    throw new Error("type and entityId are required for uploads");
+  }
+
+  const sig = await getCloudinarySignature(type, entityId);
   const uploadJson = await uploadToCloudinary(file, sig);
 
   const url = uploadJson.secure_url || uploadJson.url;
@@ -49,13 +82,12 @@ export async function persistFlyerUrl(eventId, flyer) {
 
   const url = buildUrl(`/api/event/update-flyer/${eventId}`);
   const payload = {
-    imageUrl,
-    publicId,
-    flyerImage: imageUrl,
     url: imageUrl,
+    publicId,
+    type: "EVENT_FLYER",
   };
 
-  console.log("🔗 Persisting existing flyer URL to backend:", payload);
+  console.log("🔗 Persisting flyer metadata to backend:", payload);
 
   const res = await apiFetch(url, {
     method: "PATCH",
@@ -75,10 +107,33 @@ async function uploadToCloudinary(file, signaturePayload) {
     signature,
     uploadPreset,
     resourceType = "image",
+    allowedFormats,
+    maxBytes,
   } = signaturePayload || {};
 
   if (!cloudName || !apiKey || !timestamp || !signature || !folder) {
     throw new Error("Missing Cloudinary configuration");
+  }
+
+  // Client-side validation per spec
+  const allowed = (allowedFormats || "jpg,jpeg,png,webp")
+    .split(",")
+    .map((f) => f.trim().toLowerCase())
+    .filter(Boolean);
+  const limit = maxBytes || 5_000_000;
+
+  if (file.size > limit) {
+    throw new Error(`File too large. Max ${(limit / 1_000_000).toFixed(1)}MB allowed.`);
+  }
+
+  const fileType = (file.type || "").toLowerCase();
+  const fileExt = file.name?.split(".").pop()?.toLowerCase();
+  const isValidType =
+    allowed.length === 0 ||
+    allowed.some((fmt) => fileType.includes(fmt) || (fileExt && fileExt === fmt));
+
+  if (!isValidType) {
+    throw new Error(`Invalid file format. Allowed: ${allowed.join(", ")}`);
   }
 
   const form = new FormData();
@@ -86,6 +141,7 @@ async function uploadToCloudinary(file, signaturePayload) {
   form.append("api_key", apiKey);
   form.append("timestamp", timestamp);
   form.append("folder", folder);
+  if (allowedFormats) form.append("allowed_formats", allowedFormats);
   form.append("signature", signature);
   if (uploadPreset) form.append("upload_preset", uploadPreset);
 
@@ -106,9 +162,7 @@ export async function uploadArtistImage(eventId, file) {
   if (!eventId) throw new Error("Event ID is required");
   if (!file || !(file instanceof File)) throw new Error("Valid artist image file is required");
 
-  const folder = `mapmyparty/events/${eventId}/artists`;
-
-  const sig = await getCloudinarySignature(folder);
+  const sig = await getCloudinarySignature("EVENT_GALLERY", eventId);
   const uploadJson = await uploadToCloudinary(file, sig);
 
   const secureUrl = uploadJson.secure_url || uploadJson.url;
@@ -126,14 +180,18 @@ export async function uploadArtistImage(eventId, file) {
 /**
  * Persist already-uploaded gallery URLs to backend (no Cloudinary upload).
  */
-export async function persistGalleryUrls(eventId, imageUrls) {
+export async function persistGalleryUrls(eventId, images) {
   if (!eventId) throw new Error("Event ID is required");
-  if (!imageUrls || imageUrls.length === 0) throw new Error("At least one gallery image URL is required");
+  if (!images || images.length === 0) throw new Error("At least one gallery image is required");
 
   const url = buildUrl(`/api/event/${eventId}/images`);
-  const payload = { imageUrls };
+  const payload = images.map((img) => ({
+    url: img.url,
+    publicId: img.publicId,
+    type: img.type || "EVENT_GALLERY",
+  }));
 
-  console.log("🔗 Persisting existing gallery URLs to backend:", payload);
+  console.log("🔗 Persisting gallery metadata to backend:", payload);
 
   const res = await apiFetch(url, {
     method: "POST",
@@ -306,34 +364,8 @@ export async function uploadFlyerImage(eventId, flyerImage) {
     throw new Error("Valid flyer image file is required");
   }
 
-  // Preserve folder naming: mapmyparty/events/<eventId>/flyer
-  const folder = `mapmyparty/events/${eventId}/flyer`;
-
-  // Helper to persist the uploaded URL to backend DB (keeps old behavior)
-  const persistFlyerToBackend = async (imageUrl, publicId) => {
-    // Spec: PATCH /api/event/update-flyer/:id expects imageUrl (and publicId)
-    const url = buildUrl(`/api/event/update-flyer/${eventId}`);
-    const payload = {
-      imageUrl,        // primary key per spec
-      publicId,
-      // Legacy compat (old UI expects these fields to exist on the row)
-      flyerImage: imageUrl,
-      url: imageUrl,
-    };
-
-    console.log("🔗 Persisting flyer URL to backend:", payload);
-
-    const res = await apiFetch(url, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    return res;
-  };
-
   try {
-    const sig = await getCloudinarySignature(folder);
+    const sig = await getCloudinarySignature("EVENT_FLYER", eventId);
     const uploadJson = await uploadToCloudinary(flyerImage, sig);
 
     const secureUrl = uploadJson.secure_url || uploadJson.url;
@@ -341,8 +373,8 @@ export async function uploadFlyerImage(eventId, flyerImage) {
 
     // Persist to backend DB to match old behavior
     try {
-      await persistFlyerToBackend(secureUrl, publicId);
-      console.log("✅ Flyer URL persisted to backend");
+      await persistFlyerUrl(eventId, { url: secureUrl, publicId });
+      console.log("✅ Flyer metadata persisted to backend");
     } catch (persistErr) {
       console.error("❌ Failed to persist flyer URL to backend:", persistErr);
       throw new Error(persistErr?.message || "Failed to save flyer image. Please try again.");
@@ -424,11 +456,8 @@ export async function uploadGalleryImages(eventId, galleryImages) {
     throw new Error("Maximum 10 gallery images allowed");
   }
 
-  // Preserve folder naming: mapmyparty/events/<eventId>/gallery
-  const folder = `mapmyparty/events/${eventId}/gallery`;
-
   try {
-    const sig = await getCloudinarySignature(folder);
+    const sig = await getCloudinarySignature("EVENT_GALLERY", eventId);
 
     const uploads = await Promise.all(
       galleryImages.map(async (image, index) => {
@@ -441,6 +470,7 @@ export async function uploadGalleryImages(eventId, galleryImages) {
         return {
           id: publicId, // temporary; will be replaced by DB ID after persist
           url: secureUrl,
+          publicId,
           type: "EVENT_GALLERY",
         };
       })
@@ -450,17 +480,16 @@ export async function uploadGalleryImages(eventId, galleryImages) {
 
     // Persist to backend DB
     try {
-      const imageUrls = uploads.map((u) => u.url);
-      const persistRes = await persistGalleryUrls(eventId, imageUrls);
+      const persistRes = await persistGalleryUrls(eventId, uploads);
       // Expect response: { data: { images: [ { id, url, ... } ] } }
       backendImages =
         persistRes?.data?.images ||
         persistRes?.images ||
         persistRes?.data ||
         [];
-      console.log("✅ Gallery URLs persisted to backend");
+      console.log("✅ Gallery metadata persisted to backend");
     } catch (persistErr) {
-      console.error("❌ Failed to persist gallery URLs to backend:", persistErr);
+      console.error("❌ Failed to persist gallery metadata to backend:", persistErr);
       throw new Error(persistErr?.message || "Failed to save gallery images. Please try again.");
     }
 

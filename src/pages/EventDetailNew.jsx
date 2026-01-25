@@ -235,6 +235,10 @@ const EventDetailNew = () => {
     () => (hasSponsors && sponsorsSorted.length > 1 ? sponsorsSorted.slice(1) : []),
     [hasSponsors, sponsorsSorted]
   );
+  const showSponsorStrip = useMemo(
+    () => hasSponsors && sponsorsSorted.length > 1,
+    [hasSponsors, sponsorsSorted.length]
+  );
 
   const getArtistImage = (artist) =>
     artist.image || artist.photo || artist.avatar || artist.profileImage || FALLBACK_IMAGE;
@@ -959,65 +963,36 @@ const EventDetailNew = () => {
                   </div>
                 </div>
               </div>
-
-              {secondarySponsors.length > 0 && (
-                <div className="space-y-2 text-center lg:text-left">
-                  <p className="text-xs uppercase tracking-[0.15em] text-white/55">Partners</p>
-                  <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-                    {secondarySponsors.map((s) => (
-                      <div
-                        key={s.id}
-                        className="h-12 w-12 flex items-center justify-center rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/30 p-2 shadow-inner"
-                        title={s.name}
-                      >
-                        <img
-                          src={s.logo || SPONSOR_PLACEHOLDER}
-                          alt={s.name}
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       </div>
 
-      {hasSponsors && (
-        <div className="relative isolate border-y border-[#D60024]/25 bg-[linear-gradient(90deg,#13060e,#090912,#13060e)] shadow-[0_18px_60px_rgba(214,0,36,0.22)]">
-          <div className="absolute inset-y-0 left-0 w-20 pointer-events-none bg-gradient-to-r from-[#0a0a10] via-[#0a0a10]/75 to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-20 pointer-events-none bg-gradient-to-l from-[#0a0a10] via-[#0a0a10]/75 to-transparent" />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 relative">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-8 w-8 rounded-full bg-[#D60024]/20 border border-[#D60024]/50 flex items-center justify-center shadow-[0_0_20px_rgba(214,0,36,0.35)]">
-                <Sparkles className="h-4 w-4 text-[#ff6b8d]" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/55">Partners & Sponsors</p>
-                <p className="text-sm text-white/80">In proud collaboration</p>
-              </div>
-            </div>
-
-            <div className="relative overflow-hidden">
-              <div className="flex items-center gap-6 min-w-max animate-[sponsorMarquee_22s_linear_infinite]">
+      {showSponsorStrip && (
+        <div className="relative isolate border-y border-white/10 bg-white text-slate-900 overflow-hidden">
+          <div className="absolute inset-y-0 left-0 w-20 pointer-events-none bg-gradient-to-r from-white via-white/80 to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-20 pointer-events-none bg-gradient-to-l from-white via-white/80 to-transparent" />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 relative flex items-center gap-6">
+            <p className="text-xs md:text-sm font-semibold uppercase tracking-[0.22em] text-slate-600 whitespace-nowrap">
+              Our trusted company and partners
+            </p>
+            <div className="relative flex-1 overflow-hidden">
+              <div className="flex items-center gap-10 min-w-max animate-[sponsorMarquee_18s_linear_infinite]">
                 {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
                   <div
                     key={`${s.id || s.name || "sponsor"}-${idx}`}
-                    className="flex items-center gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-[0_10px_35px_rgba(0,0,0,0.35)]"
+                    className="flex items-center gap-3 sm:gap-4"
                   >
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-white shadow-md ring-1 ring-slate-200 flex items-center justify-center overflow-hidden">
                       <img
                         src={s.logo || SPONSOR_PLACEHOLDER}
                         alt={s.name || "Sponsor"}
                         className="h-full w-full object-contain"
                       />
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] uppercase tracking-[0.18em] text-[#ff8da8]">Sponsor</span>
-                      <span className="text-sm font-semibold text-white whitespace-nowrap">{s.name || "Sponsor"}</span>
-                    </div>
+                    <span className="text-sm sm:text-base font-semibold whitespace-nowrap text-slate-800">
+                      {s.name || "Sponsor"}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1034,18 +1009,18 @@ const EventDetailNew = () => {
             {/* Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-[rgba(100,200,255,0.2)]">
               {visibleTabs.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
-                      activeTab === tab
-                        ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
-                        : "bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)]"
-                    }`}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                ))}
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
+                    activeTab === tab
+                      ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+                      : "bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)]"
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
             </div>
 
             {/* About Tab */}

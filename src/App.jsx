@@ -117,11 +117,11 @@ const App = () => {
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
-            <Route path="/organizer/financial" element={
+            {/* <Route path="/organizer/financial" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
-            } />
+            } /> */}
             <Route path="/organizer/reception/:id" element={
               <ProtectedRoute requiredRole="organizer">
                 <ReceptionDetail />

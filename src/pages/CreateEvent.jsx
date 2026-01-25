@@ -33,7 +33,7 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, uploadTempImage, createEventStep1, persistFlyerUrl, persistGalleryUrls } from "@/services/eventService";
+import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, createEventStep1, persistFlyerUrl } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
 import { Calendar } from "@/components/ui/calendar";
@@ -58,8 +58,6 @@ const CreateEvent = () => {
   const [existingGalleryUrls, setExistingGalleryUrls] = useState([]); // Existing images from backend (URLs)
   const [galleryImages, setGalleryImages] = useState([]); // All images (existing URLs + new previews)
   const [galleryImageFiles, setGalleryImageFiles] = useState([]); // Only NEW files to upload
-  const [tempCoverUpload, setTempCoverUpload] = useState(null); // Cloudinary temp result before event creation
-  const [tempGalleryUploads, setTempGalleryUploads] = useState([]); // Temp Cloudinary uploads before event creation
   const [galleryImageIds, setGalleryImageIds] = useState([]); // Map of URL -> ID for deletion
   const [deletedImageIds, setDeletedImageIds] = useState(new Set()); // Track deleted image IDs to filter them out
   const [imagesChanged, setImagesChanged] = useState(false);
@@ -1168,29 +1166,7 @@ const CreateEvent = () => {
             console.log("💾 Backend Event ID stored:", backendId);
           }
           
-          // After event exists, persist cover image using the already-uploaded temp URL (no re-upload)
-          if (backendId && tempCoverUpload?.url) {
-            try {
-              setShowLoading(true);
-              setLoadingMessage("Saving cover image...");
-              const coverResp = await persistFlyerUrl(backendId, {
-                imageUrl: tempCoverUpload.url,
-                publicId: tempCoverUpload.publicId,
-              });
-              const coverData = coverResp.data || coverResp;
-              const imageUrl = coverData.flyerImage || coverData.url || tempCoverUpload.url;
-              if (imageUrl) {
-                setCoverImage(imageUrl);
-                toast.success("Cover image saved to event.");
-              }
-            } catch (err) {
-              console.error("Failed to persist cover image after create:", err);
-              toast.error(err?.message || "Cover image upload failed after create.");
-            } finally {
-              setShowLoading(false);
-              setLoadingMessage("");
-            }
-          } else if (backendId && coverImageFile) {
+          if (backendId && coverImageFile) {
             // Fallback: if no temp upload exists, upload directly
             try {
               setShowLoading(true);
@@ -1212,40 +1188,7 @@ const CreateEvent = () => {
           }
           
           // After event exists, persist gallery images using already-uploaded temp URLs (no re-upload)
-          const tempGalleryUrls = tempGalleryUploads.map((g) => g.url).filter(Boolean);
-          if (backendId && tempGalleryUrls.length > 0) {
-            try {
-              setShowLoading(true);
-              setLoadingMessage("Saving gallery images...");
-              const galleryResp = await persistGalleryUrls(backendId, tempGalleryUrls);
-              const respData = galleryResp.data || galleryResp;
-              
-              const galleryImagesData =
-                (respData.images && Array.isArray(respData.images) && respData.images) ||
-                (respData.galleryImages && Array.isArray(respData.galleryImages) && respData.galleryImages) ||
-                [];
-              
-              const newImageUrls = galleryImagesData.map(img => img.url || img);
-              const newImageIdMap = {};
-              galleryImagesData.forEach(img => { if (img.id && (img.url || img)) newImageIdMap[img.url || img] = img.id; });
-              
-              const updatedGalleryImages = [...galleryImages, ...newImageUrls];
-              const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
-              
-              setExistingGalleryUrls(updatedGalleryImages);
-              setGalleryImages(updatedGalleryImages);
-              setGalleryImageIds(updatedImageIdMap);
-              setGalleryImageFiles([]); // clear pending files
-              
-              toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
-            } catch (err) {
-              console.error("Failed to persist gallery images after create:", err);
-              toast.error(err?.message || "Gallery upload failed after create.");
-            } finally {
-              setShowLoading(false);
-              setLoadingMessage("");
-            }
-          } else if (backendId && galleryImageFiles.length > 0) {
+          if (backendId && galleryImageFiles.length > 0) {
             // Fallback: upload if no temp uploads are available
             try {
               setShowLoading(true);
@@ -1292,9 +1235,6 @@ const CreateEvent = () => {
             }
           }
           
-          // Reset temp uploads after creation
-          setTempCoverUpload(null);
-          setTempGalleryUploads([]);
           setImagesChanged(false); // Reset flag after creation
         }
         
@@ -1917,19 +1857,17 @@ const CreateEvent = () => {
 
     setUploadingCover(true);
     try {
-      // Immediate Cloudinary upload (no event needed) to speed up UX
-      const temp = await uploadTempImage(file, "events/drafts/flyer");
-      setTempCoverUpload(temp);
-      setCoverImage(temp.url);
-      setCoverImageFile(file); // keep original file to send in create call if needed
+      const preview = URL.createObjectURL(file);
+      setCoverImage(preview);
+      setCoverImageFile(file);
       setImagesChanged(true);
       setRemoveFlyerImage(false);
-      toast.success("Cover image uploaded to cloud.");
+      toast.success("Cover image added. It will upload when you save.");
     } catch (error) {
-      console.error("Failed to upload cover image:", error);
-      toast.error(error.message || "Failed to upload cover image.");
+      console.error("Failed to stage cover image:", error);
+      toast.error(error.message || "Failed to add cover image.");
       setCoverImage(null);
-      setTempCoverUpload(null);
+      setCoverImageFile(null);
     } finally {
       setUploadingCover(false);
     }
@@ -2007,25 +1945,17 @@ const CreateEvent = () => {
     try {
       setUploadingGallery(true);
 
-      // Upload all gallery files to Cloudinary drafts folder
-      const uploads = [];
-      for (const file of validFiles) {
-        const temp = await uploadTempImage(file, "events/drafts/gallery");
-        uploads.push({ ...temp, file });
-      }
+      const previews = validFiles.map((f) => URL.createObjectURL(f));
+      const updatedGalleryImages = [...galleryImages, ...previews];
 
-      const newUrls = uploads.map(u => u.url);
-      const updatedGalleryImages = [...galleryImages, ...newUrls];
-
-      setTempGalleryUploads(prev => [...prev, ...uploads]);
       setGalleryImages(updatedGalleryImages);
-      setGalleryImageFiles(prev => [...prev, ...validFiles]);
+      setGalleryImageFiles((prev) => [...prev, ...validFiles]);
       setImagesChanged(true);
 
-      toast.success(`${validFiles.length} gallery image(s) uploaded to cloud.`);
+      toast.success(`${validFiles.length} gallery image(s) added. They will upload when you save.`);
     } catch (error) {
-      console.error("Failed to upload gallery images:", error);
-      toast.error(error.message || "Failed to upload gallery images.");
+      console.error("Failed to stage gallery images:", error);
+      toast.error(error.message || "Failed to add gallery images.");
     } finally {
       // Reset the file input to allow re-uploading the same file
       if (e.target) {
@@ -2296,15 +2226,20 @@ const CreateEvent = () => {
 
   const handleSponsorLogoChange = async (index, file) => {
     if (!file) return;
+    if (!backendEventId) {
+      toast.error("Please save event details first to upload sponsor logos.");
+      return;
+    }
     try {
       setSponsorUploadIndex(index);
       setShowLoading(true);
       setLoadingMessage("Uploading sponsor logo...");
-      const upload = await uploadTempImage(file, "events/drafts/sponsors");
+      const upload = await uploadArtistImage(backendEventId, file); // reuse Cloudinary flow (EVENT_GALLERY)
+      const logoUrl = upload?.data?.url || upload?.data?.image || "";
+      const publicId = upload?.data?.publicId;
       setSponsors((prev) => {
         const next = [...prev];
-        const logoUrl = upload.url || upload.secure_url || "";
-        next[index] = { ...next[index], logoUrl, logo: logoUrl };
+        next[index] = { ...next[index], logoUrl, logo: logoUrl, logoPublicId: publicId };
         return next;
       });
       toast.success("Logo uploaded");

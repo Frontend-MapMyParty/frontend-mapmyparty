@@ -1270,7 +1270,7 @@ const OrganizerDashboardV2 = () => {
     { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
     { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
     { id: "food-beverages", name: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" /> },
-    { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
+    // { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
 
   // Sync active tab from URL
