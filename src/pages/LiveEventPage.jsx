@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   Activity,
@@ -18,11 +18,33 @@ import {
   Shield,
   Download,
   Users,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import Footer from "@/components/Footer";
-import { getLiveEventSamples, formatDate, formatDateTime } from "@/data/liveEventsSample";
+import { apiFetch } from "@/config/api";
+import { useTicketAnalytics } from "@/hooks/useTicketAnalytics";
 
 const number = (v) => new Intl.NumberFormat("en-IN").format(v || 0);
+
+const formatDateTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
+
+const formatDate = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date));
 
 const LiveEventPage = () => {
   const { id } = useParams();
@@ -30,51 +52,177 @@ const LiveEventPage = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { events } = useMemo(() => getLiveEventSamples(), []);
-  const event = useMemo(
-    () => events.find((e) => e.id === id) || events[0],
-    [events, id]
-  );
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [bookings, setBookings] = useState({ confirmed: 0, pending: 0, cancelled: 0 });
+  const [checkIns, setCheckIns] = useState({ total: 0, last15m: 0 });
+
+  // Refs to prevent duplicate API calls
+  const isFetchingRef = useRef(false);
+  const hasFetchedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  // Real-time ticket analytics via Socket.IO
+  // This hook handles socket connection and receives real-time updates when bookings are made
+  const {
+    tickets: realtimeTickets,
+    connected: socketConnected,
+    error: socketError,
+  } = useTicketAnalytics(id);
+
+  // Fetch event data from API - CALLED ONLY ONCE
+  const fetchEventData = useCallback(async () => {
+    if (!id || isFetchingRef.current || hasFetchedRef.current) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch event details, bookings, and check-ins in parallel
+      const [eventResponse, bookingsResponse, checkInsResponse] = await Promise.allSettled([
+        apiFetch(`event/${id}`),
+        apiFetch(`booking/event/${id}`),
+        apiFetch(`booking/event/${id}/check-ins`),
+      ]);
+
+      if (!isMountedRef.current) return;
+
+      // Handle event data
+      if (eventResponse.status === "fulfilled") {
+        const eventData = eventResponse.value.data || eventResponse.value;
+        setEvent(eventData);
+      } else {
+        throw new Error(eventResponse.reason?.message || "Failed to load event");
+      }
+
+      // Handle bookings data
+      if (bookingsResponse.status === "fulfilled") {
+        const bookingsData = bookingsResponse.value.data || bookingsResponse.value.bookings || [];
+        // Ensure bookingsData is an array before calling reduce
+        const safeBookingsData = Array.isArray(bookingsData) ? bookingsData : [];
+        const stats = safeBookingsData.reduce(
+          (acc, booking) => {
+            if (booking.status === "CONFIRMED") acc.confirmed++;
+            else if (booking.status === "PENDING") acc.pending++;
+            else if (booking.status === "CANCELLED") acc.cancelled++;
+            return acc;
+          },
+          { confirmed: 0, pending: 0, cancelled: 0 }
+        );
+        setBookings(stats);
+      }
+
+      // Handle check-ins data
+      if (checkInsResponse.status === "fulfilled") {
+        const checkInsData = checkInsResponse.value.data?.items || checkInsResponse.value.items || [];
+        const now = new Date();
+        const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+
+        const checkedInItems = checkInsData.filter((item) => item.checkedIn);
+        const recentCheckIns = checkedInItems.filter(
+          (item) => item.checkedInAt && new Date(item.checkedInAt) >= fifteenMinutesAgo
+        );
+
+        setCheckIns({
+          total: checkedInItems.length,
+          last15m: recentCheckIns.length,
+        });
+      }
+
+      hasFetchedRef.current = true;
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      console.error("Error fetching event:", err);
+      setError(err.message || "Failed to load event data");
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      isFetchingRef.current = false;
+    }
+  }, [id]);
+
+  // Fetch data on mount - ONCE only
+  useEffect(() => {
+    isMountedRef.current = true;
+    hasFetchedRef.current = false; // Reset on id change
+
+    fetchEventData();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [fetchEventData]);
+
+  // Ticket types - Uses REAL-TIME socket data when available, fallback to event.tickets
+  const ticketTypes = useMemo(() => {
+    // Prefer real-time socket data (updates automatically when someone books)
+    if (realtimeTickets && realtimeTickets.length > 0) {
+      return realtimeTickets.map((ticket) => ({
+        id: ticket.ticketId,
+        name: ticket.name,
+        type: ticket.type,
+        price: ticket.price,
+        totalQty: ticket.totalQty,
+        soldQty: ticket.soldQty,
+        availableQty: ticket.availableQty,
+      }));
+    }
+
+    // Fallback to event tickets from initial API (static until socket connects)
+    if (event?.tickets) {
+      return event.tickets.map((ticket) => ({
+        id: ticket.id,
+        name: ticket.name,
+        type: ticket.type,
+        price: ticket.price,
+        totalQty: ticket.totalQty,
+        soldQty: ticket.soldQty || 0,
+        availableQty: Math.max(0, ticket.totalQty - (ticket.soldQty || 0)),
+      }));
+    }
+
+    return [];
+  }, [realtimeTickets, event?.tickets]);
 
   const ticketTotals = useMemo(() => {
-    if (!event) return { total: 0, sold: 0, checkedIn: 0, types: 0 };
-    return event.ticketTypes.reduce(
+    if (!ticketTypes || ticketTypes.length === 0) {
+      return { total: 0, sold: 0, types: 0 };
+    }
+    return ticketTypes.reduce(
       (acc, t) => {
-        acc.total += t.totalQty;
-        acc.sold += t.soldQty;
-        acc.checkedIn += t.checkedIn;
+        acc.total += t.totalQty || 0;
+        acc.sold += t.soldQty || 0;
         acc.types += 1;
         return acc;
       },
-      { total: 0, sold: 0, checkedIn: 0, types: 0 }
+      { total: 0, sold: 0, types: 0 }
     );
-  }, [event]);
+  }, [ticketTypes]);
 
   const bookingTotals = useMemo(() => {
-    if (!event) return { confirmed: 0, pending: 0, cancelled: 0, totalBookings: 0 };
-    const { confirmed = 0, pending = 0, cancelled = 0 } = event.bookings || {};
+    const { confirmed = 0, pending = 0, cancelled = 0 } = bookings;
     return {
       confirmed,
       pending,
       cancelled,
       totalBookings: confirmed + pending + cancelled,
     };
-  }, [event]);
+  }, [bookings]);
 
-  const checkInRate = ticketTotals.sold
-    ? Math.round((ticketTotals.checkedIn / ticketTotals.sold) * 100)
-    : 0;
-  const occupancy = ticketTotals.total
-    ? Math.round((ticketTotals.sold / ticketTotals.total) * 100)
-    : 0;
+  const checkInRate =
+    ticketTotals.sold > 0 ? Math.round((checkIns.total / ticketTotals.sold) * 100) : 0;
+  const occupancy =
+    ticketTotals.total > 0 ? Math.round((ticketTotals.sold / ticketTotals.total) * 100) : 0;
   const openCapacity = Math.max(ticketTotals.total - ticketTotals.sold, 0);
-  const avgTicketPrice = ticketTotals.types
-    ? Math.round(
-        event.ticketTypes.reduce((sum, t) => sum + (t.price || 0), 0) / ticketTotals.types
-      )
-    : 0;
-
-  if (!event) return null;
+  const avgTicketPrice =
+    ticketTotals.types > 0
+      ? Math.round(ticketTypes.reduce((sum, t) => sum + (t.price || 0), 0) / ticketTotals.types)
+      : 0;
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: <Home className="w-6 h-6 mr-3" />, to: "/organizer/dashboard" },
@@ -95,9 +243,50 @@ const LiveEventPage = () => {
     else setActiveTab("dashboard");
   }, [location.pathname]);
 
-  const handleNav = (id, to) => {
-    setActiveTab(id);
+  const handleNav = (navId, to) => {
+    setActiveTab(navId);
     navigate(to);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+          <p className="text-white/70">Loading event data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10]">
+        <div className="flex flex-col items-center gap-4 text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-white text-lg">Failed to load event</p>
+          <p className="text-white/60">{error}</p>
+          <button
+            onClick={() => navigate(-1)}
+            className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition text-white"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) return null;
+
+  // Extract venue info
+  const venue = event.venues?.[0] || {};
+  const venueInfo = {
+    address: venue.address || `${venue.name || ""}, ${venue.city || ""}`,
+    contact: venue.contactPhone || venue.contact || "",
+    email: venue.contactEmail || venue.email || "",
   };
 
   return (
@@ -107,10 +296,9 @@ const LiveEventPage = () => {
         className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
       >
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <h1
-            className={`text-2xl font-extrabold tracking-tight ${sidebarOpen ? "block" : "hidden"}`}
-          >
-            <span className="text-red-500">Map</span><span className="text-white">MyParty</span>
+          <h1 className={`text-2xl font-extrabold tracking-tight ${sidebarOpen ? "block" : "hidden"}`}>
+            <span className="text-red-500">Map</span>
+            <span className="text-white">MyParty</span>
           </h1>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -173,21 +361,47 @@ const LiveEventPage = () => {
                     <ArrowLeft className="w-4 h-4" /> Back
                   </button>
                   <div className="flex items-center gap-2">
+                    {/* Real-time connection indicator */}
+                    <div
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs ${
+                        socketConnected
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-100"
+                          : "bg-amber-500/20 border-amber-400/30 text-amber-100"
+                      }`}
+                    >
+                      {socketConnected ? (
+                        <>
+                          <Wifi className="w-3 h-3" />
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          Real-time
+                        </>
+                      ) : (
+                        <>
+                          <WifiOff className="w-3 h-3" />
+                          Connecting...
+                        </>
+                      )}
+                    </div>
                     <button
                       onClick={() => navigate("/organizer/reception")}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 transition text-sm"
                     >
                       <Shield className="w-4 h-4" /> Reception
                     </button>
-                    
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-xs text-white/70 uppercase tracking-[0.22em]">
                   <Sparkles className="w-4 h-4 text-red-300" />
                   Live Event Detail
-                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">{event.eventStatus}</span>
-                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">{event.publishStatus}</span>
-                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">{event.category} • {event.subCategory}</span>
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">
+                    {event.eventStatus}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">
+                    {event.publishStatus}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">
+                    {event.category} {event.subCategory ? `• ${event.subCategory}` : ""}
+                  </span>
                 </div>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="space-y-1">
@@ -197,7 +411,7 @@ const LiveEventPage = () => {
                       {formatDateTime(event.startDate)} — {formatDateTime(event.endDate)}
                       <span className="h-1 w-1 rounded-full bg-white/30" />
                       <MapPin className="w-4 h-4" />
-                      {event.venue}, {event.city}, {event.state}
+                      {venue.name || "Venue"}, {venue.city || ""}, {venue.state || ""}
                     </p>
                   </div>
                 </div>
@@ -211,9 +425,14 @@ const LiveEventPage = () => {
                   <Ticket className="w-4 h-4 text-amber-300" /> Tickets
                 </p>
                 <p className="text-3xl font-bold mt-2">{ticketTotals.total}</p>
-                <p className="text-sm text-white/60">{ticketTotals.types} types • {occupancy}% booked</p>
+                <p className="text-sm text-white/60">
+                  {ticketTotals.types} types • {occupancy}% booked
+                </p>
                 <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-red-500 to-blue-500" style={{ width: `${occupancy}%` }} />
+                  <div
+                    className="h-full bg-gradient-to-r from-red-500 to-blue-500"
+                    style={{ width: `${occupancy}%` }}
+                  />
                 </div>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/30">
@@ -227,7 +446,7 @@ const LiveEventPage = () => {
                 <p className="text-xs uppercase tracking-wide text-white/60 flex items-center gap-2">
                   <Activity className="w-4 h-4 text-emerald-300" /> Checked-in
                 </p>
-                <p className="text-3xl font-bold mt-2 text-emerald-100">{ticketTotals.checkedIn}</p>
+                <p className="text-3xl font-bold mt-2 text-emerald-100">{checkIns.total}</p>
                 <p className="text-sm text-white/60">{checkInRate}% of booked</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/30">
@@ -279,7 +498,19 @@ const LiveEventPage = () => {
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Ticket className="w-5 h-5 text-amber-300" /> Ticket types
                   </h3>
-                  <span className="text-xs text-white/60">From tickets table</span>
+                  <span className="text-xs text-white/60 flex items-center gap-2">
+                    {socketConnected ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Real-time updates
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        Static (connecting...)
+                      </>
+                    )}
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
@@ -290,13 +521,12 @@ const LiveEventPage = () => {
                         <th className="py-2 pr-4 text-left">Price</th>
                         <th className="py-2 pr-4 text-left">Total</th>
                         <th className="py-2 pr-4 text-left">Booked</th>
-                        <th className="py-2 pr-4 text-left">Checked-in</th>
+                        <th className="py-2 pr-4 text-left">Available</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {event.ticketTypes.map((t) => {
+                      {ticketTypes.map((t) => {
                         const bookedPct = t.totalQty ? Math.round((t.soldQty / t.totalQty) * 100) : 0;
-                        const checkedPct = t.soldQty ? Math.round((t.checkedIn / t.soldQty) * 100) : 0;
                         return (
                           <tr key={t.id} className="hover:bg-white/5 transition">
                             <td className="py-3 pr-4 font-semibold text-white">{t.name}</td>
@@ -316,16 +546,9 @@ const LiveEventPage = () => {
                               </div>
                             </td>
                             <td className="py-3 pr-4">
-                              <div className="flex items-center gap-2">
-                                <span className="text-white/80">{t.checkedIn}</span>
-                                <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden w-24">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-emerald-400 to-cyan-500"
-                                    style={{ width: `${checkedPct}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-white/60">{checkedPct}%</span>
-                              </div>
+                              <span className={`${t.availableQty === 0 ? "text-red-400" : "text-emerald-400"}`}>
+                                {t.availableQty}
+                              </span>
                             </td>
                           </tr>
                         );
@@ -359,26 +582,22 @@ const LiveEventPage = () => {
                   <div>
                     <div className="flex items-center justify-between text-xs text-white/60">
                       <span>Checked-in</span>
-                      <span>{ticketTotals.checkedIn}</span>
+                      <span>{checkIns.total}</span>
                     </div>
                     <div className="h-2 rounded-full bg-white/5 overflow-hidden border border-white/5">
                       <div
                         className="h-full bg-gradient-to-r from-emerald-400 to-cyan-500"
                         style={{
                           width: ticketTotals.sold
-                            ? `${Math.round((ticketTotals.checkedIn / ticketTotals.sold) * 100)}%`
+                            ? `${Math.round((checkIns.total / ticketTotals.sold) * 100)}%`
                             : "0%",
                         }}
                       />
                     </div>
                   </div>
                   <div className="text-xs text-white/60">
-                    Last 15 min check-ins: <span className="text-white">{event.checkIns?.last15m || 0}</span>
+                    Last 15 min check-ins: <span className="text-white">{checkIns.last15m}</span>
                   </div>
-                </div>
-                <div className="space-y-2 text-sm text-white/70">
-                  <p className="font-semibold text-white">Ops Notes</p>
-                  <p>{event.opsNotes}</p>
                 </div>
               </div>
             </div>
@@ -389,18 +608,11 @@ const LiveEventPage = () => {
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-blue-300" /> Venue
                 </h3>
-                <p className="text-sm text-white/80">{event.venue}</p>
-                <p className="text-sm text-white/60">{event.venueInfo?.address}</p>
+                <p className="text-sm text-white/80">{venue.name || "Venue"}</p>
+                <p className="text-sm text-white/60">{venueInfo.address}</p>
                 <div className="text-xs text-white/60 space-y-1">
-                  <p>Contact: {event.venueInfo?.contact}</p>
-                  <p>Email: {event.venueInfo?.email}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {event.tags.map((tag) => (
-                    <span key={tag} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-white/70">
-                      {tag}
-                    </span>
-                  ))}
+                  {venueInfo.contact && <p>Contact: {venueInfo.contact}</p>}
+                  {venueInfo.email && <p>Email: {venueInfo.email}</p>}
                 </div>
               </div>
 
@@ -410,9 +622,7 @@ const LiveEventPage = () => {
                 </h3>
                 <p className="text-sm text-white/80">Start: {formatDateTime(event.startDate)}</p>
                 <p className="text-sm text-white/80">End: {formatDateTime(event.endDate)}</p>
-                <div className="text-xs text-white/60">
-                  Day label: {formatDate(event.startDate)}
-                </div>
+                <div className="text-xs text-white/60">Day label: {formatDate(event.startDate)}</div>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/30 space-y-3">
@@ -423,8 +633,8 @@ const LiveEventPage = () => {
                   Use staff scanner for QR codes. Ensure split lanes per ticket type (VIP / GA / Guestlist).
                 </p>
                 <div className="text-xs text-white/60 space-y-1">
-                  <p>Guestlist: {event.ticketTypes.filter((t) => t.type === "GUESTLIST").length} types</p>
-                  <p>Paid tickets: {event.ticketTypes.filter((t) => t.price > 0).length} types</p>
+                  <p>Guestlist: {ticketTypes.filter((t) => t.type === "GUESTLIST").length} types</p>
+                  <p>Paid tickets: {ticketTypes.filter((t) => t.price > 0).length} types</p>
                 </div>
               </div>
             </div>
@@ -435,7 +645,6 @@ const LiveEventPage = () => {
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Users className="w-5 h-5 text-cyan-300" /> Bookings health
                 </h3>
-                <span className="text-xs text-white/60">From bookings table</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4">

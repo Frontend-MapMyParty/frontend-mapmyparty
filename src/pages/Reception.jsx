@@ -1,11 +1,91 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, Sparkles, Clock, MapPin, Radio, Users, Ticket } from "lucide-react";
-import { getLiveEventSamples, formatDateTime } from "@/data/liveEventsSample";
+import { Shield, Sparkles, Clock, MapPin, Radio, Users, Ticket, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { apiFetch } from "@/config/api";
+import { formatDateTime } from "@/data/liveEventsSample";
+
+const transformEvents = (events) =>
+  (events || []).map((event) => {
+    const ticketTypes = (event.tickets || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      price: t.price,
+      totalQty: t.totalQty || 0,
+      soldQty: t.soldQty || 0,
+      checkedIn: 0,
+    }));
+
+    return {
+      id: event.id,
+      title: event.title,
+      category: event.category,
+      subCategory: event.subCategory,
+      venue: event.venues?.[0]?.name || "Venue TBD",
+      city: event.venues?.[0]?.city || "",
+      state: event.venues?.[0]?.state || "",
+      startDate: event.startDate,
+      endDate: event.endDate,
+      eventStatus: event.eventStatus,
+      publishStatus: event.publishStatus,
+      ticketTypes,
+    };
+  });
 
 const ReceptionLanding = () => {
-  const { liveEvents } = useMemo(() => getLiveEventSamples(), []);
+  const [liveEvents, setLiveEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const hasFetchedRef = useRef(false);
+
+  const fetchLiveEvents = useCallback(async (isManualRefresh = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (!hasFetchedRef.current || isManualRefresh) {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const response = await apiFetch("promoter/live-events?status=ONGOING");
+      if (!isMountedRef.current) return;
+      const data = response.data || response;
+      const events = data.events || [];
+      setLiveEvents(transformEvents(events));
+      hasFetchedRef.current = true;
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      console.error("Error fetching live events:", err);
+      setError(err.message || "Failed to load live events");
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    fetchLiveEvents();
+    const interval = setInterval(() => {
+      fetchLiveEvents(false);
+    }, 30000);
+
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
+    };
+  }, [fetchLiveEvents]);
+
+  const handleManualRefresh = useCallback(() => {
+    fetchLiveEvents(true);
+  }, [fetchLiveEvents]);
 
   const noEventsToday = !liveEvents || liveEvents.length === 0;
 
@@ -28,7 +108,24 @@ const ReceptionLanding = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 lg:px-6 py-6 space-y-5">
-        {noEventsToday ? (
+        {loading && liveEvents.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-lg shadow-black/25 flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-emerald-300 animate-spin" />
+            <p className="text-sm text-white/70">Loading live events...</p>
+          </div>
+        ) : error && liveEvents.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-lg shadow-black/25 space-y-3">
+            <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
+            <p className="text-lg font-semibold">Failed to load live events</p>
+            <p className="text-sm text-white/60">{error}</p>
+            <button
+              onClick={handleManualRefresh}
+              className="mx-auto px-4 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15 transition text-sm inline-flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
+          </div>
+        ) : noEventsToday ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-lg shadow-black/25">
             <p className="text-lg font-semibold">No live events today</p>
             <p className="text-sm text-white/60 mt-2">Once an event is live, it will appear here for check-ins.</p>
