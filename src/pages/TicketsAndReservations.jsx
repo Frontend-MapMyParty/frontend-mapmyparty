@@ -14,164 +14,11 @@ const TicketsAndReservations = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Sample Tickets Data
-  const ticketsData = [
-    {
-      id: "TKT001",
-      eventName: "Summer Music Festival 2024",
-      ticketType: "VIP Pass",
-      quantity: 2,
-      price: "₹5,000",
-      totalAmount: "₹10,000",
-      customerName: "John Smith",
-      email: "john@example.com",
-      phone: "+91 9876543210",
-      purchaseDate: "28 Nov 2024",
-      status: "confirmed",
-      checkInStatus: "checked-in",
-    },
-    {
-      id: "TKT002",
-      eventName: "Tech Conference 2024",
-      ticketType: "Standard Pass",
-      quantity: 1,
-      price: "₹2,500",
-      totalAmount: "₹2,500",
-      customerName: "Sarah Johnson",
-      email: "sarah@example.com",
-      phone: "+91 9876543211",
-      purchaseDate: "27 Nov 2024",
-      status: "confirmed",
-      checkInStatus: "pending",
-    },
-    {
-      id: "TKT003",
-      eventName: "Food & Wine Tasting",
-      ticketType: "Premium Ticket",
-      quantity: 4,
-      price: "₹3,000",
-      totalAmount: "₹12,000",
-      customerName: "Mike Brown",
-      email: "mike@example.com",
-      phone: "+91 9876543212",
-      purchaseDate: "26 Nov 2024",
-      status: "confirmed",
-      checkInStatus: "checked-in",
-    },
-    {
-      id: "TKT004",
-      eventName: "Yoga Retreat Weekend",
-      ticketType: "Early Bird",
-      quantity: 1,
-      price: "₹1,500",
-      totalAmount: "₹1,500",
-      customerName: "Emily Chen",
-      email: "emily@example.com",
-      phone: "+91 9876543213",
-      purchaseDate: "25 Nov 2024",
-      status: "pending",
-      checkInStatus: "pending",
-    },
-    {
-      id: "TKT005",
-      eventName: "Summer Music Festival 2024",
-      ticketType: "General Admission",
-      quantity: 3,
-      price: "₹2,000",
-      totalAmount: "₹6,000",
-      customerName: "David Wilson",
-      email: "david@example.com",
-      phone: "+91 9876543214",
-      purchaseDate: "24 Nov 2024",
-      status: "cancelled",
-      checkInStatus: "cancelled",
-    },
-    {
-      id: "TKT006",
-      eventName: "Corporate Gala Dinner",
-      ticketType: "VIP Table",
-      quantity: 8,
-      price: "₹8,000",
-      totalAmount: "₹64,000",
-      customerName: "Lisa Anderson",
-      email: "lisa@example.com",
-      phone: "+91 9876543215",
-      purchaseDate: "23 Nov 2024",
-      status: "confirmed",
-      checkInStatus: "checked-in",
-    },
-  ];
+  // Empty data - to be populated from API
+  const ticketsData = [];
+  const reservationsData = [];
 
-  // Sample Reservations Data
-  const reservationsData = [
-    {
-      id: "RES001",
-      eventName: "Summer Music Festival 2024",
-      reservationType: "VIP Seating",
-      seats: "A1, A2, A3",
-      customerName: "Robert Taylor",
-      email: "robert@example.com",
-      phone: "+91 9876543216",
-      reservationDate: "28 Nov 2024",
-      eventDate: "15 Dec 2024",
-      status: "confirmed",
-      notes: "Window seating preferred",
-    },
-    {
-      id: "RES002",
-      eventName: "Tech Conference 2024",
-      reservationType: "Front Row",
-      seats: "B5, B6",
-      customerName: "Jennifer Lee",
-      email: "jennifer@example.com",
-      phone: "+91 9876543217",
-      reservationDate: "27 Nov 2024",
-      eventDate: "10 Dec 2024",
-      status: "confirmed",
-      notes: "Wheelchair accessible seat",
-    },
-    {
-      id: "RES003",
-      eventName: "Food & Wine Tasting",
-      reservationType: "Table for 4",
-      seats: "Table 12",
-      customerName: "James Martinez",
-      email: "james@example.com",
-      phone: "+91 9876543218",
-      reservationDate: "26 Nov 2024",
-      eventDate: "08 Dec 2024",
-      status: "pending",
-      notes: "Vegetarian menu requested",
-    },
-    {
-      id: "RES004",
-      eventName: "Yoga Retreat Weekend",
-      reservationType: "Premium Mat",
-      seats: "P1",
-      customerName: "Amanda White",
-      email: "amanda@example.com",
-      phone: "+91 9876543219",
-      reservationDate: "25 Nov 2024",
-      eventDate: "05 Dec 2024",
-      status: "confirmed",
-      notes: "Beginner level preferred",
-    },
-    {
-      id: "RES005",
-      eventName: "Corporate Gala Dinner",
-      reservationType: "Table for 10",
-      seats: "Table 5",
-      customerName: "Christopher Davis",
-      email: "chris@example.com",
-      phone: "+91 9876543220",
-      reservationDate: "24 Nov 2024",
-      eventDate: "20 Dec 2024",
-      status: "cancelled",
-      notes: "Cancelled due to scheduling conflict",
-    },
-  ];
-
-  // Statistics
+  // Statistics based on actual data
   const statistics = {
     totalTickets: ticketsData.length,
     confirmedTickets: ticketsData.filter((t) => t.status === "confirmed").length,
@@ -333,37 +180,45 @@ const TicketsAndReservations = () => {
 
           {/* Tickets Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-white/5 border-b border-white/10 text-white/60 uppercase text-[11px]">
-                <tr>
-                  <th className="px-5 py-3 text-left font-semibold">Ticket ID</th>
-                  <th className="px-5 py-3 text-left font-semibold">Event</th>
-                  <th className="px-5 py-3 text-left font-semibold">Customer</th>
-                  <th className="px-5 py-3 text-left font-semibold">Type</th>
-                  <th className="px-5 py-3 text-left font-semibold">Qty</th>
-                  <th className="px-5 py-3 text-left font-semibold">Amount</th>
-                  <th className="px-5 py-3 text-left font-semibold">Status</th>
-                  <th className="px-5 py-3 text-left font-semibold">Check-in</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredTickets.map((ticket) => (
-                  <tr key={ticket.id} className="hover:bg-white/5 transition">
-                    <td className="px-5 py-4 font-semibold text-white">{ticket.id}</td>
-                    <td className="px-5 py-4 text-white/80">{ticket.eventName}</td>
-                    <td className="px-5 py-4 text-white/80">
-                      <div>{ticket.customerName}</div>
-                      <div className="text-xs text-white/50">{ticket.email}</div>
-                    </td>
-                    <td className="px-5 py-4 text-white/80">{ticket.ticketType}</td>
-                    <td className="px-5 py-4 text-white/80">{ticket.quantity}</td>
-                    <td className="px-5 py-4 font-semibold text-white">{ticket.totalAmount}</td>
-                    <td className="px-5 py-4">{getStatusBadge(ticket.status)}</td>
-                    <td className="px-5 py-4">{getCheckInBadge(ticket.checkInStatus)}</td>
+            {filteredTickets.length === 0 ? (
+              <div className="px-5 py-16 text-center">
+                <CheckCircle className="w-12 h-12 mx-auto mb-4 text-white/30" />
+                <p className="text-white/60 text-lg font-medium">No tickets found</p>
+                <p className="text-white/40 text-sm mt-1">Tickets will appear here when customers make purchases</p>
+              </div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="bg-white/5 border-b border-white/10 text-white/60 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-5 py-3 text-left font-semibold">Ticket ID</th>
+                    <th className="px-5 py-3 text-left font-semibold">Event</th>
+                    <th className="px-5 py-3 text-left font-semibold">Customer</th>
+                    <th className="px-5 py-3 text-left font-semibold">Type</th>
+                    <th className="px-5 py-3 text-left font-semibold">Qty</th>
+                    <th className="px-5 py-3 text-left font-semibold">Amount</th>
+                    <th className="px-5 py-3 text-left font-semibold">Status</th>
+                    <th className="px-5 py-3 text-left font-semibold">Check-in</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredTickets.map((ticket) => (
+                    <tr key={ticket.id} className="hover:bg-white/5 transition">
+                      <td className="px-5 py-4 font-semibold text-white">{ticket.id}</td>
+                      <td className="px-5 py-4 text-white/80">{ticket.eventName}</td>
+                      <td className="px-5 py-4 text-white/80">
+                        <div>{ticket.customerName}</div>
+                        <div className="text-xs text-white/50">{ticket.email}</div>
+                      </td>
+                      <td className="px-5 py-4 text-white/80">{ticket.ticketType}</td>
+                      <td className="px-5 py-4 text-white/80">{ticket.quantity}</td>
+                      <td className="px-5 py-4 font-semibold text-white">{ticket.totalAmount}</td>
+                      <td className="px-5 py-4">{getStatusBadge(ticket.status)}</td>
+                      <td className="px-5 py-4">{getCheckInBadge(ticket.checkInStatus)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -375,39 +230,47 @@ const TicketsAndReservations = () => {
 
           {/* Reservations Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-white/5 border-b border-white/10 text-white/60 uppercase text-[11px]">
-                <tr>
-                  <th className="px-5 py-3 text-left font-semibold">Reservation ID</th>
-                  <th className="px-5 py-3 text-left font-semibold">Event</th>
-                  <th className="px-5 py-3 text-left font-semibold">Customer</th>
-                  <th className="px-5 py-3 text-left font-semibold">Type</th>
-                  <th className="px-5 py-3 text-left font-semibold">Seats</th>
-                  <th className="px-5 py-3 text-left font-semibold">Event Date</th>
-                  <th className="px-5 py-3 text-left font-semibold">Status</th>
-                  <th className="px-5 py-3 text-left font-semibold">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {reservationsData.map((reservation) => (
-                  <tr key={reservation.id} className="hover:bg-white/5 transition">
-                    <td className="px-5 py-4 font-semibold text-white">{reservation.id}</td>
-                    <td className="px-5 py-4 text-white/80">{reservation.eventName}</td>
-                    <td className="px-5 py-4 text-white/80">
-                      <div>{reservation.customerName}</div>
-                      <div className="text-xs text-white/50">{reservation.email}</div>
-                    </td>
-                    <td className="px-5 py-4 text-white/80">{reservation.reservationType}</td>
-                    <td className="px-5 py-4 text-white/80">{reservation.seats}</td>
-                    <td className="px-5 py-4 text-white/80">{reservation.eventDate}</td>
-                    <td className="px-5 py-4">{getStatusBadge(reservation.status)}</td>
-                    <td className="px-5 py-4 text-white/80 max-w-xs truncate" title={reservation.notes}>
-                      {reservation.notes}
-                    </td>
+            {reservationsData.length === 0 ? (
+              <div className="px-5 py-16 text-center">
+                <Clock className="w-12 h-12 mx-auto mb-4 text-white/30" />
+                <p className="text-white/60 text-lg font-medium">No reservations found</p>
+                <p className="text-white/40 text-sm mt-1">Reservations will appear here when customers book seats</p>
+              </div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="bg-white/5 border-b border-white/10 text-white/60 uppercase text-[11px]">
+                  <tr>
+                    <th className="px-5 py-3 text-left font-semibold">Reservation ID</th>
+                    <th className="px-5 py-3 text-left font-semibold">Event</th>
+                    <th className="px-5 py-3 text-left font-semibold">Customer</th>
+                    <th className="px-5 py-3 text-left font-semibold">Type</th>
+                    <th className="px-5 py-3 text-left font-semibold">Seats</th>
+                    <th className="px-5 py-3 text-left font-semibold">Event Date</th>
+                    <th className="px-5 py-3 text-left font-semibold">Status</th>
+                    <th className="px-5 py-3 text-left font-semibold">Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {reservationsData.map((reservation) => (
+                    <tr key={reservation.id} className="hover:bg-white/5 transition">
+                      <td className="px-5 py-4 font-semibold text-white">{reservation.id}</td>
+                      <td className="px-5 py-4 text-white/80">{reservation.eventName}</td>
+                      <td className="px-5 py-4 text-white/80">
+                        <div>{reservation.customerName}</div>
+                        <div className="text-xs text-white/50">{reservation.email}</div>
+                      </td>
+                      <td className="px-5 py-4 text-white/80">{reservation.reservationType}</td>
+                      <td className="px-5 py-4 text-white/80">{reservation.seats}</td>
+                      <td className="px-5 py-4 text-white/80">{reservation.eventDate}</td>
+                      <td className="px-5 py-4">{getStatusBadge(reservation.status)}</td>
+                      <td className="px-5 py-4 text-white/80 max-w-xs truncate" title={reservation.notes}>
+                        {reservation.notes}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

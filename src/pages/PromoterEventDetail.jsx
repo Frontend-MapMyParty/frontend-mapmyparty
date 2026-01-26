@@ -14,105 +14,42 @@ import { useEvents } from "@/hooks/useEvents";
 const PromoterEventDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { events } = useEvents();
+  const { events, loading } = useEvents();
 
-  const mockEvents = [
-    {
-      id: "1",
-      title: "Summer Music Festival 2024",
-      organizer: "ABC Events",
-      date: "July 15, 2024",
-      time: "6:00 PM - 11:00 PM",
-      location: "Central Park, New York",
-      status: "published",
-      category: "Music",
-      ticketsSold: 4850,
-      totalTickets: 5000,
-      revenue: 28500,
-      image: eventMusic,
-      description:
-        "Join us for an unforgettable evening of live music featuring top artists from around the world. Experience incredible performances across multiple stages with food, drinks, and entertainment for all ages.",
-      views: 15420,
-      shares: 892,
-    },
-    {
-      id: "2",
-      title: "Tech Innovation Conference",
-      organizer: "TechCorp",
-      date: "August 22, 2024",
-      time: "9:00 AM - 6:00 PM",
-      location: "Convention Center, San Francisco",
-      status: "published",
-      category: "Conference",
-      ticketsSold: 1850,
-      totalTickets: 2000,
-      revenue: 19960,
-      image: eventConference,
-      description:
-        "Explore the latest in technology innovation with keynote speakers, workshops, and networking opportunities. Connect with industry leaders and discover cutting-edge solutions.",
-      views: 8950,
-      shares: 421,
-    },
-    {
-      id: "3",
-      title: "Food & Wine Festival",
-      organizer: "Culinary Dreams",
-      date: "September 10, 2024",
-      time: "12:00 PM - 8:00 PM",
-      location: "Waterfront Plaza, Miami",
-      status: "published",
-      category: "Food",
-      ticketsSold: 3200,
-      totalTickets: 4000,
-      revenue: 45000,
-      image: eventFood,
-      description:
-        "Savor exquisite culinary creations paired with fine wines from renowned vineyards. Enjoy cooking demonstrations, tastings, and meet celebrity chefs.",
-      views: 12340,
-      shares: 678,
-    },
-    {
-      id: "4",
-      title: "Winter Gala Night",
-      organizer: "Elite Events",
-      date: "December 10, 2024",
-      time: "7:00 PM - 12:00 AM",
-      location: "Grand Hotel Ballroom, Chicago",
-      status: "draft",
-      category: "Arts",
-      ticketsSold: 0,
-      totalTickets: 500,
-      revenue: 0,
-      image: eventMusic,
-      description:
-        "An elegant evening of fine dining, live entertainment, and charity auctions. Dress to impress and support a great cause.",
-      views: 2340,
-      shares: 45,
-    },
-  ];
-
-  const allEvents = [
-    ...mockEvents,
-    ...events.map((e) => ({
-      id: e.id,
-      title: e.title,
-      organizer: "EventHub Organizer",
-      date: e.date,
-      time: "TBD",
-      location: e.location,
-      status: e.status,
-      category: e.category,
-      ticketsSold: 0,
-      totalTickets: 0,
-      revenue: 0,
-      image: e.image,
-      description: "Event description not available.",
-      views: 0,
-      shares: 0,
-    })),
-  ];
+  const allEvents = events.map((e) => ({
+    id: e.id,
+    title: e.title,
+    organizer: e.organizer?.name || "Event Organizer",
+    date: e.date || e.startDate,
+    time: e.time || "TBD",
+    location: e.location || e.venue || "TBA",
+    status: e.status || "published",
+    category: e.category || "Event",
+    ticketsSold: e.ticketsSold || 0,
+    totalTickets: e.totalTickets || 0,
+    revenue: e.revenue || 0,
+    image: e.image || e.coverImage || eventMusic,
+    description: e.description || "No description available.",
+    views: e.views || 0,
+    shares: e.shares || 0,
+  }));
 
   const event = allEvents.find((e) => e.id === id);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading event...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -121,6 +58,7 @@ const PromoterEventDetail = () => {
         <main className="flex-1 container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <h1 className="text-2xl font-bold mb-4">Event Not Found</h1>
+            <p className="text-muted-foreground mb-4">The event you're looking for doesn't exist or has been removed.</p>
             <Button onClick={() => navigate("/promoter/dashboard")}>
               Back to Dashboard
             </Button>
