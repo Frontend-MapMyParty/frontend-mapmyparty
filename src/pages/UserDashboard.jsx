@@ -294,17 +294,9 @@ const UserDashboard = () => {
     fetchBookings();
   };
 
-  const sampleImages = [
-    "https://images.unsplash.com/photo-1504893524553-b8553b1b3b17?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=1",
-    "https://images.unsplash.com/photo-1502810190503-830027c39e5a?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=2",
-    "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=3",
-  ];
-
-  const getSampleImage = (ticket, idx = 0) => {
-    // Prefer provided image, otherwise pick from sample set
-    if (ticket?.image) return ticket.image;
-    const pick = sampleImages[idx % sampleImages.length];
-    return pick;
+  const getEventImage = (ticket) => {
+    // Return actual image if available, otherwise null
+    return ticket?.image || ticket?.coverImage || null;
   };
 
   const handleDownloadTicket = async (ticket) => {
@@ -342,21 +334,23 @@ const UserDashboard = () => {
       });
 
       // Optional small event image on top-right if available
-      try {
-        const imgUrl = getSampleImage(ticket);
-        // fetch image and convert to data URL
-        const resp = await fetch(imgUrl);
-        const blob = await resp.blob();
-        const reader = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = rej;
-          r.readAsDataURL(blob);
-        });
-        doc.addImage(reader, "JPEG", 420, 40, 120, 120);
-      } catch (imgErr) {
-        // ignore image errors
-        // console.warn('Image not added to PDF', imgErr);
+      const imgUrl = getEventImage(ticket);
+      if (imgUrl) {
+        try {
+          // fetch image and convert to data URL
+          const resp = await fetch(imgUrl);
+          const blob = await resp.blob();
+          const reader = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = rej;
+            r.readAsDataURL(blob);
+          });
+          doc.addImage(reader, "JPEG", 420, 40, 120, 120);
+        } catch (imgErr) {
+          // ignore image errors
+          // console.warn('Image not added to PDF', imgErr);
+        }
       }
 
       // Terms block at bottom

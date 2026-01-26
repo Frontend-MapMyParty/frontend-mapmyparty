@@ -2,7 +2,16 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import { Shield, Sparkles, Clock, MapPin, Radio, Users, Ticket, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/config/api";
-import { formatDateTime } from "@/data/liveEventsSample";
+
+// Date formatter utility
+const formatDateTime = (date) =>
+  new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
 
 const transformEvents = (events) =>
   (events || []).map((event) => {

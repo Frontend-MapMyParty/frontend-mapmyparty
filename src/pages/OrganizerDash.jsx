@@ -13,53 +13,26 @@ import {
 import { useOrganizerEvents } from "@/hooks/useOrganizerEvents";
 
 const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
-  // Real data via hook (falls back to local data if API not available)
+  // Real data via hook
   const { events, loading, error, statistics, refresh } = useOrganizerEvents();
-  const useSample = useMemo(() => !!error || (!loading && events.length === 0), [error, loading, events]);
 
   const totals = useMemo(
     () => ({
-      totalEvents: useSample ? 0 : (statistics.totalEvents || 0),
-      totalAttendees: useSample ? 15420 : (statistics.totalAttendees || 0),
-      totalRevenue: useSample ? 48560 : (statistics.totalRevenue || 0),
-      totalTickets: useSample ? 8234 : (statistics.totalTicketsSold || 0),
-      published: useSample ? 2 : (statistics.publishedEvents || 0),
-      drafts: useSample ? 0 : (statistics.draftEvents || 0),
+      totalEvents: statistics.totalEvents || 0,
+      totalAttendees: statistics.totalAttendees || 0,
+      totalRevenue: statistics.totalRevenue || 0,
+      totalTickets: statistics.totalTicketsSold || 0,
+      published: statistics.publishedEvents || 0,
+      drafts: statistics.draftEvents || 0,
     }),
-    [useSample, statistics]
+    [statistics]
   );
 
   const formatNumber = (n) => new Intl.NumberFormat("en-IN").format(n || 0);
   const formatCurrency = (n) => `₹${new Intl.NumberFormat("en-IN").format(n || 0)}`;
 
-  const bookings = [
-    { id: "6289", customer: "John Smith", dateTime: "2025-06-15T19:00:00", tickets: 2, price: "₹5,400", status: "Confirmed" },
-    { id: "3261", customer: "Sarah Johnson", dateTime: "2025-06-04T21:30:00", tickets: 2, price: "₹7,200", status: "Pending" },
-    { id: "4678", customer: "Mike Brown", dateTime: "2025-06-03T19:00:00", tickets: 1, price: "₹3,200", status: "Confirmed" },
-    { id: "4692", customer: "Emily Chen", dateTime: "2025-06-03T20:00:00", tickets: 4, price: "₹12,000", status: "Cancelled" },
-  ];
-
-  // Dummy insight series for charts
-  const revenueSeries = [120, 90, 150, 180, 210, 160, 240];
-  const ticketSeries = [420, 360, 520, 610, 700, 540, 760];
-  const weekdayBookings = [
-    { day: "Mon", value: 38 },
-    { day: "Tue", value: 44 },
-    { day: "Wed", value: 52 },
-    { day: "Thu", value: 61 },
-    { day: "Fri", value: 88 },
-    { day: "Sat", value: 97 },
-    { day: "Sun", value: 72 },
-  ];
-
-  const sampleEvents = [
-    { id: "sunset", title: "Sunset Beats Fest", date: "2025-06-28T19:00:00", city: "Mumbai", tickets: 420, revenue: 240000, status: "Live" },
-    { id: "fusion", title: "Culture Fusion Night", date: "2025-07-05T18:30:00", city: "Bengaluru", tickets: 310, revenue: 182000, status: "Live" },
-    { id: "summit", title: "Creator Growth Summit", date: "2025-07-12T10:00:00", city: "Delhi", tickets: 190, revenue: 154000, status: "Draft" },
-  ];
-
   const liveEvents = useMemo(() => {
-    if (!useSample && events.length) {
+    if (events.length) {
       return events.slice(0, 3).map((e) => ({
         id: e.id || e.eventId,
         title: e.title || e.eventTitle || "Untitled Event",
@@ -70,14 +43,14 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
         status: (e.status2 || e.status || "Live").toUpperCase(),
       }));
     }
-    return sampleEvents;
-  }, [events, useSample]);
+    return [];
+  }, [events]);
 
   const kpis = [
-    { label: "Live Events", value: formatNumber(totals.published), hint: "+2 vs last week", icon: Sparkles },
-    { label: "Attendees", value: formatNumber(useSample ? 15240 : totals.totalAttendees), hint: "+8% MoM", icon: Users },
-    { label: "Revenue", value: formatCurrency(totals.totalRevenue), hint: "₹12.4k pending", icon: IndianRupee },
-    { label: "Tickets Sold", value: formatNumber(totals.totalTickets), hint: "3.4% conversion ↑", icon: Ticket },
+    { label: "Live Events", value: formatNumber(totals.published), hint: `${totals.drafts} drafts`, icon: Sparkles },
+    { label: "Attendees", value: formatNumber(totals.totalAttendees), hint: "Total attendees", icon: Users },
+    { label: "Revenue", value: formatCurrency(totals.totalRevenue), hint: "Total revenue", icon: IndianRupee },
+    { label: "Tickets Sold", value: formatNumber(totals.totalTickets), hint: "All time", icon: Ticket },
   ];
 
   const eventHealth = [
@@ -172,28 +145,41 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
                 </button>
               </div>
               <div className="space-y-3">
-                {liveEvents.map((ev) => (
-                  <div key={ev.id} className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{ev.title}</h4>
-                        {getStatusBadge(ev.status)}
-                      </div>
-                      <p className="text-xs text-white/60 mt-1 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {formatDate(ev.date)}
-                        <span className="h-1 w-1 rounded-full bg-white/30" />
-                        <MapPin className="w-4 h-4" />
-                        {ev.city}
-                      </p>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-sm text-white/60">Tickets</p>
-                      <p className="text-lg font-semibold">{formatNumber(ev.tickets)}</p>
-                      <p className="text-xs text-white/60">Revenue {formatCurrency(ev.revenue)}</p>
-                    </div>
+                {loading ? (
+                  <div className="text-center py-8 text-white/60">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    <p className="text-sm">Loading events...</p>
                   </div>
-                ))}
+                ) : liveEvents.length === 0 ? (
+                  <div className="text-center py-8 text-white/60">
+                    <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No events yet</p>
+                    <p className="text-xs mt-1">Create your first event to get started</p>
+                  </div>
+                ) : (
+                  liveEvents.map((ev) => (
+                    <div key={ev.id} className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{ev.title}</h4>
+                          {getStatusBadge(ev.status)}
+                        </div>
+                        <p className="text-xs text-white/60 mt-1 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          {formatDate(ev.date)}
+                          <span className="h-1 w-1 rounded-full bg-white/30" />
+                          <MapPin className="w-4 h-4" />
+                          {ev.city}
+                        </p>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <p className="text-sm text-white/60">Tickets</p>
+                        <p className="text-lg font-semibold">{formatNumber(ev.tickets)}</p>
+                        <p className="text-xs text-white/60">Revenue {formatCurrency(ev.revenue)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
             
@@ -255,7 +241,7 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
           </div>
         </div>
 
-        {/* Bookings table */}
+        {/* Bookings table - empty state */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur shadow-lg shadow-black/20">
           <div className="px-5 py-4 flex items-center justify-between">
             <div>
@@ -264,31 +250,10 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
             </div>
             <button className="text-xs font-semibold text-red-300 hover:text-red-200">View all</button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-white/5 text-white/60">
-                <tr>
-                  <th className="px-5 py-3 text-left font-medium">Booking ID</th>
-                  <th className="px-5 py-3 text-left font-medium">Customer</th>
-                  <th className="px-5 py-3 text-left font-medium">Date & Time</th>
-                  <th className="px-5 py-3 text-right font-medium">Tickets</th>
-                  <th className="px-5 py-3 text-right font-medium">Amount</th>
-                  <th className="px-5 py-3 text-right font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {bookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-white/5 transition">
-                    <td className="px-5 py-3 font-semibold">{b.id}</td>
-                    <td className="px-5 py-3">{b.customer}</td>
-                    <td className="px-5 py-3 text-white/70">{formatDate(b.dateTime)}</td>
-                    <td className="px-5 py-3 text-right">{b.tickets}</td>
-                    <td className="px-5 py-3 text-right">{b.price}</td>
-                    <td className="px-5 py-3 text-right">{getStatusBadge(b.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="px-5 py-12 text-center text-white/60">
+            <Ticket className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            <p className="text-sm">No recent bookings</p>
+            <p className="text-xs mt-1">Bookings will appear here when customers purchase tickets</p>
           </div>
         </div>
       </div>
