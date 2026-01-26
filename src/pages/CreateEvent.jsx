@@ -616,6 +616,21 @@ const CreateEvent = () => {
       setVenueContact(eventToEdit.venueContact || "");
       setVenueEmail(eventToEdit.venueEmail || "");
       setFullAddress(firstVenue.fullAddress || firstVenue.address || "");
+
+      // Set original venue data for change detection
+      setOriginalVenueData({
+        name: pickVenueName(firstVenue),
+        contact: eventToEdit.venueContact || "",
+        email: eventToEdit.venueEmail || "",
+        fullAddress: firstVenue.fullAddress || firstVenue.address || "",
+        city: firstVenue.city || "",
+        state: firstVenue.state || "",
+        country: eventToEdit.country || "India",
+        postalCode: eventToEdit.postalCode || "",
+        latitude: firstVenue.latitude || 0,
+        longitude: firstVenue.longitude || 0,
+      });
+      setVenueCreated(true);
     } else if (eventToEdit.location) {
       const locationParts = eventToEdit.location.split(", ");
       if (locationParts.length > 0) setVenueName(locationParts[0]);
@@ -1532,6 +1547,9 @@ const CreateEvent = () => {
             
             console.log('💾 Saved updated venue data:', { id: updatedVenueId });
             toast.success("Venue updated successfully!");
+
+            // Update originalVenueData to prevent unnecessary API calls on next visit
+            setOriginalVenueData(venueData);
             
             // Update the response with the ID for the rest of the function
             response.id = updatedVenueId;
@@ -1588,6 +1606,9 @@ const CreateEvent = () => {
             
             console.log('✅ Created new venue with ID:', newVenueId);
             toast.success("Venue created successfully!");
+
+            // Update originalVenueData to prevent unnecessary API calls on next visit
+            setOriginalVenueData(venueData);
             
             // Update the response with the ID for the rest of the function
             response.id = newVenueId;
@@ -2214,6 +2235,13 @@ const CreateEvent = () => {
     }
   };
 
+  const handleRemoveArtistPhoto = (index) => {
+    const newArtists = [...artists];
+    newArtists[index].photo = "";
+    newArtists[index].image = "";
+    setArtists(newArtists);
+  };
+
   const openTicketModal = (type) => {
     setSelectedTicketType(type);
     setTicketModalOpen(true);
@@ -2316,6 +2344,14 @@ const CreateEvent = () => {
       setShowLoading(false);
       setLoadingMessage("");
     }
+  };
+
+  const handleRemoveSponsorLogo = (index) => {
+    setSponsors((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], logoUrl: "", logo: "" };
+      return next;
+    });
   };
 
   const handleSaveTicket = async (ticketData) => {
@@ -2974,6 +3010,16 @@ const CreateEvent = () => {
                                         alt={`${sponsor.name || "Sponsor"} logo`}
                                         className="w-full h-full object-contain p-2"
                                       />
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="icon"
+                                        className="absolute -top-2 -right-2 h-7 w-7 rounded-full"
+                                        onClick={() => handleRemoveSponsorLogo(index)}
+                                        title="Remove logo"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
                                     </div>
                                   )}
                                 </div>
@@ -3488,6 +3534,16 @@ const CreateEvent = () => {
                                   alt={`${artist.name} preview`} 
                                   className="w-full h-full object-cover"
                                 />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute top-1 right-1 h-7 w-7"
+                                  onClick={() => handleRemoveArtistPhoto(index)}
+                                  title="Remove photo"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
                               </div>
                             )}
                             <p className="text-xs text-muted-foreground">JPG/PNG/WebP</p>

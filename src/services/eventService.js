@@ -13,7 +13,21 @@ async function getCloudinarySignature(folder) {
     const errJson = await res.json().catch(() => ({}));
     throw new Error(errJson.errorMessage || errJson.message || "Cloudinary not configured");
   }
-  return res.json();
+
+  const json = await res.json().catch(() => ({}));
+  // Backend responses are wrapped as { code, data, success, message }
+  const payload = json && json.data ? json.data : json;
+
+  // Tolerate snake_case keys if present
+  if (payload && (!payload.cloudName || !payload.apiKey) && (payload.cloud_name || payload.api_key)) {
+    return {
+      ...payload,
+      cloudName: payload.cloudName || payload.cloud_name,
+      apiKey: payload.apiKey || payload.api_key,
+    };
+  }
+
+  return payload;
 }
 
 /**
