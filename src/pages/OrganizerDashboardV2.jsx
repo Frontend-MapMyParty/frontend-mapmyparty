@@ -42,6 +42,7 @@ import MyEvents from "./MyEvents";
 import LiveEvents from "./LiveEvents";
 import Reception from "./Reception";
 import FoodBeverages from "./FoodBeverages";
+import Logo from "@/assets/MMP logo.svg";
 
 // Profile Content Component
 const OrganizerProfileContent = ({ user }) => {
@@ -1270,7 +1271,8 @@ const OrganizerDashboardV2 = () => {
     { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
     { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
     { id: "food-beverages", name: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" /> },
-    { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
+    // Temporarily hidden - uncomment to restore
+    // { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
 
   // Sync active tab from URL
@@ -1304,11 +1306,12 @@ const OrganizerDashboardV2 = () => {
         className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}
       >
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <h1
-            className={`text-2xl font-extrabold tracking-tight ${sidebarOpen ? "block" : "hidden"}`}
+          <button
+            onClick={() => handleNav("dashboard")}
+            className={`${sidebarOpen ? "block" : "hidden"} hover:opacity-80 transition`}
           >
-            <span className="text-red-500">Map</span><span className="text-white">MyParty</span>
-          </h1>
+            <img src={Logo} alt="MapMyParty" className="h-10 w-auto" />
+          </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 rounded-lg hover:bg-white/5 text-white/80"
