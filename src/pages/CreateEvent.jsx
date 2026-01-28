@@ -33,12 +33,13 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, createEventStep1, persistFlyerUrl } from "@/services/eventService";
+import { updateEventStep1, updateEventStep2, deleteFlyerImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, createEventStep1, persistFlyerUrl, syncEventGalleryImages, extractPublicIdFromCloudinaryUrl } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
+import EventImagesDraftSection from "@/components/EventImagesDraftSection";
 
 const CreateEvent = () => {
   const navigate = useNavigate();
@@ -54,20 +55,20 @@ const CreateEvent = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [eventType, setEventType] = useState("one-time");
   const [coverImage, setCoverImage] = useState(null);
-  const [coverImageFile, setCoverImageFile] = useState(null);
   const [existingGalleryUrls, setExistingGalleryUrls] = useState([]); // Existing images from backend (URLs)
   const [galleryImages, setGalleryImages] = useState([]); // All images (existing URLs + new previews)
-  const [galleryImageFiles, setGalleryImageFiles] = useState([]); // Only NEW files to upload
   const [galleryImageIds, setGalleryImageIds] = useState([]); // Map of URL -> ID for deletion
   const [deletedImageIds, setDeletedImageIds] = useState(new Set()); // Track deleted image IDs to filter them out
   const [imagesChanged, setImagesChanged] = useState(false);
   const [textFieldsChanged, setTextFieldsChanged] = useState(false); // Track if text fields changed
   const [removeFlyerImage, setRemoveFlyerImage] = useState(false); // Track if flyer should be removed
   const [removeGalleryIds, setRemoveGalleryIds] = useState([]); // Track gallery image IDs to remove
-  const [uploadingCover, setUploadingCover] = useState(false); // Loader for cover image upload
-  const [uploadingGallery, setUploadingGallery] = useState(false); // Loader for gallery upload
   const [loadingMessage, setLoadingMessage] = useState(""); // Message for loading overlay
   const [showLoading, setShowLoading] = useState(false); // Control loading overlay visibility
+  const [flyerDraft, setFlyerDraft] = useState(null); // { url, publicId } | null
+  const [flyerOrigin, setFlyerOrigin] = useState(null); // 'draft' | 'persisted' | null
+  const [galleryDraft, setGalleryDraft] = useState([]); // Array<{ url, publicId }>
+  const [galleryOriginByPublicId, setGalleryOriginByPublicId] = useState({}); // publicId -> 'draft' | 'persisted'
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedTicketType, setSelectedTicketType] = useState(null);
   const [savedTickets, setSavedTickets] = useState([]);
@@ -215,6 +216,21 @@ const CreateEvent = () => {
   const editId = searchParams.get('edit');
   const eventTypeParam = searchParams.get('type');
   const isEditMode = !!editId;
+
+  const imagesDirty =
+    flyerOrigin === "draft" ||
+    Object.values(galleryOriginByPublicId || {}).some((v) => v === "draft") ||
+    Boolean(removeFlyerImage);
+
+  useEffect(() => {
+    setCoverImage(flyerDraft?.url || null);
+  }, [flyerDraft]);
+
+  useEffect(() => {
+    const urls = galleryDraft.map((img) => img.url);
+    setGalleryImages(urls);
+    setExistingGalleryUrls(urls);
+  }, [galleryDraft]);
 
   // Form data
   const [eventTitle, setEventTitle] = useState("");
@@ -549,7 +565,19 @@ const CreateEvent = () => {
     setEventDescription(eventToEdit.description || "");
     setMainCategory(eventToEdit.category || "");
     setSelectedCategories([eventToEdit.subCategory || eventToEdit.subcategory || ""]);
-    setCoverImage(eventToEdit.flyerImage || eventToEdit.image || eventToEdit.flyer);
+    const initialFlyerUrl = eventToEdit.flyerImage || eventToEdit.image || eventToEdit.flyer;
+    setCoverImage(initialFlyerUrl);
+    if (initialFlyerUrl) {
+      const flyerPublicId =
+        eventToEdit.flyerPublicId ||
+        eventToEdit.flyerPublicID ||
+        extractPublicIdFromCloudinaryUrl(initialFlyerUrl);
+      if (flyerPublicId) {
+        setFlyerDraft({ url: initialFlyerUrl, publicId: flyerPublicId });
+        setFlyerOrigin("persisted");
+        setRemoveFlyerImage(false);
+      }
+    }
     hydrateGallery(eventToEdit.images);
     setAdditionalFromEvent(eventToEdit);
     const startDateStr = toDateStr(start);
@@ -877,9 +905,17 @@ const CreateEvent = () => {
           
           // Load cover image (or clear if none exists)
           if (eventData.flyerImage) {
+            const flyerPublicId = eventData.flyerPublicId || extractPublicIdFromCloudinaryUrl(eventData.flyerImage);
+            if (flyerPublicId) {
+              setFlyerDraft({ url: eventData.flyerImage, publicId: flyerPublicId });
+              setFlyerOrigin("persisted");
+              setRemoveFlyerImage(false);
+            }
             setCoverImage(eventData.flyerImage);
             console.log("✅ Loaded cover image:", eventData.flyerImage);
           } else {
+            setFlyerDraft(null);
+            setFlyerOrigin(null);
             setCoverImage(null);
             console.log("ℹ️ No cover image in backend - cleared");
           }
@@ -903,25 +939,38 @@ const CreateEvent = () => {
             console.log("📋 Valid gallery images after deletion filter:", validGalleryImages.length);
             
             if (validGalleryImages.length > 0) {
-              const imageUrls = validGalleryImages.map(img => img.url);
-              const imageIdMap = {};
-              validGalleryImages.forEach(img => {
-                imageIdMap[img.url] = img.id; // Store ID for deletion
+              const normalized = validGalleryImages
+                .map((img) => {
+                  const url = img.url;
+                  const publicId = img.cloudinaryPublicId || img.publicId || extractPublicIdFromCloudinaryUrl(url);
+                  return url && publicId ? { url, publicId } : null;
+                })
+                .filter(Boolean);
+
+              const seen = new Set();
+              const deduped = normalized.filter((img) => {
+                if (seen.has(img.publicId)) return false;
+                seen.add(img.publicId);
+                return true;
               });
-              
-              // Update UI with ONLY valid images from backend
-              setExistingGalleryUrls(imageUrls);
-              setGalleryImages(imageUrls);
-              setGalleryImageIds(imageIdMap);
-              
-              console.log(`✅ Loaded ${imageUrls.length} valid gallery images`);
-              console.log("📋 Image URLs:", imageUrls);
-              console.log("📋 Image IDs:", imageIdMap);
+
+              setGalleryDraft(deduped);
+              setGalleryOriginByPublicId(() => {
+                const map = {};
+                deduped.forEach((img) => {
+                  map[img.publicId] = "persisted";
+                });
+                return map;
+              });
+
+              console.log(`✅ Loaded ${deduped.length} valid gallery images`);
             } else {
               // No valid gallery images in backend
               setExistingGalleryUrls([]);
               setGalleryImages([]);
               setGalleryImageIds({});
+              setGalleryDraft([]);
+              setGalleryOriginByPublicId({});
               console.log("ℹ️ No valid gallery images - cleared all");
             }
           } else {
@@ -929,6 +978,8 @@ const CreateEvent = () => {
             setExistingGalleryUrls([]);
             setGalleryImages([]);
             setGalleryImageIds({});
+            setGalleryDraft([]);
+            setGalleryOriginByPublicId({});
             console.log("ℹ️ No images array in backend response - cleared all");
           }
           
@@ -940,6 +991,8 @@ const CreateEvent = () => {
           setGalleryImages([]);
           setGalleryImageIds({});
           setExistingGalleryUrls([]);
+          setGalleryDraft([]);
+          setGalleryOriginByPublicId({});
         }
       }
     };
@@ -1042,8 +1095,18 @@ const CreateEvent = () => {
         return;
       }
 
-      if (!coverImage && !coverImageFile) {
+      if (!flyerDraft?.url || !flyerDraft?.publicId) {
         toast.error("Cover image is required");
+        return;
+      }
+
+      if (galleryDraft.some((img) => !img?.url || !img?.publicId)) {
+        toast.error("Gallery images are missing required metadata.");
+        return;
+      }
+
+      if (new Set(galleryDraft.map((img) => img.publicId)).size !== galleryDraft.length) {
+        toast.error("Duplicate gallery images detected.");
         return;
       }
 
@@ -1063,7 +1126,7 @@ const CreateEvent = () => {
         if (hasExistingDraft) {
           // UPDATE existing event (user went back to step 1)
           console.log("🔄 Updating existing draft event:", backendEventId);
-          const hasAnyChanges = textFieldsChanged || imagesChanged;
+          const hasAnyChanges = textFieldsChanged || imagesDirty;
           console.log("📝 Text fields changed?", textFieldsChanged, "🖼️ Images changed?", imagesChanged);
           
           try {
@@ -1074,65 +1137,7 @@ const CreateEvent = () => {
               return;
             }
 
-            // Upload media first (backend /update-event is JSON-only)
-            if (imagesChanged) {
-              if (coverImageFile) {
-                try {
-                  const coverResp = await uploadFlyerImage(backendEventId, coverImageFile);
-                  const coverData = coverResp.data || coverResp;
-                  const imageUrl = coverData.flyerImage || coverData.url;
-                  if (imageUrl) setCoverImage(imageUrl);
-                } catch (err) {
-                  console.error("❌ Failed to upload flyer image during edit:", err);
-                  toast.error(err?.message || "Failed to upload cover image");
-                  return;
-                }
-              }
-
-              if (galleryImageFiles.length > 0) {
-                try {
-                  const galleryResp = await uploadGalleryImages(backendEventId, galleryImageFiles);
-                  const respData = galleryResp.data || galleryResp;
-                  const galleryImagesData = Array.isArray(respData.images)
-                    ? respData.images
-                    : Array.isArray(respData.galleryImages)
-                      ? respData.galleryImages
-                      : [];
-
-                  const newImageUrls = galleryImagesData
-                    .filter((img) => (img.type ? img.type === "EVENT_GALLERY" : true))
-                    .map((img) => img.url || img);
-
-                  const newImageIdMap = {};
-                  galleryImagesData.forEach((img) => {
-                    const url = img.url || img;
-                    const id = img.id || img._id;
-                    if (url && id) newImageIdMap[url] = id;
-                  });
-
-                  const updatedGallery = [...existingGalleryUrls, ...newImageUrls];
-                  setExistingGalleryUrls(updatedGallery);
-                  setGalleryImages(updatedGallery);
-                  setGalleryImageIds((prev) => ({ ...prev, ...newImageIdMap }));
-                } catch (err) {
-                  console.error("❌ Failed to upload gallery images during edit:", err);
-                  toast.error(err?.message || "Failed to upload gallery images");
-                  return;
-                }
-              }
-
-              // Clear pending files after uploads
-              setImagesChanged(false);
-              setGalleryImageFiles([]);
-              setCoverImageFile(null);
-            }
-
-            // If only images changed, advance without JSON update
-            if (!textFieldsChanged) {
-              console.log("ℹ️ Only image changes detected; skipping update-event payload");
-              setCurrentStep(currentStep + 1);
-              return;
-            }
+            // No image uploads here. Images are uploaded client-side on selection.
 
             const eventData = {
               eventTitle,
@@ -1145,14 +1150,40 @@ const CreateEvent = () => {
             console.log("📤 Sending JSON update payload via updateEventStep1", eventData);
 
             response = await updateEventStep1(backendEventId, eventData);
+
+            // Persist uploaded image metadata (no uploads here)
+            try {
+              if (removeFlyerImage) {
+                await deleteFlyerImage(backendEventId);
+              } else if (flyerDraft) {
+                await persistFlyerUrl(backendEventId, flyerDraft);
+              }
+              await syncEventGalleryImages(backendEventId, galleryDraft);
+
+              if (flyerDraft) {
+                setFlyerOrigin("persisted");
+              } else {
+                setFlyerOrigin(null);
+              }
+              setGalleryOriginByPublicId(() => {
+                const map = {};
+                galleryDraft.forEach((img) => {
+                  map[img.publicId] = "persisted";
+                });
+                return map;
+              });
+              setRemoveFlyerImage(false);
+            } catch (imgErr) {
+              console.error("❌ Failed to persist image metadata:", imgErr);
+              toast.error(imgErr?.message || "Failed to save images. Please try again.");
+              return;
+            }
             
             toast.success("Event details updated successfully!");
             
             // Reset change flags after successful update
             setTextFieldsChanged(false);
             setImagesChanged(false);
-            setGalleryImageFiles([]);
-            setCoverImageFile(null);
           } catch (updateError) {
             console.error("⚠️ Update failed:", updateError);
             toast.error(updateError?.message || "Failed to update event. Please try again.");
@@ -1181,72 +1212,33 @@ const CreateEvent = () => {
             console.log("💾 Backend Event ID stored:", backendId);
           }
           
-          if (backendId && coverImageFile) {
-            // Fallback: if no temp upload exists, upload directly
+          // Persist uploaded image metadata (no uploads here)
+          if (backendId) {
             try {
-              setShowLoading(true);
-              setLoadingMessage("Saving cover image...");
-              const coverResp = await uploadFlyerImage(backendId, coverImageFile);
-              const coverData = coverResp.data || coverResp;
-              const imageUrl = coverData.flyerImage || coverData.url;
-              if (imageUrl) {
-                setCoverImage(imageUrl);
-                toast.success("Cover image saved to event.");
+              if (removeFlyerImage) {
+                await deleteFlyerImage(backendId);
+              } else if (flyerDraft) {
+                await persistFlyerUrl(backendId, flyerDraft);
               }
-            } catch (err) {
-              console.error("Failed to persist cover image after create:", err);
-              toast.error(err?.message || "Cover image upload failed after create.");
-            } finally {
-              setShowLoading(false);
-              setLoadingMessage("");
-            }
-          }
-          
-          // After event exists, persist gallery images using already-uploaded temp URLs (no re-upload)
-          if (backendId && galleryImageFiles.length > 0) {
-            // Fallback: upload if no temp uploads are available
-            try {
-              setShowLoading(true);
-              setLoadingMessage("Saving gallery images...");
-              const galleryResp = await uploadGalleryImages(backendId, galleryImageFiles);
-              const respData = galleryResp.data || galleryResp;
-              
-              if (respData.images && Array.isArray(respData.images)) {
-                const galleryImagesData = respData.images.filter(img => img.type === 'EVENT_GALLERY');
-                const newImageUrls = galleryImagesData.map(img => img.url);
-                const newImageIdMap = {};
-                galleryImagesData.forEach(img => { newImageIdMap[img.url] = img.id; });
-                
-                const updatedGalleryImages = [...galleryImages, ...newImageUrls];
-                const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
-                
-                setExistingGalleryUrls(updatedGalleryImages);
-                setGalleryImages(updatedGalleryImages);
-                setGalleryImageIds(updatedImageIdMap);
-                setGalleryImageFiles([]); // clear pending files
-                
-                toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
-              } else if (respData.galleryImages && Array.isArray(respData.galleryImages)) {
-                const newImageUrls = respData.galleryImages.map(img => img.url || img);
-                const newImageIdMap = {};
-                respData.galleryImages.forEach(img => { if (img.id && img.url) newImageIdMap[img.url] = img.id; });
-                
-                const updatedGalleryImages = [...galleryImages, ...newImageUrls];
-                const updatedImageIdMap = { ...galleryImageIds, ...newImageIdMap };
-                
-                setExistingGalleryUrls(updatedGalleryImages);
-                setGalleryImages(updatedGalleryImages);
-                setGalleryImageIds(updatedImageIdMap);
-                setGalleryImageFiles([]);
-                
-                toast.success(`${newImageUrls.length} gallery image(s) saved to event.`);
+              await syncEventGalleryImages(backendId, galleryDraft);
+
+              if (flyerDraft) {
+                setFlyerOrigin("persisted");
+              } else {
+                setFlyerOrigin(null);
               }
-            } catch (err) {
-              console.error("Failed to persist gallery images after create:", err);
-              toast.error(err?.message || "Gallery upload failed after create.");
-            } finally {
-              setShowLoading(false);
-              setLoadingMessage("");
+              setGalleryOriginByPublicId(() => {
+                const map = {};
+                galleryDraft.forEach((img) => {
+                  map[img.publicId] = "persisted";
+                });
+                return map;
+              });
+              setRemoveFlyerImage(false);
+            } catch (imgErr) {
+              console.error("❌ Failed to persist image metadata after create:", imgErr);
+              toast.error(imgErr?.message || "Failed to save images. Please try again.");
+              return;
             }
           }
           
@@ -1872,263 +1864,7 @@ const CreateEvent = () => {
     }
   };
 
-  const handleCoverImageChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    setUploadingCover(true);
-    try {
-      const preview = URL.createObjectURL(file);
-      setCoverImage(preview);
-      setCoverImageFile(file);
-      setImagesChanged(true);
-      setRemoveFlyerImage(false);
-      toast.success("Cover image added. It will upload when you save.");
-    } catch (error) {
-      console.error("Failed to stage cover image:", error);
-      toast.error(error.message || "Failed to add cover image.");
-      setCoverImage(null);
-      setCoverImageFile(null);
-    } finally {
-      setUploadingCover(false);
-    }
-  };
-
-  const handleRemoveCoverImage = async () => {
-    // If editing existing event with backend ID and has existing cover image
-    if (backendEventId && coverImage && typeof coverImage === 'string' && !coverImage.startsWith('data:')) {
-      try {
-        setLoadingMessage("Deleting cover image...");
-        setShowLoading(true);
-        
-        console.log("🗑️ Deleting flyer image from backend immediately...");
-        await deleteFlyerImage(backendEventId);
-        
-        console.log("✅ Flyer image deleted from backend successfully!");
-        
-        // Remove from UI immediately after successful backend deletion
-        setCoverImage(null);
-        setCoverImageFile(null);
-        setRemoveFlyerImage(true);
-        setImagesChanged(true);
-        
-        toast.success("Cover image deleted successfully!");
-        console.log("✅ Cover image removed from UI and backend");
-        
-      } catch (error) {
-        console.error("Failed to delete flyer image:", error);
-        toast.error("Failed to delete image from server");
-        return; // Don't remove from UI if backend deletion failed
-      } finally {
-        setShowLoading(false);
-      }
-    } else {
-      // For local images (not yet uploaded), just remove from UI
-      console.log("🗑️ Removing local cover image from UI");
-      
-      setCoverImage(null);
-      setCoverImageFile(null);
-      setRemoveFlyerImage(true);
-      setImagesChanged(true);
-      
-      console.log("✅ Local cover image removed from UI");
-    }
-  };
-
-  const handleGalleryImagesChange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    // Check file types
-    const validFiles = [];
-    const invalidFiles = [];
-
-    for (const file of files) {
-      if (!file.type.match('image.*')) {
-        invalidFiles.push(file.name);
-        continue;
-      }
-      validFiles.push(file);
-    }
-
-    if (invalidFiles.length > 0) {
-      toast.error(`Invalid files (${invalidFiles.join(', ')}) - Only images are allowed`);
-      if (validFiles.length === 0) return;
-    }
-
-    // Check total count (max 10 gallery images)
-    const currentCount = galleryImages.length;
-    if (currentCount + validFiles.length > 10) {
-      toast.error(`Maximum 10 gallery images allowed. You already have ${currentCount} image(s).`);
-      return;
-    }
-
-    try {
-      setUploadingGallery(true);
-
-      const previews = validFiles.map((f) => URL.createObjectURL(f));
-      const updatedGalleryImages = [...galleryImages, ...previews];
-
-      setGalleryImages(updatedGalleryImages);
-      setGalleryImageFiles((prev) => [...prev, ...validFiles]);
-      setImagesChanged(true);
-
-      toast.success(`${validFiles.length} gallery image(s) added. They will upload when you save.`);
-    } catch (error) {
-      console.error("Failed to stage gallery images:", error);
-      toast.error(error.message || "Failed to add gallery images.");
-    } finally {
-      // Reset the file input to allow re-uploading the same file
-      if (e.target) {
-        e.target.value = '';
-      }
-      setUploadingGallery(false);
-    }
-  };
-
-// ... (rest of the code remains the same)
-  const removeGalleryImage = async (index) => {
-    const imageToRemove = galleryImages[index];
-    
-    console.log("🔍 Attempting to remove gallery image at index:", index);
-    console.log("   Image URL:", imageToRemove);
-    console.log("   Backend event ID:", backendEventId);
-    console.log("   All gallery image IDs:", galleryImageIds);
-    
-    // Check if this image has an ID in our map (means it's from backend)
-    const imageId = galleryImageIds[imageToRemove];
-    
-    if (imageId && backendEventId) {
-      try {
-        setLoadingMessage("Deleting gallery image...");
-        setShowLoading(true);
-        
-        console.log("🗑️ Deleting gallery image from backend...");
-        console.log("   Image ID:", imageId);
-        console.log("   DELETE URL:", `/api/event/${backendEventId}/images/${imageId}`);
-        
-        // Call DELETE API using new deleteGalleryImage function
-        await deleteGalleryImage(backendEventId, imageId);
-        
-        console.log("✅ Gallery image deleted from backend successfully!");
-        
-        // Mark this image as deleted so it never shows again
-        setDeletedImageIds(prev => {
-          const newSet = new Set(prev);
-          newSet.add(imageId);
-          // Persist to sessionStorage
-          sessionStorage.setItem('deletedImageIds', JSON.stringify([...newSet]));
-          console.log("🔒 Added to deleted images list:", imageId);
-          return newSet;
-        });
-        
-      } catch (error) {
-        console.error("❌ Failed to delete gallery image from backend:", error);
-        
-        // Check if error is 404 (image already deleted) or other error
-        const errorMessage = error.message || "";
-        if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-          console.warn("⚠️ Image already deleted from backend, marking as deleted");
-          
-          // Still mark as deleted to prevent showing again
-          setDeletedImageIds(prev => {
-            const newSet = new Set(prev);
-            newSet.add(imageId);
-            sessionStorage.setItem('deletedImageIds', JSON.stringify([...newSet]));
-            return newSet;
-          });
-          
-          toast.info("Image already deleted, removing from display");
-        } else {
-          toast.error("Failed to delete image from server");
-          setShowLoading(false);
-          return; // Don't remove from UI if it's a real error
-        }
-      }
-      
-      // Remove from UI after deletion attempt (successful or 404)
-      setGalleryImages((prev) => prev.filter((_, i) => i !== index));
-      
-      // Remove from tracking
-      setExistingGalleryUrls(prev => prev.filter(url => url !== imageToRemove));
-      
-      // Remove from ID map
-      setGalleryImageIds(prev => {
-        const newMap = { ...prev };
-        delete newMap[imageToRemove];
-        return newMap;
-      });
-      
-      setImagesChanged(true);
-      
-      console.log("✅ Gallery image removed from UI and marked as permanently deleted");
-      setShowLoading(false);
-      
-    } else {
-      // For local images (not yet uploaded), just remove from UI
-      console.log("🗑️ Removing local gallery image from UI");
-      
-      setGalleryImages((prev) => prev.filter((_, i) => i !== index));
-      
-      // Remove from files if it's a new upload (no ID)
-      const newFileIndex = index - Object.keys(galleryImageIds).length;
-      if (newFileIndex >= 0) {
-        setGalleryImageFiles((prev) => prev.filter((_, i) => i !== newFileIndex));
-      }
-      
-      setImagesChanged(true);
-      console.log("✅ Local gallery image removed from UI");
-    }
-  };
-
-  // Helper function to extract image ID from URL
-  const extractImageId = (imageUrl) => {
-    try {
-      console.log("🔍 Extracting image ID from URL:", imageUrl);
-      
-      // Different URL patterns:
-      // Cloudinary: https://res.cloudinary.com/.../v1234567/abc123.jpg
-      // S3: https://bucket.s3.amazonaws.com/folder/abc123.jpg
-      // Direct: https://server.com/uploads/abc123.jpg
-      
-      // Method 1: Try to get the last segment (most common)
-      const urlParts = imageUrl.split('/');
-      const lastSegment = urlParts[urlParts.length - 1];
-      
-      // Remove query parameters if any
-      const cleanSegment = lastSegment.split('?')[0];
-      
-      // Remove file extension
-      const imageId = cleanSegment.split('.')[0];
-      
-      console.log("   Last segment:", lastSegment);
-      console.log("   Clean segment:", cleanSegment);
-      console.log("   Extracted ID:", imageId);
-      
-      // Validate that we got something meaningful
-      if (imageId && imageId.length > 3) {
-        return imageId;
-      }
-      
-      // Method 2: If ID is too short, try second-to-last segment (for some URL structures)
-      if (urlParts.length > 2) {
-        const secondLast = urlParts[urlParts.length - 2];
-        console.log("   Trying second-to-last segment:", secondLast);
-        
-        // Check if it looks like an ID (alphanumeric, no special chars)
-        if (/^[a-zA-Z0-9_-]+$/.test(secondLast) && secondLast.length > 5) {
-          console.log("   Using second-to-last as ID:", secondLast);
-          return secondLast;
-        }
-      }
-      
-      console.warn("⚠️ Could not extract valid image ID from URL");
-      return null;
-    } catch (error) {
-      console.error("❌ Failed to extract image ID:", error);
-      return null;
-    }
-  };
 
   const handleArtistPhotoChange = async (index, e) => {
     const file = e.target.files?.[0];
@@ -2449,10 +2185,10 @@ const CreateEvent = () => {
           startDate: startDate,
           endDate: endDate,
           date: startDate, // Alias for compatibility
-          flyerImage: coverImage,
-          flyerImageUrl: coverImage,
-          image: coverImage, // Alias for compatibility
-          galleryImages: galleryImages,
+          flyerImage: flyerDraft?.url || null,
+          flyerImageUrl: flyerDraft?.url || null,
+          image: flyerDraft?.url || null, // Alias for compatibility
+          galleryImages: galleryDraft.map((img) => img.url),
           ticketsSold: 0,
           totalTickets: savedTickets.reduce((sum, t) => sum + (t.available || 0), 0),
           revenue: 0,
@@ -2717,117 +2453,21 @@ const CreateEvent = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      Add a striking cover and gallery to make your event pop.
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cover-image">Cover Image *</Label>
-                      <div className="space-y-3">
-                        <Input 
-                          id="cover-image" 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleCoverImageChange}
-                          className={`${fieldClass} cursor-pointer`}
-                          disabled={uploadingCover || !basicDetailsFilled}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Recommended size: 1920x1080px.
-                        </p>
-                        {!basicDetailsFilled && (
-                          <p className="text-xs text-amber-400">
-                            Fill title, category, and subcategory to enable image uploads.
-                          </p>
-                        )}
-                        
-                        {/* Loading indicator for cover upload */}
-                        {uploadingCover && (
-                          <div className="flex items-center gap-2 text-sm text-primary">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Uploading cover image to cloud...</span>
-                          </div>
-                        )}
-                        
-                        {coverImage && !uploadingCover && (
-                          <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
-                            <img 
-                              src={coverImage} 
-                              alt="Cover preview" 
-                              className="w-full h-full object-cover"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-2 right-2"
-                              onClick={handleRemoveCoverImage}
-                              title="Delete from cloud"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="gallery">Gallery Images (optional)</Label>
-                      <div className="space-y-3">
-                        <Input 
-                          id="gallery" 
-                          type="file" 
-                          accept="image/*" 
-                          multiple 
-                          onChange={handleGalleryImagesChange}
-                          className={`${fieldClass} cursor-pointer`}
-                          disabled={uploadingGallery || !basicDetailsFilled}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Add up to 10 images. Max file size: 10MB each. Images upload immediately after selection.
-                        </p>
-                        
-                        {/* Loading indicator for gallery upload */}
-                        {uploadingGallery && (
-                          <div className="flex items-center gap-2 text-sm text-primary">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Uploading gallery images to cloud...</span>
-                          </div>
-                        )}
-                        
-                        {galleryImages.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {galleryImages.map((img, index) => (
-                              <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
-                                <img 
-                                  src={img} 
-                                  alt={`Gallery preview ${index + 1}`} 
-                                  className="w-full h-full object-cover"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon"
-                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => removeGalleryImage(index)}
-                                  title="Delete from cloud"
-                                  disabled={uploadingGallery}
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {galleryImages.length > 0 && !uploadingGallery && (
-                          <p className="text-xs text-success">
-                            ✅ {galleryImages.length} image{galleryImages.length !== 1 ? 's' : ''} uploaded to cloud
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <EventImagesDraftSection
+                    backendEventId={backendEventId}
+                    ensureBackendEventId={ensureBackendEventId}
+                    basicDetailsFilled={basicDetailsFilled}
+                    fieldClass={fieldClass}
+                    flyerDraft={flyerDraft}
+                    setFlyerDraft={setFlyerDraft}
+                    flyerOrigin={flyerOrigin}
+                    setFlyerOrigin={setFlyerOrigin}
+                    setRemoveFlyerImage={setRemoveFlyerImage}
+                    galleryDraft={galleryDraft}
+                    setGalleryDraft={setGalleryDraft}
+                    galleryOriginByPublicId={galleryOriginByPublicId}
+                    setGalleryOriginByPublicId={setGalleryOriginByPublicId}
+                  />
                 </div>
               )}
 

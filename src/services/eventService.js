@@ -7,6 +7,25 @@ const getAuthToken = () =>
   localStorage.getItem("authToken") ||
   "";
 
+export function extractPublicIdFromCloudinaryUrl(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname || "";
+    const marker = "/upload/";
+    const idx = pathname.indexOf(marker);
+    if (idx === -1) return null;
+
+    let rest = pathname.slice(idx + marker.length);
+    rest = rest.replace(/^v\d+\//, "");
+    rest = rest.replace(/\.[^./]+$/, "");
+    rest = rest.replace(/^\//, "");
+    return rest || null;
+  } catch {
+    return null;
+  }
+}
+
 async function getCloudinarySignature(type, entityId) {
   if (!type || !entityId) {
     throw new Error("Upload signature requires both type and entityId");
@@ -66,6 +85,39 @@ export async function uploadTempImage(file, type, entityId) {
   const publicId = uploadJson.public_id || uploadJson.publicId;
 
   return { url, publicId, raw: uploadJson };
+}
+
+export async function deleteDraftImage(publicId, type) {
+  if (!publicId) throw new Error("publicId is required");
+
+  const url = buildUrl("/api/cloudinary/draft");
+  const payload = type ? { publicId, type } : { publicId };
+
+  return apiFetch(url, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function syncEventGalleryImages(eventId, images) {
+  if (!eventId) throw new Error("Event ID is required");
+  const url = buildUrl(`/api/event/${eventId}/images/sync`);
+  const normalized = Array.isArray(images)
+    ? images
+        .filter(Boolean)
+        .map((img) => ({
+          url: img.url,
+          publicId: img.publicId,
+          type: "EVENT_GALLERY",
+        }))
+    : [];
+
+  return apiFetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ images: normalized }),
+  });
 }
 
 /**
