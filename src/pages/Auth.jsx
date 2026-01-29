@@ -238,7 +238,7 @@ const Auth = () => {
       const dashboardPath = type === "organizer" 
         ? "/organizer/dashboard-v2" 
         : type === "promoter" 
-        ? "/promoter/dashboard" 
+        ? "/promoter" 
         : "/dashboard";
       
       console.log(`🚀 Navigating to dashboard: ${dashboardPath}`);
@@ -251,8 +251,27 @@ const Auth = () => {
   };
 
   const handlePromoterLogin = () => {
-    // Directly redirect to promoter dashboard without showing auth form
-    navigate("/promoter/dashboard");
+    // Directly mark promoter as authenticated (guest) and redirect to dashboard
+    sessionStorage.setItem("isAuthenticated", "true");
+    sessionStorage.setItem("role", "PROMOTER");
+    sessionStorage.setItem("userType", "promoter");
+    sessionStorage.setItem("authProvider", "promoter-guest");
+    sessionStorage.setItem("promoterGuest", "true");
+
+    const guestProfile = {
+      role: "PROMOTER",
+      type: "promoter",
+      name: "Promoter Guest",
+      authProvider: "promoter-guest",
+    };
+
+    try {
+      sessionStorage.setItem("userProfile", JSON.stringify(guestProfile));
+    } catch (err) {
+      console.warn("Unable to persist promoter guest profile", err);
+    }
+
+    navigate("/promoter", { replace: true });
   };
 
   const handleGoogleLogin = () => {

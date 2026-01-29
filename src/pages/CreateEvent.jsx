@@ -33,7 +33,7 @@ import eventMusic from "@/assets/event-music.jpg";
 import TicketTypeModal from "@/components/TicketTypeModal";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, createEventStep1, persistFlyerUrl } from "@/services/eventService";
+import { updateEventStep1, updateEventStep2, uploadFlyerImage, deleteFlyerImage, uploadGalleryImages, deleteGalleryImage, generateEventId, createTicket, deleteTicket, createVenue, updateVenue, createArtist, updateEventStep6, uploadArtistImage, createEventStep1, persistFlyerUrl, uploadDraftImage, persistGalleryUrls, deleteDraftCloudinaryImage } from "@/services/eventService";
 import { apiFetch } from "@/config/api";
 import { TEMPLATE_CONFIGS, DETAIL_TEMPLATE_CONFIGS, getTemplateConfig, mapTemplateId, mapTemplateNameToId } from "@/config/templates";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,10 +55,12 @@ const CreateEvent = () => {
   const [eventType, setEventType] = useState("one-time");
   const [coverImage, setCoverImage] = useState(null);
   const [coverImageFile, setCoverImageFile] = useState(null);
+  const [coverPublicId, setCoverPublicId] = useState(null);
   const [existingGalleryUrls, setExistingGalleryUrls] = useState([]); // Existing images from backend (URLs)
   const [galleryImages, setGalleryImages] = useState([]); // All images (existing URLs + new previews)
   const [galleryImageFiles, setGalleryImageFiles] = useState([]); // Only NEW files to upload
   const [galleryImageIds, setGalleryImageIds] = useState([]); // Map of URL -> ID for deletion
+  const [galleryImagePublicIds, setGalleryImagePublicIds] = useState({}); // Map URL -> Cloudinary publicId
   const [deletedImageIds, setDeletedImageIds] = useState(new Set()); // Track deleted image IDs to filter them out
   const [imagesChanged, setImagesChanged] = useState(false);
   const [textFieldsChanged, setTextFieldsChanged] = useState(false); // Track if text fields changed
@@ -66,6 +68,8 @@ const CreateEvent = () => {
   const [removeGalleryIds, setRemoveGalleryIds] = useState([]); // Track gallery image IDs to remove
   const [uploadingCover, setUploadingCover] = useState(false); // Loader for cover image upload
   const [uploadingGallery, setUploadingGallery] = useState(false); // Loader for gallery upload
+  const [draftCoverPublicId, setDraftCoverPublicId] = useState(null); // Store draft cover publicId for later persistence
+  const [draftGalleryUploads, setDraftGalleryUploads] = useState([]); // Store draft gallery uploads { url, publicId }
   const [loadingMessage, setLoadingMessage] = useState(""); // Message for loading overlay
   const [showLoading, setShowLoading] = useState(false); // Control loading overlay visibility
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -513,6 +517,7 @@ const CreateEvent = () => {
         setExistingGalleryUrls([]);
         setGalleryImages([]);
         setGalleryImageIds({});
+        setGalleryImagePublicIds({});
         return;
       }
 
@@ -522,16 +527,20 @@ const CreateEvent = () => {
       if (validGalleryImages.length > 0) {
         const imageUrls = validGalleryImages.map((img) => img.url);
         const imageIdMap = {};
+        const publicIdMap = {};
         validGalleryImages.forEach((img) => {
           imageIdMap[img.url] = img.id;
+          if (img.publicId) publicIdMap[img.url] = img.publicId;
         });
         setExistingGalleryUrls(imageUrls);
         setGalleryImages(imageUrls);
         setGalleryImageIds(imageIdMap);
+        setGalleryImagePublicIds(publicIdMap);
       } else {
         setExistingGalleryUrls([]);
         setGalleryImages([]);
         setGalleryImageIds({});
+        setGalleryImagePublicIds({});
       }
     };
 
@@ -1076,23 +1085,40 @@ const CreateEvent = () => {
 
             // Upload media first (backend /update-event is JSON-only)
             if (imagesChanged) {
-              if (coverImageFile) {
+              if (coverImageFile || draftCoverPublicId) {
                 try {
-                  const coverResp = await uploadFlyerImage(backendEventId, coverImageFile);
-                  const coverData = coverResp.data || coverResp;
-                  const imageUrl = coverData.flyerImage || coverData.url;
-                  if (imageUrl) setCoverImage(imageUrl);
+                  // If we have a draft publicId, persist it; otherwise upload file
+                  if (draftCoverPublicId) {
+                    await persistFlyerUrl(backendEventId, { url: coverImage, publicId: draftCoverPublicId });
+                  } else {
+                    const coverResp = await uploadFlyerImage(backendEventId, coverImageFile);
+                    const coverData = coverResp.data || coverResp;
+                    const imageUrl = coverData.flyerImage || coverData.url;
+                    if (imageUrl) setCoverImage(imageUrl);
+                  }
                 } catch (err) {
-                  console.error("❌ Failed to upload flyer image during edit:", err);
-                  toast.error(err?.message || "Failed to upload cover image");
+                  console.error("❌ Failed to persist flyer image during edit:", err);
+                  toast.error(err?.message || "Failed to save cover image");
                   return;
                 }
               }
 
-              if (galleryImageFiles.length > 0) {
+              if (draftGalleryUploads.length > 0 || galleryImageFiles.length > 0) {
                 try {
-                  const galleryResp = await uploadGalleryImages(backendEventId, galleryImageFiles);
-                  const respData = galleryResp.data || galleryResp;
+                  let respData;
+                  if (draftGalleryUploads.length > 0) {
+                    const persistPayload = draftGalleryUploads.map((img) => ({
+                      url: img.url,
+                      publicId: img.publicId,
+                      type: "EVENT_GALLERY",
+                    }));
+                    const persistRes = await persistGalleryUrls(backendEventId, persistPayload);
+                    respData = persistRes?.data || persistRes;
+                  } else {
+                    const galleryResp = await uploadGalleryImages(backendEventId, galleryImageFiles);
+                    respData = galleryResp.data || galleryResp;
+                  }
+
                   const galleryImagesData = Array.isArray(respData.images)
                     ? respData.images
                     : Array.isArray(respData.galleryImages)
@@ -1114,6 +1140,8 @@ const CreateEvent = () => {
                   setExistingGalleryUrls(updatedGallery);
                   setGalleryImages(updatedGallery);
                   setGalleryImageIds((prev) => ({ ...prev, ...newImageIdMap }));
+                  setDraftGalleryUploads([]);
+                  setImagesChanged(false);
                 } catch (err) {
                   console.error("❌ Failed to upload gallery images during edit:", err);
                   toast.error(err?.message || "Failed to upload gallery images");
@@ -1181,21 +1209,69 @@ const CreateEvent = () => {
             console.log("💾 Backend Event ID stored:", backendId);
           }
           
-          if (backendId && coverImageFile) {
-            // Fallback: if no temp upload exists, upload directly
+          if (backendId && (coverImageFile || draftCoverPublicId)) {
+            // Persist draft cover image if available; otherwise upload file
             try {
               setShowLoading(true);
               setLoadingMessage("Saving cover image...");
-              const coverResp = await uploadFlyerImage(backendId, coverImageFile);
-              const coverData = coverResp.data || coverResp;
-              const imageUrl = coverData.flyerImage || coverData.url;
-              if (imageUrl) {
-                setCoverImage(imageUrl);
+              if (draftCoverPublicId) {
+                await persistFlyerUrl(backendId, { url: coverImage, publicId: draftCoverPublicId });
                 toast.success("Cover image saved to event.");
+              } else {
+                const coverResp = await uploadFlyerImage(backendId, coverImageFile);
+                const coverData = coverResp.data || coverResp;
+                const imageUrl = coverData.flyerImage || coverData.url;
+                if (imageUrl) {
+                  setCoverImage(imageUrl);
+                  toast.success("Cover image saved to event.");
+                }
               }
             } catch (err) {
               console.error("Failed to persist cover image after create:", err);
               toast.error(err?.message || "Cover image upload failed after create.");
+            } finally {
+              setShowLoading(false);
+              setLoadingMessage("");
+            }
+          }
+
+          if (backendId && (draftGalleryUploads.length > 0 || galleryImageFiles.length > 0)) {
+            try {
+              setShowLoading(true);
+              setLoadingMessage("Saving gallery images...");
+
+              let respData;
+              if (draftGalleryUploads.length > 0) {
+                const persistPayload = draftGalleryUploads.map((img) => ({
+                  url: img.url,
+                  publicId: img.publicId,
+                  type: "EVENT_GALLERY",
+                }));
+                const persistRes = await persistGalleryUrls(backendId, persistPayload);
+                respData = persistRes?.data || persistRes;
+              } else {
+                const galleryResp = await uploadGalleryImages(backendId, galleryImageFiles);
+                respData = galleryResp.data || galleryResp;
+              }
+
+              if (respData.images && Array.isArray(respData.images)) {
+                setGalleryImages(respData.images.map((img) => img.url || img));
+                setExistingGalleryUrls(respData.images.map((img) => img.url || img));
+                const idMap = {};
+                respData.images.forEach((img) => {
+                  const url = img.url || img;
+                  const id = img.id || img._id;
+                  if (url && id) idMap[url] = id;
+                });
+                setGalleryImageIds((prev) => ({ ...prev, ...idMap }));
+              }
+
+              setDraftGalleryUploads([]);
+              setImagesChanged(false);
+              toast.success("Gallery images saved to event.");
+            } catch (err) {
+              console.error("Failed to persist gallery images after create:", err);
+              toast.error(err?.message || "Gallery image upload failed after create.");
             } finally {
               setShowLoading(false);
               setLoadingMessage("");
@@ -1883,18 +1959,36 @@ const CreateEvent = () => {
       setCoverImageFile(file);
       setImagesChanged(true);
       setRemoveFlyerImage(false);
-      toast.success("Cover image added. It will upload when you save.");
+
+      // Upload immediately to Cloudinary draft
+      const { url, publicId } = await uploadDraftImage(file, 'flyers');
+      setCoverImage(url);
+      setDraftCoverPublicId(publicId);
+      setCoverPublicId(publicId);
+      toast.success("Cover image uploaded successfully.");
     } catch (error) {
-      console.error("Failed to stage cover image:", error);
-      toast.error(error.message || "Failed to add cover image.");
+      console.error("Failed to upload cover image:", error);
+      toast.error(error.message || "Failed to upload cover image.");
+      // Reset on error
       setCoverImage(null);
       setCoverImageFile(null);
+      setDraftCoverPublicId(null);
     } finally {
       setUploadingCover(false);
     }
   };
 
   const handleRemoveCoverImage = async () => {
+    const deleteDraftCoverIfAny = async () => {
+      if (draftCoverPublicId) {
+        try {
+          await deleteDraftCloudinaryImage(draftCoverPublicId, "EVENT_FLYER");
+        } catch (err) {
+          console.warn("⚠️ Failed to delete draft cover from Cloudinary", err?.message);
+        }
+      }
+    };
+
     // If editing existing event with backend ID and has existing cover image
     if (backendEventId && coverImage && typeof coverImage === 'string' && !coverImage.startsWith('data:')) {
       try {
@@ -1905,11 +1999,18 @@ const CreateEvent = () => {
         await deleteFlyerImage(backendEventId);
         
         console.log("✅ Flyer image deleted from backend successfully!");
-        
+
+        if (coverPublicId) {
+          await deleteDraftCloudinaryImage(coverPublicId, "EVENT_FLYER");
+        }
+        await deleteDraftCoverIfAny();
+
         // Remove from UI immediately after successful backend deletion
         setCoverImage(null);
         setCoverImageFile(null);
         setRemoveFlyerImage(true);
+        setDraftCoverPublicId(null);
+        setCoverPublicId(null);
         setImagesChanged(true);
         
         toast.success("Cover image deleted successfully!");
@@ -1926,8 +2027,12 @@ const CreateEvent = () => {
       // For local images (not yet uploaded), just remove from UI
       console.log("🗑️ Removing local cover image from UI");
       
+      await deleteDraftCoverIfAny();
+
       setCoverImage(null);
       setCoverImageFile(null);
+      setDraftCoverPublicId(null);
+      setCoverPublicId(null);
       setRemoveFlyerImage(true);
       setImagesChanged(true);
       
@@ -1966,17 +2071,25 @@ const CreateEvent = () => {
     try {
       setUploadingGallery(true);
 
-      const previews = validFiles.map((f) => URL.createObjectURL(f));
-      const updatedGalleryImages = [...galleryImages, ...previews];
+      // Upload each valid file to draft folder immediately
+      const uploads = [];
+      for (const file of validFiles) {
+        const res = await uploadDraftImage(file, 'gallery');
+        uploads.push(res);
+      }
 
-      setGalleryImages(updatedGalleryImages);
-      setGalleryImageFiles((prev) => [...prev, ...validFiles]);
+      const newUrls = uploads.map((u) => u.url).filter(Boolean);
+      const newDrafts = uploads.map((u) => ({ url: u.url, publicId: u.publicId })).filter((u) => u.url && u.publicId);
+
+      setGalleryImages((prev) => [...prev, ...newUrls]);
+      setDraftGalleryUploads((prev) => [...prev, ...newDrafts]);
+      setGalleryImagePublicIds((prev) => ({ ...prev, ...newDrafts.reduce((acc, d) => ({ ...acc, [d.url]: d.publicId }), {}) }));
       setImagesChanged(true);
 
-      toast.success(`${validFiles.length} gallery image(s) added. They will upload when you save.`);
+      toast.success(`${uploads.length} gallery image(s) uploaded.`);
     } catch (error) {
-      console.error("Failed to stage gallery images:", error);
-      toast.error(error.message || "Failed to add gallery images.");
+      console.error("Failed to upload gallery images:", error);
+      toast.error(error.message || "Failed to upload gallery images.");
     } finally {
       // Reset the file input to allow re-uploading the same file
       if (e.target) {
@@ -1986,10 +2099,21 @@ const CreateEvent = () => {
     }
   };
 
-// ... (rest of the code remains the same)
   const removeGalleryImage = async (index) => {
     const imageToRemove = galleryImages[index];
     
+    const draftMatch = draftGalleryUploads.find((d) => d.url === imageToRemove);
+    const publicIdFromMap = galleryImagePublicIds[imageToRemove];
+    const deleteDraftIfAny = async () => {
+      if (draftMatch?.publicId) {
+        try {
+          await deleteDraftCloudinaryImage(draftMatch.publicId, "EVENT_GALLERY");
+        } catch (err) {
+          console.warn("⚠️ Failed to delete draft gallery image from Cloudinary", err?.message);
+        }
+      }
+    };
+
     console.log("🔍 Attempting to remove gallery image at index:", index);
     console.log("   Image URL:", imageToRemove);
     console.log("   Backend event ID:", backendEventId);
@@ -2009,6 +2133,10 @@ const CreateEvent = () => {
         
         // Call DELETE API using new deleteGalleryImage function
         await deleteGalleryImage(backendEventId, imageId);
+
+        if (publicIdFromMap) {
+          await deleteDraftCloudinaryImage(publicIdFromMap, "EVENT_GALLERY");
+        }
         
         console.log("✅ Gallery image deleted from backend successfully!");
         
@@ -2058,6 +2186,12 @@ const CreateEvent = () => {
         delete newMap[imageToRemove];
         return newMap;
       });
+
+      setGalleryImagePublicIds(prev => {
+        const next = { ...prev };
+        delete next[imageToRemove];
+        return next;
+      });
       
       setImagesChanged(true);
       
@@ -2068,65 +2202,26 @@ const CreateEvent = () => {
       // For local images (not yet uploaded), just remove from UI
       console.log("🗑️ Removing local gallery image from UI");
       
+      await deleteDraftIfAny();
+
       setGalleryImages((prev) => prev.filter((_, i) => i !== index));
-      
+
       // Remove from files if it's a new upload (no ID)
       const newFileIndex = index - Object.keys(galleryImageIds).length;
       if (newFileIndex >= 0) {
         setGalleryImageFiles((prev) => prev.filter((_, i) => i !== newFileIndex));
       }
-      
-      setImagesChanged(true);
-      console.log("✅ Local gallery image removed from UI");
-    }
-  };
 
-  // Helper function to extract image ID from URL
-  const extractImageId = (imageUrl) => {
-    try {
-      console.log("🔍 Extracting image ID from URL:", imageUrl);
-      
-      // Different URL patterns:
-      // Cloudinary: https://res.cloudinary.com/.../v1234567/abc123.jpg
-      // S3: https://bucket.s3.amazonaws.com/folder/abc123.jpg
-      // Direct: https://server.com/uploads/abc123.jpg
-      
-      // Method 1: Try to get the last segment (most common)
-      const urlParts = imageUrl.split('/');
-      const lastSegment = urlParts[urlParts.length - 1];
-      
-      // Remove query parameters if any
-      const cleanSegment = lastSegment.split('?')[0];
-      
-      // Remove file extension
-      const imageId = cleanSegment.split('.')[0];
-      
-      console.log("   Last segment:", lastSegment);
-      console.log("   Clean segment:", cleanSegment);
-      console.log("   Extracted ID:", imageId);
-      
-      // Validate that we got something meaningful
-      if (imageId && imageId.length > 3) {
-        return imageId;
+      if (draftMatch) {
+        setDraftGalleryUploads((prev) => prev.filter((d) => d.url !== imageToRemove));
+        setGalleryImagePublicIds((prev) => {
+          const next = { ...prev };
+          delete next[imageToRemove];
+          return next;
+        });
       }
-      
-      // Method 2: If ID is too short, try second-to-last segment (for some URL structures)
-      if (urlParts.length > 2) {
-        const secondLast = urlParts[urlParts.length - 2];
-        console.log("   Trying second-to-last segment:", secondLast);
-        
-        // Check if it looks like an ID (alphanumeric, no special chars)
-        if (/^[a-zA-Z0-9_-]+$/.test(secondLast) && secondLast.length > 5) {
-          console.log("   Using second-to-last as ID:", secondLast);
-          return secondLast;
-        }
-      }
-      
-      console.warn("⚠️ Could not extract valid image ID from URL");
-      return null;
-    } catch (error) {
-      console.error("❌ Failed to extract image ID:", error);
-      return null;
+
+      setImagesChanged(true);
     }
   };
 
@@ -2145,6 +2240,7 @@ const CreateEvent = () => {
 
       const res = await uploadArtistImage(backendEventId, file);
       const imageUrl = res?.data?.image || res?.data?.url || res?.url;
+      const publicId = res?.data?.publicId;
 
       if (!imageUrl) {
         throw new Error("Image uploaded but URL was not returned. Please try again.");
@@ -2153,6 +2249,7 @@ const CreateEvent = () => {
       const newArtists = [...artists];
       newArtists[index].photo = imageUrl;
       newArtists[index].image = imageUrl;
+      if (publicId) newArtists[index].publicId = publicId;
       setArtists(newArtists);
 
       toast.success("Artist photo uploaded successfully!");
@@ -2165,10 +2262,22 @@ const CreateEvent = () => {
     }
   };
 
-  const handleRemoveArtistPhoto = (index) => {
+  const handleRemoveArtistPhoto = async (index) => {
+    const artist = artists[index];
+    const publicId = artist?.publicId;
+
+    if (publicId) {
+      try {
+        await deleteDraftCloudinaryImage(publicId, "EVENT_GALLERY");
+      } catch (err) {
+        console.warn("⚠️ Failed to delete artist photo from Cloudinary", err?.message);
+      }
+    }
+
     const newArtists = [...artists];
     newArtists[index].photo = "";
     newArtists[index].image = "";
+    newArtists[index].publicId = "";
     setArtists(newArtists);
   };
 
@@ -2281,10 +2390,21 @@ const CreateEvent = () => {
     }
   };
 
-  const handleRemoveSponsorLogo = (index) => {
+  const handleRemoveSponsorLogo = async (index) => {
+    const sponsor = sponsors[index];
+    const publicId = sponsor?.logoPublicId;
+
+    if (publicId) {
+      try {
+        await deleteDraftCloudinaryImage(publicId, "EVENT_GALLERY");
+      } catch (err) {
+        console.warn("⚠️ Failed to delete sponsor logo from Cloudinary", err?.message);
+      }
+    }
+
     setSponsors((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], logoUrl: "", logo: "" };
+      next[index] = { ...next[index], logoUrl: "", logo: "", logoPublicId: "" };
       return next;
     });
   };

@@ -17,6 +17,14 @@ import UserProfile from "./components/dashboard/UserProfile";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import PromoterDashboard from "./pages/PromoterDashboard";
 import PromoterEventDetail from "./pages/PromoterEventDetail";
+import PromoterOverview from "./components/promoter/PromoterOverview";
+import PromoterOrganizers from "./components/promoter/PromoterOrganizers";
+import PromoterEvents from "./components/promoter/PromoterEvents";
+import PromoterAnalytics from "./components/promoter/PromoterAnalytics";
+import PromoterLiveEvents from "./components/promoter/PromoterLiveEvents";
+import PromoterUsers from "./components/promoter/PromoterUsers";
+import PromoterBookings from "./components/promoter/PromoterBookings";
+import PromoterPayouts from "./components/promoter/PromoterPayouts";
 import CreateEvent from "./pages/CreateEvent.jsx";
 import EventTypeSelection from "./pages/EventTypeSelection";
 import NotFound from "./pages/NotFound";
@@ -145,9 +153,24 @@ const App = () => {
             } />
             
             {/* Protected Promoter Routes */}
-            <Route path="/promoter/dashboard" element={
+            <Route path="/promoter" element={
               <ProtectedRoute requiredRole="promoter">
                 <PromoterDashboard />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="/promoter/overview" replace />} />
+              <Route path="overview" element={<PromoterOverview />} />
+              <Route path="organizers" element={<PromoterOrganizers />} />
+              <Route path="events" element={<PromoterEvents />} />
+              <Route path="users" element={<PromoterUsers />} />
+              <Route path="bookings" element={<PromoterBookings />} />
+              <Route path="payouts" element={<PromoterPayouts />} />
+              <Route path="live" element={<PromoterLiveEvents />} />
+              <Route path="analytics" element={<PromoterAnalytics />} />
+            </Route>
+            <Route path="/promoter/dashboard" element={
+              <ProtectedRoute requiredRole="promoter">
+                <Navigate to="/promoter/overview" replace />
               </ProtectedRoute>
             } />
             <Route path="/promoter/event/:id" element={

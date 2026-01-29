@@ -29,6 +29,33 @@ async function tryRefreshToken() {
  * 4. Only fallback to sessionStorage if /auth/me endpoint doesn't exist (404)
  */
 export async function fetchSession() {
+  // Temporary promoter-guest bypass (no backend session required)
+  const promoterGuest = sessionStorage.getItem("promoterGuest") === "true";
+  const storedRole = (sessionStorage.getItem("role") || "").toUpperCase();
+
+  if (promoterGuest && storedRole === "PROMOTER") {
+    const storedProfileRaw = sessionStorage.getItem("userProfile");
+    let storedProfile = null;
+    try {
+      storedProfile = storedProfileRaw ? JSON.parse(storedProfileRaw) : null;
+    } catch {
+      storedProfile = null;
+    }
+
+    const user = storedProfile || {
+      role: "PROMOTER",
+      type: sessionStorage.getItem("userType") || "promoter",
+      authProvider: sessionStorage.getItem("authProvider") || "promoter-guest",
+      name: sessionStorage.getItem("userName") || "Promoter Guest",
+    };
+
+    return {
+      isAuthenticated: true,
+      user,
+      role: "PROMOTER",
+    };
+  }
+
   if (!sessionPromise) {
     sessionPromise = (async () => {
       // Fallback function - only used if /auth/me endpoint is unavailable (404)

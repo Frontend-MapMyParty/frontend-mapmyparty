@@ -40,8 +40,55 @@ async function getCloudinarySignature(type, entityId) {
     cloudName: data.cloud_name,
     apiKey: data.api_key,
     timestamp: data.timestamp,
-    signature: data.signature,
     folder: data.folder,
+    signature: data.signature,
+    uploadPreset: data.upload_preset,
+    resourceType: data.resource_type || "image",
+    allowedFormats: data.allowed_formats,
+    maxBytes: data.max_bytes,
+  };
+}
+
+/**
+ * Get a Cloudinary signature for folder-based draft uploads (no event required)
+ */
+async function getCloudinarySignatureForFolder(folder) {
+  if (!folder || typeof folder !== "string") {
+    throw new Error("Valid folder is required for draft upload signature");
+  }
+
+  const token = getAuthToken();
+  const url = buildUrl(`/api/cloudinary/sign?folder=${encodeURIComponent(folder)}`);
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {},
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (res.status === 429) {
+    throw new Error("Upload rate limit reached. Please try again in a few moments.");
+  }
+
+  if (!res.ok || json.success === false) {
+    throw new Error(json.error || json.errorMessage || json.message || "Failed to get folder upload signature");
+  }
+
+  const data = json.data || json;
+
+  return {
+    cloudName: data.cloud_name,
+    apiKey: data.api_key,
+    timestamp: data.timestamp,
+    folder: data.folder,
+    signature: data.signature,
+    uploadPreset: data.upload_preset,
+    resourceType: data.resource_type || "image",
     allowedFormats: data.allowed_formats,
     maxBytes: data.max_bytes,
   };
@@ -60,6 +107,25 @@ export async function uploadTempImage(file, type, entityId) {
   }
 
   const sig = await getCloudinarySignature(type, entityId);
+  const uploadJson = await uploadToCloudinary(file, sig);
+
+  const url = uploadJson.secure_url || uploadJson.url;
+  const publicId = uploadJson.public_id || uploadJson.publicId;
+
+  return { url, publicId, raw: uploadJson };
+}
+
+/**
+ * Upload an image to a draft folder without requiring an event.
+ * Returns { url, publicId, raw }.
+ */
+export async function uploadDraftImage(file, subfolder = "general") {
+  if (!file || !(file instanceof File)) {
+    throw new Error("Valid image file is required");
+  }
+
+  const folder = `mapmyparty/draft/${subfolder}`;
+  const sig = await getCloudinarySignatureForFolder(folder);
   const uploadJson = await uploadToCloudinary(file, sig);
 
   const url = uploadJson.secure_url || uploadJson.url;
@@ -98,6 +164,92 @@ export async function persistFlyerUrl(eventId, flyer) {
   return res;
 }
 
+async function getCloudinaryDeleteSignature(publicId) {
+  if (!publicId) {
+    throw new Error("Public ID is required for delete signature");
+  }
+
+  const token = getAuthToken();
+  const url = buildUrl(`/api/cloudinary/sign-delete?publicId=${encodeURIComponent(publicId)}`);
+  const res = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {},
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (res.status === 429) {
+    throw new Error("Delete rate limit reached. Please try again in a few moments.");
+  }
+
+  if (!res.ok || json.success === false) {
+    throw new Error(json.error || json.errorMessage || json.message || "Failed to get delete signature");
+  }
+
+  const data = json.data || json;
+
+  return {
+    cloudName: data.cloud_name,
+    apiKey: data.api_key,
+    timestamp: data.timestamp,
+    signature: data.signature,
+    publicId: data.public_id || publicId,
+  };
+}
+
+/**
+ * Delete an image from Cloudinary (client-side). Returns { result }.
+ */
+export async function deleteCloudinaryImage(publicId) {
+  if (!publicId || typeof publicId !== "string") {
+    throw new Error("Valid publicId is required");
+  }
+
+  const sig = await getCloudinaryDeleteSignature(publicId);
+
+  const form = new FormData();
+  form.append("public_id", sig.publicId);
+  form.append("api_key", sig.apiKey);
+  form.append("timestamp", sig.timestamp);
+  form.append("signature", sig.signature);
+
+  const deleteUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/destroy`;
+  const res = await fetch(deleteUrl, { method: "POST", body: form });
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.error?.message || errJson.message || "Delete failed");
+  }
+  return res.json();
+}
+
+/**
+ * Delete a Cloudinary image via backend draft endpoint (best-effort).
+ * This is used to clean up temporary uploads or explicit deletions from UI.
+ */
+export async function deleteDraftCloudinaryImage(publicId, type = null) {
+  if (!publicId || typeof publicId !== "string") {
+    return; // quietly ignore missing ids
+  }
+
+  const payload = { publicId };
+  if (type) payload.type = type;
+
+  try {
+    await apiFetch(buildUrl("/api/cloudinary/draft"), {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.warn("⚠️ Failed to delete draft Cloudinary image", publicId, err?.message);
+  }
+}
+
 async function uploadToCloudinary(file, signaturePayload) {
   const {
     cloudName,
@@ -120,10 +272,10 @@ async function uploadToCloudinary(file, signaturePayload) {
     .split(",")
     .map((f) => f.trim().toLowerCase())
     .filter(Boolean);
-  const limit = maxBytes || 5_000_000;
+  const limit = maxBytes || 100_000_000;
 
   if (file.size > limit) {
-    throw new Error(`File too large. Max ${(limit / 1_000_000).toFixed(1)}MB allowed.`);
+    throw new Error(`File too large. Max ${(limit / 1_000_000).toFixed(0)}MB allowed.`);
   }
 
   const fileType = (file.type || "").toLowerCase();

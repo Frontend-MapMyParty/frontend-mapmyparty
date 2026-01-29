@@ -1,4 +1,18 @@
-export const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || "https://server-8as1.onrender.com/api/").replace(/\/$/, "");
+// const rawEnvBase = (import.meta?.env?.VITE_API_BASE_URL ?? "").trim();
+const rawEnvBase = import.meta.env.VITE_API_BASE_URL;
+
+const hostedDefault = "https://server2-e4si.onrender.com/api";
+
+// Prefer env; fallback to hosted default (never localhost)
+export const API_BASE_URL = (rawEnvBase || hostedDefault).replace(/\/+$/, "");
+
+if (!rawEnvBase) {
+  console.warn(
+    `VITE_API_BASE_URL is not set. Falling back to hosted default ${hostedDefault}. Add it to your .env to override.`
+  );
+} else {
+  console.info("Using API base from .env:", API_BASE_URL);
+}
 
 export function buildUrl(path = "") {
   let cleanPath = String(path).replace(/^\/+/, "");
@@ -7,7 +21,7 @@ export function buildUrl(path = "") {
   if (API_BASE_URL.endsWith("/api") && (cleanPath === "api" || cleanPath.startsWith("api/"))) {
     cleanPath = cleanPath.replace(/^api\/?/, "");
   }
-
+ 
   return `${API_BASE_URL}/${cleanPath}`;
 }
 

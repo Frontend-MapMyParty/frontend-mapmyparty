@@ -1,219 +1,117 @@
- import { useState } from "react";
-import { Search, Mail, Ban, Trash2, MoreVertical, Building2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+ import { useOutletContext } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Mail, Phone, Building2, Users, Wallet2, Ticket } from "lucide-react";
 
 const PromoterOrganizers = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
-  const organizers = [
-    {
-      id: "1",
-      name: "ABC Events",
-      email: "contact@abcevents.com",
-      totalEvents: 12,
-      activeEvents: 8,
-      revenue: 125000,
-      status: "active",
-      joinedDate: "Jan 2024",
-    },
-    {
-      id: "2",
-      name: "TechCorp",
-      email: "info@techcorp.com",
-      totalEvents: 5,
-      activeEvents: 3,
-      revenue: 85000,
-      status: "active",
-      joinedDate: "Feb 2024",
-    },
-    {
-      id: "3",
-      name: "Culinary Dreams",
-      email: "hello@culinarydreams.com",
-      totalEvents: 8,
-      activeEvents: 5,
-      revenue: 95000,
-      status: "active",
-      joinedDate: "Mar 2024",
-    },
-    {
-      id: "4",
-      name: "Elite Events",
-      email: "contact@eliteevents.com",
-      totalEvents: 3,
-      activeEvents: 1,
-      revenue: 45000,
-      status: "suspended",
-      joinedDate: "Apr 2024",
-    },
-  ];
-
-  const filteredOrganizers = organizers.filter((org) => {
-    const matchesSearch =
-      org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      org.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || org.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const { data, currency, statusBadge } = useOutletContext();
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <CardTitle>Event Organizers</CardTitle>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search organizers..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Organizers</h2>
+          <p className="text-white/70">Ownership, bank details, events, bookings, payouts.</p>
         </div>
-      </CardHeader>
+        <Badge variant="outline" className="text-sm py-1 px-3 border-white/20">
+          {data.organizers.length} Active
+        </Badge>
+      </div>
 
-      <CardContent>
-        {filteredOrganizers.length === 0 ? (
-          <div className="text-center py-12">
-            <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">No organizers found</p>
-          </div>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Organizer</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Events</TableHead>
-                  <TableHead>Revenue</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrganizers.map((organizer) => (
-                  <TableRow key={organizer.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {organizer.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{organizer.name}</div>
-                        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {data.organizers.map((org) => (
+          <Card key={org.name} className="bg-white/5 border-white/10">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-11 w-11">
+                    <AvatarFallback>{org.name.slice(0, 2)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <CardTitle className="text-lg">{org.name}</CardTitle>
+                    <CardDescription className="text-white/70 flex items-center gap-2">
+                      <Building2 className="w-4 h-4" />
+                      {org.state}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge variant={statusBadge(org.bank.status)}>{org.bank.status}</Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <p className="text-white/60 text-xs">Owner</p>
+                  <p className="font-semibold">{org.owner.name}</p>
+                  <p className="text-white/60 flex items-center gap-2 text-xs mt-1"><Mail className="w-3 h-3" />{org.owner.email}</p>
+                  <p className="text-white/60 flex items-center gap-2 text-xs"><Phone className="w-3 h-3" />{org.owner.phone}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1 text-sm">
+                  <p className="text-white/60 text-xs">Bank</p>
+                  <p className="font-semibold">{org.bank.bankName}</p>
+                  <p className="text-white/70 text-xs">A/C •••• {org.bank.accountNumber}</p>
+                  <p className="text-white/70 text-xs">IFSC {org.bank.ifsc}</p>
+                  <p className="text-white/70 text-xs">GST {org.bank.gstNumber}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-2 text-white/60 text-xs">
+                    <Users className="w-4 h-4" /> Events
+                  </div>
+                  <p className="text-lg font-semibold">{org.events.length}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-2 text-white/60 text-xs">
+                    <Ticket className="w-4 h-4" /> Bookings
+                  </div>
+                  <p className="text-lg font-semibold">{org.bookings.toLocaleString()}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-2 text-white/60 text-xs">
+                    <Wallet2 className="w-4 h-4" /> Gross
+                  </div>
+                  <p className="text-lg font-semibold">{currency(org.gross)}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div className="flex items-center gap-2 text-white/60 text-xs">
+                    <Wallet2 className="w-4 h-4" /> Platform fee
+                  </div>
+                  <p className="text-lg font-semibold text-emerald-400">{currency(org.platformFee)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/60">Payout due</span>
+                <Badge variant="outline" className="border-white/20">{currency(org.payoutDue)}</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs text-white/60">
+                <span>Last payout</span>
+                <span>{org.lastPayout}</span>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs text-white/60 uppercase tracking-wide">Events</p>
+                <div className="space-y-2">
+                  {org.events.map((ev) => (
+                    <div key={ev.title} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/5 px-3 py-2 text-sm">
+                      <div>
+                        <p className="font-semibold">{ev.title}</p>
+                        <p className="text-white/60 text-xs">Tickets {ev.tickets.toLocaleString()} • Gross {currency(ev.gross)}</p>
                       </div>
-                    </TableCell>
-
-                    <TableCell className="text-muted-foreground">
-                      {organizer.email}
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium">
-                          {organizer.totalEvents} total
-                        </div>
-                        <div className="text-muted-foreground">
-                          {organizer.activeEvents} active
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="font-medium">
-                      ₹{organizer.revenue.toLocaleString()}
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge
-                        variant={
-                          organizer.status === "active"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {organizer.status}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="text-muted-foreground">
-                      {organizer.joinedDate}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Mail className="w-4 h-4 mr-2" />
-                            Send Email
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-yellow-600">
-                            <Ban className="w-4 h-4 mr-2" />
-                            {organizer.status === "active"
-                              ? "Suspend"
-                              : "Activate"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                      <Badge variant={statusBadge(ev.status)}>{ev.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 };
 
