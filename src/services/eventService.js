@@ -87,17 +87,49 @@ export async function uploadTempImage(file, type, entityId) {
   return { url, publicId, raw: uploadJson };
 }
 
+/**
+ * Delete a draft image from Cloudinary.
+ * This is for cleaning up images that were uploaded but not yet persisted to the database.
+ *
+ * @param {string} publicId - The Cloudinary public ID (must start with the folder base, e.g., "mapmyparty/...")
+ * @param {string} [type] - Optional image type (EVENT_FLYER or EVENT_GALLERY)
+ * @returns {Promise<Object>} Response from the server
+ */
 export async function deleteDraftImage(publicId, type) {
-  if (!publicId) throw new Error("publicId is required");
+  if (!publicId) {
+    console.warn("deleteDraftImage called without publicId, skipping");
+    return { success: true, skipped: true };
+  }
+
+  // Validate publicId format - must start with folder base
+  const normalizedPublicId = String(publicId).replace(/^\/+/, "");
+  if (!normalizedPublicId.startsWith("mapmyparty/")) {
+    console.warn(`deleteDraftImage: publicId "${publicId}" doesn't start with "mapmyparty/", skipping`);
+    return { success: true, skipped: true, reason: "invalid_format" };
+  }
 
   const url = buildUrl("/api/cloudinary/draft");
-  const payload = type ? { publicId, type } : { publicId };
+  const payload = { publicId: normalizedPublicId };
+  if (type && ["EVENT_FLYER", "EVENT_GALLERY"].includes(type)) {
+    payload.type = type;
+  }
 
-  return apiFetch(url, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  console.log("🗑️ Deleting draft image:", payload);
+
+  try {
+    const response = await apiFetch(url, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    console.log("✅ Draft image deleted:", response);
+    return response;
+  } catch (err) {
+    // Log but don't throw - draft deletion failures shouldn't block the user
+    console.error("❌ Draft image deletion failed:", err.message);
+    // Return a success-like response to not block the flow
+    return { success: false, error: err.message };
+  }
 }
 
 export async function syncEventGalleryImages(eventId, images) {

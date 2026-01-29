@@ -69,6 +69,7 @@ const CreateEvent = () => {
   const [flyerOrigin, setFlyerOrigin] = useState(null); // 'draft' | 'persisted' | null
   const [galleryDraft, setGalleryDraft] = useState([]); // Array<{ url, publicId }>
   const [galleryOriginByPublicId, setGalleryOriginByPublicId] = useState({}); // publicId -> 'draft' | 'persisted'
+  const [originalGalleryPublicIds, setOriginalGalleryPublicIds] = useState([]); // Track original gallery for deletion detection
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedTicketType, setSelectedTicketType] = useState(null);
   const [savedTickets, setSavedTickets] = useState([]);
@@ -217,10 +218,17 @@ const CreateEvent = () => {
   const eventTypeParam = searchParams.get('type');
   const isEditMode = !!editId;
 
+  // Check if gallery images were deleted (comparing current with original)
+  const currentGalleryPublicIds = galleryDraft.map((img) => img.publicId);
+  const galleryImagesDeleted = originalGalleryPublicIds.some(
+    (id) => !currentGalleryPublicIds.includes(id)
+  );
+
   const imagesDirty =
     flyerOrigin === "draft" ||
     Object.values(galleryOriginByPublicId || {}).some((v) => v === "draft") ||
-    Boolean(removeFlyerImage);
+    Boolean(removeFlyerImage) ||
+    galleryImagesDeleted;
 
   useEffect(() => {
     setCoverImage(flyerDraft?.url || null);
@@ -299,7 +307,7 @@ const CreateEvent = () => {
 
   // Small pulse to emphasize manual entry section
   useEffect(() => {
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       setVenueThemePulse(true);
       const timer = setTimeout(() => setVenueThemePulse(false), 1200);
       return () => clearTimeout(timer);
@@ -962,6 +970,8 @@ const CreateEvent = () => {
                 });
                 return map;
               });
+              // Track original gallery public IDs for deletion detection
+              setOriginalGalleryPublicIds(deduped.map((img) => img.publicId));
 
               console.log(`✅ Loaded ${deduped.length} valid gallery images`);
             } else {
@@ -971,6 +981,7 @@ const CreateEvent = () => {
               setGalleryImageIds({});
               setGalleryDraft([]);
               setGalleryOriginByPublicId({});
+              setOriginalGalleryPublicIds([]);
               console.log("ℹ️ No valid gallery images - cleared all");
             }
           } else {
@@ -980,6 +991,7 @@ const CreateEvent = () => {
             setGalleryImageIds({});
             setGalleryDraft([]);
             setGalleryOriginByPublicId({});
+            setOriginalGalleryPublicIds([]);
             console.log("ℹ️ No images array in backend response - cleared all");
           }
           
@@ -993,6 +1005,7 @@ const CreateEvent = () => {
           setExistingGalleryUrls([]);
           setGalleryDraft([]);
           setGalleryOriginByPublicId({});
+          setOriginalGalleryPublicIds([]);
         }
       }
     };
@@ -1067,13 +1080,14 @@ const CreateEvent = () => {
 
   const steps = [
     { number: 1, title: "Event Details" },
-    { number: 2, title: "Date & Time" },
-    { number: 3, title: "Tickets" },
-    { number: 4, title: "Venue & Location" },
-    { number: 5, title: "Sponsor" },
-    { number: 6, title: "Add Artist" },
-    { number: 7, title: "Additional Info" },
-    { number: 8, title: "Review & Publish" },
+    { number: 2, title: "Event Images" },
+    { number: 3, title: "Date & Time" },
+    { number: 4, title: "Tickets" },
+    { number: 5, title: "Venue & Location" },
+    { number: 6, title: "Sponsor" },
+    { number: 7, title: "Add Artist" },
+    { number: 8, title: "Additional Info" },
+    { number: 9, title: "Review & Publish" },
   ];
 
   const progress = (currentStep / steps.length) * 100;
@@ -1095,49 +1109,30 @@ const CreateEvent = () => {
         return;
       }
 
-      if (!flyerDraft?.url || !flyerDraft?.publicId) {
-        toast.error("Cover image is required");
-        return;
-      }
-
-      if (galleryDraft.some((img) => !img?.url || !img?.publicId)) {
-        toast.error("Gallery images are missing required metadata.");
-        return;
-      }
-
-      if (new Set(galleryDraft.map((img) => img.publicId)).size !== galleryDraft.length) {
-        toast.error("Duplicate gallery images detected.");
-        return;
-      }
-
-      // Call API for Step 1 - Create or Update Event with basic details
+      // Call API for Step 1 - Create or Update Event with basic details (no images)
       try {
         setIsSubmitting(true);
         setLoadingMessage("Saving event details...");
         setShowLoading(true);
-        
+
         let response;
-        
+
         // Treat edit mode as existing draft even if session flags are missing
         const hasExistingDraft =
           backendEventId &&
           (sessionStorage.getItem('draftStarted') || isEditMode);
-        
+
         if (hasExistingDraft) {
           // UPDATE existing event (user went back to step 1)
           console.log("🔄 Updating existing draft event:", backendEventId);
-          const hasAnyChanges = textFieldsChanged || imagesDirty;
-          console.log("📝 Text fields changed?", textFieldsChanged, "🖼️ Images changed?", imagesChanged);
-          
+
           try {
-            if (!hasAnyChanges) {
-              console.log("ℹ️ No field or image changes detected in Step 1");
+            if (!textFieldsChanged) {
+              console.log("ℹ️ No field changes detected in Step 1");
               toast.info("No changes to update");
               setCurrentStep(currentStep + 1);
               return;
             }
-
-            // No image uploads here. Images are uploaded client-side on selection.
 
             const eventData = {
               eventTitle,
@@ -1151,48 +1146,19 @@ const CreateEvent = () => {
 
             response = await updateEventStep1(backendEventId, eventData);
 
-            // Persist uploaded image metadata (no uploads here)
-            try {
-              if (removeFlyerImage) {
-                await deleteFlyerImage(backendEventId);
-              } else if (flyerDraft) {
-                await persistFlyerUrl(backendEventId, flyerDraft);
-              }
-              await syncEventGalleryImages(backendEventId, galleryDraft);
-
-              if (flyerDraft) {
-                setFlyerOrigin("persisted");
-              } else {
-                setFlyerOrigin(null);
-              }
-              setGalleryOriginByPublicId(() => {
-                const map = {};
-                galleryDraft.forEach((img) => {
-                  map[img.publicId] = "persisted";
-                });
-                return map;
-              });
-              setRemoveFlyerImage(false);
-            } catch (imgErr) {
-              console.error("❌ Failed to persist image metadata:", imgErr);
-              toast.error(imgErr?.message || "Failed to save images. Please try again.");
-              return;
-            }
-            
             toast.success("Event details updated successfully!");
-            
+
             // Reset change flags after successful update
             setTextFieldsChanged(false);
-            setImagesChanged(false);
           } catch (updateError) {
             console.error("⚠️ Update failed:", updateError);
             toast.error(updateError?.message || "Failed to update event. Please try again.");
             return;
           }
         } else {
-          // CREATE new event (first time) — send only allowed fields, then persist images to backend
-          console.log("✨ Creating new event (first time) with temp uploads");
-          
+          // CREATE new event (first time)
+          console.log("✨ Creating new event (first time)");
+
           const eventData = {
             eventTitle,
             description: eventDescription,
@@ -1202,58 +1168,26 @@ const CreateEvent = () => {
           };
 
           response = await createEventStep1(eventData);
-          
+
           toast.success("Event details saved successfully!");
-          
+
           // Store the backend event ID for future updates
           let backendId = response.data?.id || response.data?._id || response.id || response._id;
           if (backendId) {
             setBackendEventId(backendId);
             console.log("💾 Backend Event ID stored:", backendId);
           }
-          
-          // Persist uploaded image metadata (no uploads here)
-          if (backendId) {
-            try {
-              if (removeFlyerImage) {
-                await deleteFlyerImage(backendId);
-              } else if (flyerDraft) {
-                await persistFlyerUrl(backendId, flyerDraft);
-              }
-              await syncEventGalleryImages(backendId, galleryDraft);
-
-              if (flyerDraft) {
-                setFlyerOrigin("persisted");
-              } else {
-                setFlyerOrigin(null);
-              }
-              setGalleryOriginByPublicId(() => {
-                const map = {};
-                galleryDraft.forEach((img) => {
-                  map[img.publicId] = "persisted";
-                });
-                return map;
-              });
-              setRemoveFlyerImage(false);
-            } catch (imgErr) {
-              console.error("❌ Failed to persist image metadata after create:", imgErr);
-              toast.error(imgErr?.message || "Failed to save images. Please try again.");
-              return;
-            }
-          }
-          
-          setImagesChanged(false); // Reset flag after creation
         }
-        
+
         console.log("API Response:", response);
-        
+
         // Move to next step after successful API call
         setCurrentStep(currentStep + 1);
       } catch (error) {
         console.error("Error saving event:", error);
         const errorMessage = error.message || "Failed to save event details. Please try again.";
         toast.error(errorMessage);
-        
+
         // If authentication error, redirect to login
         if (errorMessage.includes("Authentication") || errorMessage.includes("Unauthorized")) {
           setTimeout(() => {
@@ -1268,7 +1202,86 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
+    // Step 2: Event Images
     if (currentStep === 2) {
+      // Validate cover image is required
+      if (!flyerDraft?.url || !flyerDraft?.publicId) {
+        toast.error("Cover image is required");
+        return;
+      }
+
+      // Validate gallery metadata
+      if (galleryDraft.some((img) => !img?.url || !img?.publicId)) {
+        toast.error("Gallery images are missing required metadata.");
+        return;
+      }
+
+      // Check for duplicates
+      if (new Set(galleryDraft.map((img) => img.publicId)).size !== galleryDraft.length) {
+        toast.error("Duplicate gallery images detected.");
+        return;
+      }
+
+      // Persist images to backend
+      try {
+        setIsSubmitting(true);
+        setLoadingMessage("Saving images...");
+        setShowLoading(true);
+
+        if (!backendEventId) {
+          toast.error("Event ID not found. Please go back to Step 1.");
+          setIsSubmitting(false);
+          setShowLoading(false);
+          return;
+        }
+
+        // Check if images have changed
+        if (!imagesDirty) {
+          console.log("ℹ️ No image changes detected in Step 2");
+          toast.info("No changes to update");
+          setCurrentStep(currentStep + 1);
+          return;
+        }
+
+        if (removeFlyerImage) {
+          await deleteFlyerImage(backendEventId);
+        } else if (flyerDraft) {
+          await persistFlyerUrl(backendEventId, flyerDraft);
+        }
+        await syncEventGalleryImages(backendEventId, galleryDraft);
+
+        // Update origins to persisted
+        if (flyerDraft) {
+          setFlyerOrigin("persisted");
+        } else {
+          setFlyerOrigin(null);
+        }
+        setGalleryOriginByPublicId(() => {
+          const map = {};
+          galleryDraft.forEach((img) => {
+            map[img.publicId] = "persisted";
+          });
+          return map;
+        });
+        // Update original gallery IDs to reflect the new saved state
+        setOriginalGalleryPublicIds(galleryDraft.map((img) => img.publicId));
+        setRemoveFlyerImage(false);
+        setImagesChanged(false);
+
+        toast.success("Images saved successfully!");
+        setCurrentStep(currentStep + 1);
+      } catch (error) {
+        console.error("Error saving images:", error);
+        toast.error(error.message || "Failed to save images. Please try again.");
+      } finally {
+        setIsSubmitting(false);
+        setShowLoading(false);
+      }
+      return;
+    }
+
+    // Step 3: Date & Time
+    if (currentStep === 3) {
       if (!startDate) {
         toast.error("Starting date is required");
         return;
@@ -1353,25 +1366,27 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 3) {
+    // Step 4: Tickets
+    if (currentStep === 4) {
       // Just validate that at least one ticket exists
       if (savedTickets.length === 0) {
         toast.error("Please add at least one ticket type");
         return;
       }
-      
+
       // Check if we have backend event ID
       if (!backendEventId) {
         toast.error("Event ID not found. Please go back to Step 1.");
         return;
       }
-      
+
       // Move to next step - tickets are already created when added
       setCurrentStep(currentStep + 1);
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 4) {
+    // Step 5: Venue & Location
+    if (currentStep === 5) {
       if (!venueName.trim()) {
         toast.error("Venue name is required");
         return;
@@ -1571,7 +1586,8 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 5) {
+    // Step 6: Sponsor
+    if (currentStep === 6) {
       const cleanedSponsors = normalizeSponsors(sponsors);
       const hasChanges = sponsorsChanged(cleanedSponsors);
 
@@ -1600,7 +1616,7 @@ const CreateEvent = () => {
 
           const payload = { sponsors: [] };
           const response = await updateEventStep6(backendEventId, payload);
-          console.log("Step 5 (Sponsor - cleared) API Response:", response);
+          console.log("Step 6 (Sponsor - cleared) API Response:", response);
           setOriginalSponsors([]);
           setOriginalIsSponsored(false);
           setSponsors([emptySponsor]);
@@ -1654,7 +1670,7 @@ const CreateEvent = () => {
         };
 
         const response = await updateEventStep6(backendEventId, payload);
-        console.log("Step 5 (Sponsor) API Response:", response);
+        console.log("Step 6 (Sponsor) API Response:", response);
         setOriginalSponsors(cleanedSponsors);
         setOriginalIsSponsored(true);
         toast.success("Sponsor details saved");
@@ -1671,7 +1687,8 @@ const CreateEvent = () => {
       return;
     }
 
-    if (currentStep === 6) {
+    // Step 7: Add Artist
+    if (currentStep === 7) {
       // Validate that all artists with names have Instagram
       for (let i = 0; i < artists.length; i++) {
         const artist = artists[i];
@@ -1784,7 +1801,8 @@ const CreateEvent = () => {
       return; // Exit early to prevent default next step behavior
     }
 
-    if (currentStep === 7) {
+    // Step 8: Additional Info
+    if (currentStep === 8) {
       // Persist Additional Info before moving to Review
       const currentNormalized = normalizeAdditionalFromState();
       if (
@@ -2382,7 +2400,7 @@ const CreateEvent = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 text-gray-100 pt-7">
-              {/* Step 1: Event Details + Images */}
+              {/* Step 1: Event Details */}
               {currentStep === 1 && (
                 <div className="space-y-8">
                   <div className="space-y-4">
@@ -2452,11 +2470,23 @@ const CreateEvent = () => {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Step 2: Event Images */}
+              {currentStep === 2 && (
+                <div className="space-y-8">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold text-white">Upload Event Images</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Add a cover image and gallery photos for your event
+                    </p>
+                  </div>
 
                   <EventImagesDraftSection
                     backendEventId={backendEventId}
                     ensureBackendEventId={ensureBackendEventId}
-                    basicDetailsFilled={basicDetailsFilled}
+                    basicDetailsFilled={true}
                     fieldClass={fieldClass}
                     flyerDraft={flyerDraft}
                     setFlyerDraft={setFlyerDraft}
@@ -2471,8 +2501,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 5: Sponsor */}
-              {currentStep === 5 && (
+              {/* Step 6: Sponsor */}
+              {currentStep === 6 && (
                 <div className="space-y-5">
                   <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -2632,8 +2662,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 2: Date & Time */}
-              {currentStep === 2 && (
+              {/* Step 3: Date & Time */}
+              {currentStep === 3 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-2">
@@ -2766,8 +2796,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 3: Tickets */}
-              {currentStep === 3 && (
+              {/* Step 4: Tickets */}
+              {currentStep === 4 && (
                 <div className="space-y-6">
                   <div className="text-sm text-muted-foreground">
                     Select ticket types to add for your event
@@ -2904,8 +2934,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 4: Venue & Location */}
-              {currentStep === 4 && (
+              {/* Step 5: Venue & Location */}
+              {currentStep === 5 && (
                 <div className="space-y-6">
                   <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
                     <div className="flex items-center justify-between mb-4">
@@ -3018,8 +3048,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 6: Add Artist */}
-              {currentStep === 6 && (
+              {/* Step 7: Add Artist */}
+              {currentStep === 7 && (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-4">
                     <Label>Artists</Label>
@@ -3159,8 +3189,8 @@ const CreateEvent = () => {
                 </div>
               )}
 
-              {/* Step 7: Additional Information */}
-              {currentStep === 7 && (() => {
+              {/* Step 8: Additional Information */}
+              {currentStep === 8 && (() => {
                 const advisoryOptions = [
                   { id: 'smokingAllowed', label: '🚬 Smoking allowed' },
                   { id: 'drinkingAllowed', label: '🍺 Drinking allowed' },
@@ -3189,7 +3219,7 @@ const CreateEvent = () => {
                   <div className="space-y-5">
                     <Card className="border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] shadow-[0_20px_80px_rgba(0,0,0,0.55)]">
                       <CardHeader className="pb-2">
-                        <p className="text-xs uppercase tracking-[0.2em] text-white/50">Step 7</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-white/50">Step 8</p>
                         <CardTitle className="text-xl text-white">Additional Info</CardTitle>
                         <p className="text-sm text-white/70">Set policies, advisories, and helpful notes for attendees.</p>
                       </CardHeader>
@@ -3501,8 +3531,8 @@ const CreateEvent = () => {
                 );
               })()}
 
-              {/* Step 8: Review & Publish */}
-              {currentStep === 8 && (() => {
+              {/* Step 9: Review & Publish */}
+              {currentStep === 9 && (() => {
                 const statusBadge = (filled) => (
                   <Badge className={filled ? 'bg-emerald-500/20 text-emerald-100 border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.25)]' : 'bg-white/10 text-white/70 border-white/15'}>
                     {filled ? 'Filled' : 'Missing'}
@@ -3775,7 +3805,7 @@ const CreateEvent = () => {
               Previous
             </Button>
 
-            {currentStep < 8 ? (
+            {currentStep < 9 ? (
               <Button
                 onClick={nextStep}
                 disabled={isSubmitting}
