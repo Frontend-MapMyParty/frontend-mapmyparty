@@ -4,39 +4,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Activity, Users, TrendingUp, Eye, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "@/config/api";
+import { fetchOrganizerLiveEventsCards } from "@/services/eventService";
 
 // Transform API response to component format (outside component to avoid recreation)
 const transformEvent = (event) => {
-  const ticketStats = (event.tickets || []).reduce(
-    (acc, ticket) => {
-      acc.totalCapacity += ticket.totalQty || 0;
-      acc.soldQty += ticket.soldQty || 0;
-      return acc;
-    },
-    { totalCapacity: 0, soldQty: 0 }
-  );
-
-  const revenueEstimate = (event.tickets || []).reduce((acc, ticket) => {
-    return acc + (ticket.soldQty || 0) * (ticket.price || 0);
-  }, 0);
-
   return {
-    id: event.id,
+    id: event.eventId || event.id,
     title: event.title,
-    organizer: event.organizer?.name || "Unknown Organizer",
-    currentAttendees: ticketStats.soldQty,
-    totalCapacity: ticketStats.totalCapacity,
-    ticketsSoldToday: ticketStats.soldQty,
-    revenueToday: revenueEstimate,
-    status: event.eventStatus?.toLowerCase() || "live",
+    organizer: "",
+    currentAttendees: event.occupancySold || 0,
+    totalCapacity: event.occupancyTotal || 0,
+    ticketsSoldToday: event.occupancySold || 0,
+    revenueToday: 0,
+    status: (event.status || "Live").toLowerCase(),
     category: event.category,
     subCategory: event.subCategory,
     startDate: event.startDate,
     endDate: event.endDate,
-    venue: event.venues?.[0]?.name || "",
-    city: event.venues?.[0]?.city || "",
-    flyerImage: event.flyerImage || event.images?.[0]?.url,
+    venue: event.venueName || "",
+    city: event.venueCity || "",
+    flyerImage: null,
   };
 };
 
@@ -67,15 +54,14 @@ const PromoterLiveEvents = () => {
     setError(null);
 
     try {
-      const response = await apiFetch("promoter/live-events?status=ONGOING");
+      const response = await fetchOrganizerLiveEventsCards("ONGOING");
 
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
       const data = response.data || response;
-      const events = data.events || [];
 
-      setLiveEvents(events.map(transformEvent));
+      setLiveEvents((data || []).map(transformEvent));
       hasFetchedRef.current = true;
     } catch (err) {
       if (!isMountedRef.current) return;

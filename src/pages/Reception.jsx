@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, Sparkles, Clock, MapPin, Radio, Users, Ticket, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { apiFetch } from "@/config/api";
+import { fetchOrganizerLiveEventsCards } from "@/services/eventService";
 
 // Date formatter utility
 const formatDateTime = (date) =>
@@ -15,28 +15,30 @@ const formatDateTime = (date) =>
 
 const transformEvents = (events) =>
   (events || []).map((event) => {
-    const ticketTypes = (event.tickets || []).map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      price: t.price,
-      totalQty: t.totalQty || 0,
-      soldQty: t.soldQty || 0,
-      checkedIn: 0,
-    }));
+    const ticketTypes = [
+      {
+        id: event.eventId || event.id,
+        name: "All",
+        type: "ALL",
+        price: 0,
+        totalQty: event.occupancyTotal || 0,
+        soldQty: event.occupancySold || 0,
+        checkedIn: event.checkedInCount || 0,
+      },
+    ];
 
     return {
-      id: event.id,
+      id: event.eventId || event.id,
       title: event.title,
       category: event.category,
       subCategory: event.subCategory,
-      venue: event.venues?.[0]?.name || "Venue TBD",
-      city: event.venues?.[0]?.city || "",
-      state: event.venues?.[0]?.state || "",
+      venue: event.venueName || "Venue TBD",
+      city: event.venueCity || "",
+      state: "",
       startDate: event.startDate,
       endDate: event.endDate,
-      eventStatus: event.eventStatus,
-      publishStatus: event.publishStatus,
+      eventStatus: event.status === "Upcoming" ? "UPCOMING" : "ONGOING",
+      publishStatus: "PUBLISHED",
       ticketTypes,
     };
   });
@@ -61,11 +63,10 @@ const ReceptionLanding = () => {
     setError(null);
 
     try {
-      const response = await apiFetch("promoter/live-events?status=ONGOING");
+      const response = await fetchOrganizerLiveEventsCards("ONGOING");
       if (!isMountedRef.current) return;
       const data = response.data || response;
-      const events = data.events || [];
-      setLiveEvents(transformEvents(events));
+      setLiveEvents(transformEvents(data));
       hasFetchedRef.current = true;
     } catch (err) {
       if (!isMountedRef.current) return;

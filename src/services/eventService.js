@@ -150,6 +150,14 @@ export async function persistFlyerUrl(eventId, flyer) {
   return res;
 }
 
+export async function fetchOrganizerLiveEventsCards(status) {
+  const s = String(status || "ongoing").trim().toLowerCase();
+  const finalStatus = s === "upcoming" ? "UPCOMING" : "ONGOING";
+
+  const url = buildUrl(`/api/event/my-events/live?status=${encodeURIComponent(finalStatus)}`);
+  return apiFetch(url);
+}
+
 async function uploadToCloudinary(file, signaturePayload) {
   const {
     cloudName,

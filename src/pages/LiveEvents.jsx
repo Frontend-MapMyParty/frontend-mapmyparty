@@ -15,7 +15,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { apiFetch } from "@/config/api";
+import { fetchOrganizerLiveEventsCards } from "@/services/eventService";
 
 const formatDateTime = (date) =>
   new Intl.DateTimeFormat("en-IN", {
@@ -36,33 +36,35 @@ const formatDate = (date) =>
 // Transform events to include computed ticket data
 const transformEvents = (events) =>
   (events || []).map((event) => {
-    const ticketTypes = (event.tickets || []).map((t) => ({
-      id: t.id,
-      name: t.name,
-      type: t.type,
-      price: t.price,
-      totalQty: t.totalQty || 0,
-      soldQty: t.soldQty || 0,
-      checkedIn: 0,
-    }));
+    const ticketTypes = [
+      {
+        id: event.eventId || event.id,
+        name: "All",
+        type: "ALL",
+        price: 0,
+        totalQty: event.occupancyTotal || 0,
+        soldQty: event.occupancySold || 0,
+        checkedIn: event.checkedInCount || 0,
+      },
+    ];
 
     return {
-      id: event.id,
+      id: event.eventId || event.id,
       title: event.title,
       category: event.category,
       subCategory: event.subCategory,
-      venue: event.venues?.[0]?.name || "Venue TBD",
-      city: event.venues?.[0]?.city || "",
-      state: event.venues?.[0]?.state || "",
+      venue: event.venueName || "Venue TBD",
+      city: event.venueCity || "",
+      state: "",
       startDate: event.startDate,
       endDate: event.endDate,
-      eventStatus: event.eventStatus,
-      publishStatus: event.publishStatus,
+      eventStatus: event.status === "Upcoming" ? "UPCOMING" : "ONGOING",
+      publishStatus: "PUBLISHED",
       tags: [event.category, event.subCategory].filter(Boolean),
       ticketTypes,
-      organizer: event.organizer,
-      bookingsCount: event._count?.bookings || 0,
-      checkIns: { total: 0, last15m: 0 },
+      organizer: null,
+      bookingsCount: 0,
+      checkIns: { total: event.checkedInCount || 0, last15m: 0 },
     };
   });
 
@@ -96,8 +98,8 @@ const LiveEvents = () => {
     try {
       // Fetch both ONGOING and UPCOMING events in parallel
       const [liveResponse, upcomingResponse] = await Promise.all([
-        apiFetch("promoter/live-events?status=ONGOING"),
-        apiFetch("promoter/live-events?status=UPCOMING"),
+        fetchOrganizerLiveEventsCards("ONGOING"),
+        fetchOrganizerLiveEventsCards("UPCOMING"),
       ]);
 
       // Only update state if component is still mounted
@@ -106,12 +108,12 @@ const LiveEvents = () => {
       const liveData = liveResponse.data || liveResponse;
       const upcomingData = upcomingResponse.data || upcomingResponse;
 
-      setLiveEvents(transformEvents(liveData.events));
+      setLiveEvents(transformEvents(liveData));
 
       // Filter upcoming events to show only next 7 days
       const now = new Date();
       const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const filteredUpcoming = (upcomingData.events || []).filter((event) => {
+      const filteredUpcoming = (upcomingData || []).filter((event) => {
         const startDate = new Date(event.startDate);
         return startDate >= now && startDate <= sevenDaysFromNow;
       });
