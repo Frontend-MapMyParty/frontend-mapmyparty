@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Ticket, Calendar, MapPin, Loader2, AlertCircle, Receipt, CreditCard, User, Download, Hash, Clock, CheckCircle2, XCircle, Search, Filter, ChevronRight, Star, TrendingUp, Mail } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Ticket, Calendar, MapPin, Loader2, AlertCircle, Receipt, CreditCard, User, Download, Hash, Clock, CheckCircle2, XCircle, Search, Filter, ChevronRight, ChevronLeft, Star, TrendingUp, Mail, Eye } from "lucide-react";
+import { useBookings } from "@/hooks/useBookings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,15 +14,56 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
-import TicketModal from "@/components/TicketModal";
+import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import StarRating from "@/components/StarRating";
 
+// Skeleton component for loading state
+const BookingSkeleton = () => (
+  <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-xl overflow-hidden animate-pulse">
+    <CardHeader className="p-3 sm:p-4 border-b border-[rgba(100,200,255,0.15)]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 bg-[rgba(255,255,255,0.2)] rounded" />
+          <div className="h-3 w-20 bg-[rgba(255,255,255,0.2)] rounded" />
+          <div className="h-3 w-32 bg-[rgba(255,255,255,0.2)] rounded" />
+        </div>
+        <div className="flex gap-2">
+          <div className="h-5 w-20 bg-[rgba(255,255,255,0.2)] rounded-full" />
+          <div className="h-5 w-16 bg-[rgba(255,255,255,0.2)] rounded-full" />
+        </div>
+      </div>
+    </CardHeader>
+    <CardContent className="p-3 sm:p-4">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex gap-3 flex-1">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg bg-[rgba(255,255,255,0.15)]" />
+          <div className="flex-1 space-y-2">
+            <div className="h-5 w-16 bg-[rgba(255,255,255,0.2)] rounded" />
+            <div className="h-5 w-48 bg-[rgba(255,255,255,0.2)] rounded" />
+            <div className="h-3 w-32 bg-[rgba(255,255,255,0.15)] rounded" />
+            <div className="h-3 w-24 bg-[rgba(255,255,255,0.15)] rounded" />
+          </div>
+        </div>
+        <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-[rgba(255,255,255,0.05)]">
+          <div className="h-8 w-16 bg-[rgba(255,255,255,0.15)] rounded" />
+          <div className="h-8 w-20 bg-[rgba(255,255,255,0.15)] rounded" />
+          <div className="h-8 w-16 bg-[rgba(255,255,255,0.15)] rounded" />
+        </div>
+        <div className="flex lg:flex-col gap-2 lg:w-24">
+          <div className="h-8 flex-1 bg-[rgba(255,255,255,0.15)] rounded" />
+          <div className="h-8 flex-1 bg-[rgba(255,255,255,0.15)] rounded" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
 const MyBookings = () => {
+  const navigate = useNavigate();
   const feedbackSuggestions = [
     "Loved every minute of the performances!",
     "Great crowd energy and smooth entry experience.",
@@ -29,10 +71,7 @@ const MyBookings = () => {
     "Felt the schedule ran late; could improve timing.",
   ];
 
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
@@ -41,89 +80,101 @@ const MyBookings = () => {
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const fetchBookings = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiFetch("/api/user/bookings", { method: "GET" });
-      if (response?.success && Array.isArray(response?.data?.items)) {
-        const normalized = response.data.items.map((item) => {
-          const evt = item.event || {};
-          const amounts = item.analytics?.amounts || {};
-          const tickets = Array.isArray(item.tickets) ? item.tickets : [];
-          const totalTickets =
-            item.analytics?.totalTickets ??
-            tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
+  // Use the new React Query hook for bookings with pagination
+  const {
+    bookings: rawBookings,
+    pagination,
+    isLoading: loading,
+    isFetching,
+    isError,
+    error,
+    refetch: fetchBookings,
+    hasNextPage,
+    hasPrevPage,
+    prefetchNextPage,
+    invalidateBookings,
+  } = useBookings({
+    page: currentPage,
+    limit: 10,
+    status: filterStatus,
+  });
 
-          const primaryTicket = tickets[0];
-          const startDate = evt.startDate || null;
-          const endDate = evt.endDate || null;
-          const statusNormalized = (item.status || "").toLowerCase();
-          const paymentStatus = (item.payment?.status || "").toLowerCase();
+  // Normalize bookings data for display
+  const bookings = useMemo(() => {
+    if (!Array.isArray(rawBookings)) return [];
 
-          const location = evt.venue
-            ? [evt.venue.city, evt.venue.state].filter(Boolean).join(", ")
-            : "Venue TBA";
+    return rawBookings.map((item) => {
+      const evt = item.event || {};
+      const amounts = item.analytics?.amounts || {};
+      const tickets = Array.isArray(item.tickets) ? item.tickets : [];
+      const totalTickets =
+        item.analytics?.totalTickets ??
+        tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
 
-          const formatTime = (date) => {
-            if (!date) return "Time TBA";
-            const d = new Date(date);
-            if (isNaN(d)) return "Time TBA";
-            return d.toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-            });
-          };
+      const primaryTicket = tickets[0];
+      const startDate = evt.startDate || null;
+      const endDate = evt.endDate || null;
+      const statusNormalized = (item.status || "").toLowerCase();
+      const paymentStatus = (item.payment?.status || "").toLowerCase();
 
-          const fallbackTotal =
-            tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) ||
-            tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
+      const location = evt.venue
+        ? [evt.venue.city, evt.venue.state].filter(Boolean).join(", ")
+        : "Venue TBA";
 
-          return {
-            id: item.id,
-            orderId: item.payment?.transactionId || item.id,
-            bookingDate: item.createdAt || evt.createdAt,
-            status: statusNormalized,
-            paymentStatus,
-            eventId: evt.id,
-            eventTitle: evt.title || "Event",
-            eventDate: startDate || endDate,
-            eventEndDate: endDate,
-            eventTime: formatTime(startDate),
-            image:
-              evt.flyerImage ||
-              evt.image ||
-              "https://via.placeholder.com/600x400?text=Event",
-            category: evt.category || evt.subCategory || "Event",
-            location,
-            ticketType: primaryTicket?.name || "Ticket",
-            quantity: totalTickets || 0,
-            totalPrice: amounts.total || fallbackTotal || 0,
-            tickets,
-            analytics: item.analytics,
-            payment: item.payment,
-            review: item.review || null,
-            status1: evt.status1,
-            status2: evt.status2,
-          };
+      const formatTime = (date) => {
+        if (!date) return "Time TBA";
+        const d = new Date(date);
+        if (isNaN(d)) return "Time TBA";
+        return d.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
         });
+      };
 
-        setBookings(normalized);
-      } else {
-        setBookings([]);
-      }
-    } catch (err) {
-      console.error("Failed to load bookings", err);
-      setError(err?.message || "Failed to load your bookings.");
-      setBookings([]);
-    } finally {
-      setLoading(false);
-    }
+      const fallbackTotal =
+        tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) ||
+        tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
+
+      return {
+        id: item.id,
+        orderId: item.payment?.transactionId || item.id,
+        bookingDate: item.createdAt || evt.createdAt,
+        status: statusNormalized,
+        paymentStatus,
+        eventId: evt.id,
+        eventTitle: evt.title || "Event",
+        eventDate: startDate || endDate,
+        eventEndDate: endDate,
+        eventTime: formatTime(startDate),
+        image:
+          evt.flyerImage ||
+          evt.image ||
+          "https://via.placeholder.com/600x400?text=Event",
+        category: evt.category || evt.subCategory || "Event",
+        location,
+        ticketType: primaryTicket?.name || "Ticket",
+        quantity: totalTickets || 0,
+        totalPrice: amounts.total || fallbackTotal || 0,
+        tickets,
+        analytics: item.analytics,
+        payment: item.payment,
+        review: item.review || null,
+        status1: evt.status1,
+        status2: evt.status2,
+      };
+    });
+  }, [rawBookings]);
+
+  // Prefetch next page when hovering pagination
+  const handlePrefetchNext = useCallback(() => {
+    prefetchNextPage();
+  }, [prefetchNextPage]);
+
+  // Reset to first page when filter changes
+  const handleFilterChange = useCallback((newStatus) => {
+    setFilterStatus(newStatus);
+    setCurrentPage(1);
   }, []);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "Date TBA";
@@ -167,15 +218,17 @@ const MyBookings = () => {
     toast.success(`Ticket for ${booking.eventTitle} has been sent to your email!`);
   };
 
+  // Client-side search filtering (pagination handles status filter server-side)
   const filteredBookings = useMemo(() => {
+    if (!searchQuery.trim()) return bookings;
+
     return bookings.filter(booking => {
       const matchesSearch =
         (booking.eventTitle || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (booking.orderId || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = filterStatus === 'all' || booking.status === filterStatus;
-      return matchesSearch && matchesFilter;
+      return matchesSearch;
     });
-  }, [bookings, searchQuery, filterStatus]);
+  }, [bookings, searchQuery]);
 
   const stats = useMemo(() => {
     const total = bookings.length;
@@ -264,15 +317,8 @@ const MyBookings = () => {
 
       if (response?.success || response?.code === 201) {
         toast.success("Thanks for your feedback!");
-        const reviewData = await fetchUserReview(selectedBookingForReview.eventId);
-
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === selectedBookingForReview.id
-              ? { ...b, review: reviewData || payload }
-              : b
-          )
-        );
+        // Invalidate bookings cache to refetch with updated review data
+        invalidateBookings();
         handleCloseReview();
       } else {
         throw new Error(response?.message || "Failed to submit review");
@@ -287,10 +333,27 @@ const MyBookings = () => {
 
   const hasBookings = bookings.length > 0;
   const hasFilteredBookings = filteredBookings.length > 0;
-  const showEmptyState = !loading && !hasBookings;
+  const showEmptyState = !loading && !hasBookings && currentPage === 1;
 
   const handleRetry = () => {
     fetchBookings();
+  };
+
+  // Pagination handlers
+  const goToNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (hasPrevPage) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+
+  const goToPage = (page) => {
+    setCurrentPage(page);
   };
 
   return (
@@ -360,14 +423,14 @@ const MyBookings = () => {
           <div className="flex gap-2">
             <Button
               variant={filterStatus === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilterStatus('all')}
+              onClick={() => handleFilterChange('all')}
               className="text-sm"
             >
               All
             </Button>
             <Button
               variant={filterStatus === 'confirmed' ? 'default' : 'outline'}
-              onClick={() => setFilterStatus('confirmed')}
+              onClick={() => handleFilterChange('confirmed')}
               className="text-sm"
             >
               Confirmed
@@ -397,7 +460,7 @@ const MyBookings = () => {
                 <Card
                   key={booking.id}
                   className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden group cursor-pointer"
-                  onClick={() => setSelectedTicket(booking)}
+                  onClick={() => navigate(`/dashboard/bookings/${booking.id}/tickets`)}
                 >
                   <div className="relative h-40 overflow-hidden">
                     <img
@@ -441,17 +504,30 @@ const MyBookings = () => {
                       </div>
                     </div>
                     
-                    <Button
-                      size="sm"
-                      className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadTicket(booking);
-                      }}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Ticket
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/bookings/${booking.id}/tickets`);
+                        }}
+                      >
+                        <Ticket className="h-4 w-4 mr-2" />
+                        View Tickets
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-white/20 text-white hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadTicket(booking);
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -469,12 +545,11 @@ const MyBookings = () => {
 
       {/* Bookings List */}
       {loading ? (
-        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-          <CardContent className="p-12 text-center">
-            <Loader2 className="w-10 h-10 mx-auto animate-spin text-[#D60024] mb-4" />
-            <p className="text-[rgba(255,255,255,0.65)]">Loading your bookings...</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <BookingSkeleton key={i} />
+          ))}
+        </div>
       ) : showEmptyState ? (
         <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
           <CardContent className="p-12 text-center">
@@ -503,6 +578,12 @@ const MyBookings = () => {
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* Show loading overlay when fetching new page */}
+          {isFetching && !loading && (
+            <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl">
+              <Loader2 className="w-6 h-6 animate-spin text-[#D60024]" />
+            </div>
+          )}
           {filteredBookings.map((booking) => (
             <Card
               key={booking.id}
@@ -595,10 +676,10 @@ const MyBookings = () => {
                       size="sm"
                       variant="outline"
                       className="flex-1 lg:flex-none border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)] hover:border-[#60a5fa] text-xs px-3 py-2"
-                      onClick={() => setSelectedTicket(booking)}
+                      onClick={() => navigate(`/dashboard/bookings/${booking.id}/tickets`)}
                     >
-                      <Ticket className="h-3.5 w-3.5 mr-1.5" />
-                      Details
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View Tickets
                     </Button>
                     {isEventPast(booking) && (
                       <Button
@@ -616,15 +697,73 @@ const MyBookings = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
-      )}
 
-      {selectedTicket && (
-        <TicketModal
-          isOpen={!!selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-          ticket={selectedTicket}
-        />
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-6 border-t border-[rgba(100,200,255,0.15)]">
+              <p className="text-sm text-[rgba(255,255,255,0.65)]">
+                Showing {((currentPage - 1) * pagination.limit) + 1} - {Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} bookings
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPrevPage}
+                  disabled={!hasPrevPage || isFetching}
+                  className="border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)] disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {[...Array(Math.min(5, pagination.totalPages))].map((_, idx) => {
+                    let pageNum;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = idx + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = idx + 1;
+                    } else if (currentPage >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + idx;
+                    } else {
+                      pageNum = currentPage - 2 + idx;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(pageNum)}
+                        disabled={isFetching}
+                        className={`min-w-[36px] ${
+                          currentPage === pageNum
+                            ? "bg-[#D60024] text-white"
+                            : "border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)]"
+                        }`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  onMouseEnter={handlePrefetchNext}
+                  disabled={!hasNextPage || isFetching}
+                  className="border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)] disabled:opacity-50"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Feedback Dialog */}

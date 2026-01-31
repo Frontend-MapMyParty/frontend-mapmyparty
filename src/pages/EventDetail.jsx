@@ -1,9 +1,10 @@
  import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Loader2, Calendar, MapPin, Plus, Minus, ShoppingCart, Download } from "lucide-react";
+import { useEventDetail } from "@/hooks/useEventDetail";
 import FloatingCTA from "@/components/event-detail/FloatingCTA";
 import ClassicDetailTemplate from "@/components/EventDetailTemplates/ClassicDetailTemplate";
 import ModernSplitTemplate from "@/components/EventDetailTemplates/ModernSplitTemplate";
@@ -222,12 +223,58 @@ const transformTicketList = (tickets = []) => {
   return normalized;
 };
 
+// Skeleton loader for event detail page
+const EventDetailSkeleton = () => (
+  <div className="min-h-screen flex flex-col animate-pulse">
+    {/* Hero skeleton */}
+    <div className="relative h-[50vh] bg-gradient-to-br from-gray-800 to-gray-900">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+      <div className="absolute bottom-8 left-8 right-8 space-y-4">
+        <div className="h-8 w-32 bg-white/10 rounded-full" />
+        <div className="h-12 w-3/4 bg-white/20 rounded" />
+        <div className="flex gap-4">
+          <div className="h-6 w-40 bg-white/10 rounded" />
+          <div className="h-6 w-48 bg-white/10 rounded" />
+        </div>
+      </div>
+    </div>
+    {/* Content skeleton */}
+    <div className="flex-1 bg-black px-8 py-12">
+      <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 space-y-6">
+          <div className="h-6 w-48 bg-white/10 rounded" />
+          <div className="space-y-3">
+            <div className="h-4 w-full bg-white/10 rounded" />
+            <div className="h-4 w-5/6 bg-white/10 rounded" />
+            <div className="h-4 w-4/6 bg-white/10 rounded" />
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="h-48 w-full bg-white/10 rounded-xl" />
+          <div className="h-12 w-full bg-white/10 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const EventDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const userIsAuthenticated = isAuthenticated();
-  const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  // Use React Query hook for parallel data fetching
+  const {
+    event,
+    tickets: bookingTicketsFromHook,
+    isLoading: loading,
+    isTicketsLoading: bookingTicketsLoading,
+    isError: eventError,
+    isTicketsError: bookingTicketsError,
+    refetchTickets,
+    invalidateTickets,
+  } = useEventDetail(id);
+
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkStep, setBulkStep] = useState("select");
   const [bulkSelections, setBulkSelections] = useState({});
@@ -249,10 +296,12 @@ const EventDetail = () => {
   );
   const [bulkDetails, setBulkDetails] = useState(defaultBookingDetails);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
-  const [bookingTickets, setBookingTickets] = useState([]);
-  const [bookingTicketsLoading, setBookingTicketsLoading] = useState(false);
-  const [bookingTicketsError, setBookingTicketsError] = useState(null);
   const [bookingResponse, setBookingResponse] = useState(null);
+
+  // Transform tickets from hook to match expected format
+  const bookingTickets = useMemo(() => {
+    return transformTicketList(bookingTicketsFromHook || []);
+  }, [bookingTicketsFromHook]);
 
   const eventTickets = useMemo(
     () => transformTicketList(event?.tickets || []),
@@ -637,6 +686,8 @@ const EventDetail = () => {
 
         setBookingResponse(bookingData);
         toast.success("Booking created! Complete payment to finalize your tickets.");
+        // Invalidate tickets cache to reflect updated availability
+        invalidateTickets();
         setBulkStep("success");
       } catch (error) {
         console.error("Booking creation failed:", error);
@@ -685,128 +736,6 @@ const EventDetail = () => {
       totalSelectedTickets,
     ]
   );
-  
-  // Fetch event data
-  useEffect(() => {
-    const fetchEventData = async () => {
-      try {
-        setLoading(true);
-        let foundEvent = null;
-        
-        // Always try to fetch from API first for fresh data
-        console.log(`🔍 Fetching event ${id} from API...`);
-        try {
-          const response = await apiFetch(`/api/event/${id}`, {
-            method: "GET",
-          });
-          
-          console.log("📅 Fetched event from API:", response);
-          
-          // Handle different response structures
-          foundEvent = response.data?.event || response.data || response.event || response;
-          
-          // If we got the event from API, cache it to localStorage
-          if (foundEvent && foundEvent.id) {
-            const STORAGE_KEY = "mapMyParty_events";
-            const stored = localStorage.getItem(STORAGE_KEY);
-            const events = stored ? JSON.parse(stored) : [];
-            
-            const existingIndex = events.findIndex(e => e.id === foundEvent.id || e.eventId === foundEvent.id);
-            if (existingIndex >= 0) {
-              events[existingIndex] = foundEvent;
-            } else {
-              events.push(foundEvent);
-            }
-            
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-            console.log("💾 Saved/Updated event in localStorage");
-          }
-        } catch (apiError) {
-          console.error("❌ Error fetching from API:", apiError);
-          
-          // Fallback to cached events only (no dummy)
-          const STORAGE_KEY = "mapMyParty_events";
-          const stored = localStorage.getItem(STORAGE_KEY);
-          const events = stored ? JSON.parse(stored) : [];
-          foundEvent = events.find(e => e.id === id || e.eventId === id);
-          
-          if (foundEvent) {
-            console.log("✅ Found event in localStorage");
-          }
-        }
-        
-        if (foundEvent) {
-          console.log("✅ Event loaded successfully:", {
-            id: foundEvent.id,
-            title: foundEvent.title || foundEvent.eventTitle,
-            category: foundEvent.category || foundEvent.mainCategory,
-            status: foundEvent.status2 || foundEvent.status,
-            template: foundEvent.template || "not set",
-            hasVenues: !!foundEvent.venues,
-            hasTickets: !!foundEvent.tickets,
-            hasStats: !!foundEvent.stats
-          });
-          setEvent(foundEvent);
-        } else {
-          // No dummy fallback
-          setEvent(null);
-        }
-      } catch (error) {
-        console.error("💥 Error fetching event:", error);
-        setEvent(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchEventData();
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const fetchBookingTickets = async () => {
-      try {
-        setBookingTicketsLoading(true);
-        setBookingTicketsError(null);
-
-        const response = await apiFetch(`api/booking/event/${id}/tickets`, {
-          method: "GET",
-          headers: {
-
-          },
-        });
-
-        const ticketPayload = response?.data?.tickets ?? response?.tickets ?? response?.data ?? [];
-        const rawTickets = Array.isArray(ticketPayload) ? ticketPayload : [];
-        const normalizedTickets = transformTicketList(rawTickets);
-
-        if (!isCancelled) {
-          setBookingTickets(normalizedTickets);
-        }
-      } catch (error) {
-        if (!isCancelled) {
-          console.error("Error fetching booking tickets:", error);
-          setBookingTicketsError(error);
-          setBookingTickets([]);
-        }
-      } finally {
-        if (!isCancelled) {
-          setBookingTicketsLoading(false);
-        }
-      }
-    };
-
-    fetchBookingTickets();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [id]);
   
   // Format date and time from event data
   const formatEventDate = (dateString) => {
@@ -914,18 +843,9 @@ const EventDetail = () => {
     };
   }, [event, eventQuestions, normalizedArtists]);
   
-  // Show loading state
+  // Show loading state with skeleton
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading event details...</p>
-          </div>
-        </main>
-      </div>
-    );
+    return <EventDetailSkeleton />;
   }
   
   // Show error if event not found
