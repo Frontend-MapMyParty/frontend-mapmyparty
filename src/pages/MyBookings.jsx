@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Ticket, Calendar, MapPin, Loader2, AlertCircle, Receipt, CreditCard, User, Download, Hash, Clock, CheckCircle2, XCircle, Search, Filter, ChevronRight, Star, TrendingUp, Mail } from "lucide-react";
+import { Ticket, Calendar, MapPin, Loader2, AlertCircle, Receipt, CreditCard, User, Download, Hash, Clock, CheckCircle2, XCircle, Search, Filter, ChevronRight, Star, TrendingUp, Mail, Eye, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
-import TicketModal from "@/components/TicketModal";
+import VintageTicket from "@/components/VintageTicket";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
@@ -40,6 +40,12 @@ const MyBookings = () => {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Tickets modal state
+  const [ticketsModalOpen, setTicketsModalOpen] = useState(false);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [selectedBookingTickets, setSelectedBookingTickets] = useState([]);
+  const [selectedBookingForTickets, setSelectedBookingForTickets] = useState(null);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -105,6 +111,9 @@ const MyBookings = () => {
             review: item.review || null,
             status1: evt.status1,
             status2: evt.status2,
+            eventStatus: evt.eventStatus,
+            venue: evt.venue,
+            organizer: evt.organizer,
           };
         });
 
@@ -125,6 +134,98 @@ const MyBookings = () => {
     fetchBookings();
   }, [fetchBookings]);
 
+  // Fetch tickets for a specific booking
+  const fetchBookingTickets = useCallback(async (booking) => {
+    setTicketsLoading(true);
+    setSelectedBookingForTickets(booking);
+    setTicketsModalOpen(true);
+
+    try {
+      const response = await apiFetch(`/api/user/tickets?bookingId=${booking.id}`, { method: "GET" });
+
+      if (response?.success && Array.isArray(response?.data?.items)) {
+        // Filter tickets for this specific booking
+        const bookingTickets = response.data.items.filter(t => t.bookingId === booking.id);
+        setSelectedBookingTickets(bookingTickets);
+      } else {
+        // Fallback: construct tickets from booking data
+        const tickets = [];
+        const bookingTicketsData = booking.tickets || [];
+
+        bookingTicketsData.forEach((ticketGroup, groupIndex) => {
+          for (let i = 0; i < (ticketGroup.quantity || 1); i++) {
+            tickets.push({
+              id: `${booking.id}-${groupIndex}-${i}`,
+              bookingId: booking.id,
+              bookingStatus: booking.status?.toUpperCase(),
+              bookingDate: booking.bookingDate,
+              ticketName: ticketGroup.name || "Ticket",
+              ticketType: ticketGroup.type || "STANDARD_TICKET",
+              ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
+              ticketNumber: i + 1,
+              totalTickets: ticketGroup.quantity || 1,
+              qrCode: null,
+              manualCheckInCode: null,
+              checkedIn: false,
+              eventId: booking.eventId,
+              eventTitle: booking.eventTitle,
+              eventImage: booking.image,
+              eventStartDate: booking.eventDate,
+              eventEndDate: booking.eventEndDate,
+              eventStatus: booking.eventStatus,
+              eventCategory: booking.category,
+              venueName: booking.venue?.name || null,
+              venueCity: booking.venue?.city || null,
+              venueState: booking.venue?.state || null,
+              organizerName: booking.organizer?.name || null,
+            });
+          }
+        });
+
+        setSelectedBookingTickets(tickets);
+      }
+    } catch (err) {
+      console.error("Failed to fetch tickets", err);
+      toast.error("Failed to load tickets");
+
+      // Fallback to basic ticket data
+      const tickets = [];
+      const bookingTicketsData = booking.tickets || [];
+
+      bookingTicketsData.forEach((ticketGroup, groupIndex) => {
+        for (let i = 0; i < (ticketGroup.quantity || 1); i++) {
+          tickets.push({
+            id: `${booking.id}-${groupIndex}-${i}`,
+            bookingId: booking.id,
+            bookingStatus: booking.status?.toUpperCase(),
+            ticketName: ticketGroup.name || "Ticket",
+            ticketType: ticketGroup.type || "STANDARD_TICKET",
+            ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
+            ticketNumber: i + 1,
+            eventId: booking.eventId,
+            eventTitle: booking.eventTitle,
+            eventStartDate: booking.eventDate,
+            eventEndDate: booking.eventEndDate,
+            eventCategory: booking.category,
+            venueName: null,
+            venueCity: booking.location?.split(", ")[0] || null,
+            organizerName: null,
+          });
+        }
+      });
+
+      setSelectedBookingTickets(tickets);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  const closeTicketsModal = () => {
+    setTicketsModalOpen(false);
+    setSelectedBookingTickets([]);
+    setSelectedBookingForTickets(null);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "Date TBA";
     const d = new Date(dateString);
@@ -141,26 +242,76 @@ const MyBookings = () => {
     return d.toLocaleDateString('en-US', options);
   };
 
-  const handleDownloadTicket = (booking) => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('EVENT TICKET', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`Event: ${booking.eventTitle}`, 20, 40);
-    doc.text(`Date: ${formatDate(booking.eventDate)}`, 20, 50);
-    doc.text(`Time: ${booking.eventTime}`, 20, 60);
-    doc.text(`Location: ${booking.location}`, 20, 70);
-    doc.text(`Order ID: ${booking.orderId}`, 20, 80);
-    
-    const qrData = `Order: ${booking.orderId}\nEvent: ${booking.eventTitle}\nDate: ${booking.eventDate}\nQR: ${booking.qrCode}`;
-    
-    QRCode.toDataURL(qrData, { width: 100 }, (err, url) => {
-      if (err) return console.error(err);
-      doc.addImage(url, 'PNG', 150, 40, 40, 40);
-      doc.save(`ticket-${booking.orderId}.pdf`);
-    });
-    
-    toast.success('Ticket downloaded successfully!');
+  const handleDownloadTicket = async (ticket) => {
+    if (!ticket) return;
+
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Header with gradient effect
+      doc.setFillColor(119, 34, 86); // #772256
+      doc.rect(0, 0, pageWidth, 45, 'F');
+
+      doc.setTextColor(201, 151, 116); // #C99774
+      doc.setFontSize(28);
+      doc.setFont('helvetica', 'bold');
+      doc.text('EVENT TICKET', pageWidth / 2, 28, { align: 'center' });
+
+      // Event title
+      doc.setTextColor(72, 40, 93); // #48285D
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(ticket.eventTitle || 'Event', 20, 65);
+
+      // Ticket details
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(119, 34, 86);
+
+      doc.text(`Ticket Type: ${ticket.ticketName}`, 20, 80);
+      doc.text(`Ticket #: ${ticket.ticketNumber}`, 20, 90);
+      doc.text(`Date: ${ticket.eventStartDate ? new Date(ticket.eventStartDate).toLocaleDateString() : 'TBA'}`, 20, 100);
+
+      const venue = [ticket.venueName, ticket.venueCity].filter(Boolean).join(', ') || 'TBA';
+      doc.text(`Venue: ${venue}`, 20, 110);
+
+      if (ticket.ticketPrice) {
+        doc.text(`Price: ₹${ticket.ticketPrice.toLocaleString()}`, 20, 120);
+      }
+
+      // QR Code
+      if (ticket.qrCode) {
+        const qrData = JSON.stringify({
+          qr: ticket.qrCode,
+          booking: ticket.bookingId,
+        });
+        const qrUrl = await QRCode.toDataURL(qrData, { width: 120 });
+        doc.addImage(qrUrl, 'PNG', pageWidth - 60, 60, 45, 45);
+      }
+
+      // Manual code
+      if (ticket.manualCheckInCode) {
+        doc.text(`Check-in Code: ${ticket.manualCheckInCode.toUpperCase()}`, 20, 135);
+      }
+
+      // Footer
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Present this ticket at the venue entrance', pageWidth / 2, 280, { align: 'center' });
+
+      // Decorative line
+      doc.setDrawColor(201, 151, 116);
+      doc.setLineWidth(0.5);
+      doc.line(20, 270, pageWidth - 20, 270);
+
+      const fileName = `ticket-${ticket.eventTitle?.replace(/\s+/g, '-') || 'event'}-${ticket.ticketNumber || 1}.pdf`;
+      doc.save(fileName);
+      toast.success('Ticket downloaded successfully!');
+    } catch (err) {
+      console.error('Failed to download ticket:', err);
+      toast.error('Failed to download ticket');
+    }
   };
 
   const handleResendTicket = (booking) => {
@@ -232,7 +383,6 @@ const MyBookings = () => {
     if (!open) {
       handleCloseReview();
     } else {
-      // Fresh slate every open to avoid auto-filled stars/comments
       setReviewRating(0);
       setReviewComment("");
       setReviewDialogOpen(true);
@@ -300,7 +450,7 @@ const MyBookings = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl sm:text-4xl font-bold text-white flex items-center gap-3">
-              <Ticket className="h-8 w-8 text-[#D60024]" />
+              <Ticket className="h-8 w-8 text-[#772256]" />
               My Bookings
             </h1>
             <p className="text-[rgba(255,255,255,0.65)] mt-2 text-sm sm:text-base">
@@ -311,10 +461,10 @@ const MyBookings = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] rounded-xl">
+          <Card className="border-2 border-[#772256]/30 bg-gradient-to-br from-[#772256]/15 to-[#48285D]/10 rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-2">
-                <Receipt className="h-5 w-5 text-[#D60024]" />
+                <Receipt className="h-5 w-5 text-[#772256]" />
                 <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
               </div>
               <p className="text-3xl font-bold text-white mb-1">{stats.total}</p>
@@ -322,10 +472,10 @@ const MyBookings = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)] rounded-xl">
+          <Card className="border-2 border-[#48285D]/30 bg-gradient-to-br from-[#48285D]/15 to-[#772256]/10 rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-2">
-                <Calendar className="h-5 w-5 text-[#60a5fa]" />
+                <Calendar className="h-5 w-5 text-[#C99774]" />
                 <Star className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
               </div>
               <p className="text-3xl font-bold text-white mb-1">{stats.upcoming}</p>
@@ -333,10 +483,10 @@ const MyBookings = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(34,197,94,0.15)] to-[rgba(34,197,94,0.05)] rounded-xl">
+          <Card className="border-2 border-[#C99774]/30 bg-gradient-to-br from-[#C99774]/15 to-[#772256]/10 rounded-xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-2">
-                <CreditCard className="h-5 w-5 text-[#22c55e]" />
+                <CreditCard className="h-5 w-5 text-[#C99774]" />
                 <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
               </div>
               <p className="text-3xl font-bold text-white mb-1">₹{stats.totalSpent.toLocaleString()}</p>
@@ -348,27 +498,27 @@ const MyBookings = () => {
         {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-[rgba(100,200,255,0.7)]" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#C99774]" />
             <Input
               type="search"
               placeholder="Search by event name or order ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-[rgba(255,255,255,0.08)] border border-[rgba(100,200,255,0.2)] text-white placeholder:text-[rgba(255,255,255,0.6)] focus:ring-2 focus:ring-[#60a5fa] focus:border-[#60a5fa] rounded-lg"
+              className="w-full pl-10 pr-4 py-2 bg-[rgba(255,255,255,0.08)] border border-[#772256]/30 text-white placeholder:text-[rgba(255,255,255,0.6)] focus:ring-2 focus:ring-[#772256] focus:border-[#772256] rounded-lg"
             />
           </div>
           <div className="flex gap-2">
             <Button
               variant={filterStatus === 'all' ? 'default' : 'outline'}
               onClick={() => setFilterStatus('all')}
-              className="text-sm"
+              className={`text-sm ${filterStatus === 'all' ? 'bg-gradient-to-r from-[#772256] to-[#48285D] text-white' : 'border-[#772256]/30 text-white hover:bg-[#772256]/20'}`}
             >
               All
             </Button>
             <Button
               variant={filterStatus === 'confirmed' ? 'default' : 'outline'}
               onClick={() => setFilterStatus('confirmed')}
-              className="text-sm"
+              className={`text-sm ${filterStatus === 'confirmed' ? 'bg-gradient-to-r from-[#772256] to-[#48285D] text-white' : 'border-[#772256]/30 text-white hover:bg-[#772256]/20'}`}
             >
               Confirmed
             </Button>
@@ -381,14 +531,14 @@ const MyBookings = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Star className="h-6 w-6 text-[#D60024]" />
+              <Star className="h-6 w-6 text-[#C99774]" />
               Upcoming Events
             </h2>
-            <Badge className="bg-[#D60024]/20 text-[#D60024] border border-[#D60024]/30 px-3 py-1">
+            <Badge className="bg-[#772256]/20 text-[#C99774] border border-[#772256]/30 px-3 py-1">
               {filteredBookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length} Events
             </Badge>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredBookings
               .filter(b => b?.eventDate && new Date(b.eventDate) > new Date())
@@ -396,8 +546,8 @@ const MyBookings = () => {
               .map((booking) => (
                 <Card
                   key={booking.id}
-                  className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden group cursor-pointer"
-                  onClick={() => setSelectedTicket(booking)}
+                  className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[#48285D]/10 rounded-xl hover:border-[#772256]/40 hover:shadow-[0_20px_50px_-20px_rgba(119,34,86,0.3)] transition-all duration-300 overflow-hidden group cursor-pointer"
+                  onClick={() => fetchBookingTickets(booking)}
                 >
                   <div className="relative h-40 overflow-hidden">
                     <img
@@ -406,51 +556,51 @@ const MyBookings = () => {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-                    <Badge className="absolute top-3 left-3 bg-[#D60024] text-white text-xs px-2 py-1">
+                    <Badge className="absolute top-3 left-3 bg-gradient-to-r from-[#772256] to-[#48285D] text-white text-xs px-2 py-1">
                       {booking.category}
                     </Badge>
                     <div className="absolute bottom-3 left-3 right-3">
                       <h3 className="text-white font-bold text-base line-clamp-2 mb-1">{booking.eventTitle}</h3>
                     </div>
                   </div>
-                  
+
                   <CardContent className="p-4 space-y-3">
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-[rgba(255,255,255,0.75)]">
-                        <Calendar className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
+                        <Calendar className="h-4 w-4 text-[#C99774] flex-shrink-0" />
                         <span className="line-clamp-1">{formatDate(booking.eventDate)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[rgba(255,255,255,0.75)]">
-                        <Clock className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
+                        <Clock className="h-4 w-4 text-[#C99774] flex-shrink-0" />
                         <span>{booking.eventTime}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[rgba(255,255,255,0.75)]">
-                        <MapPin className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
+                        <MapPin className="h-4 w-4 text-[#C99774] flex-shrink-0" />
                         <span className="line-clamp-1">{booking.location}</span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center justify-between pt-3 border-t border-[rgba(100,200,255,0.15)]">
+
+                    <div className="flex items-center justify-between pt-3 border-t border-[#772256]/20">
                       <div>
                         <p className="text-xs text-[rgba(255,255,255,0.65)]">{booking.quantity} {booking.quantity > 1 ? 'Tickets' : 'Ticket'}</p>
                         <p className="text-sm font-bold text-white">{booking.ticketType}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-[rgba(255,255,255,0.65)]">Total</p>
-                        <p className="text-lg font-bold text-[#D60024]">₹{booking.totalPrice.toLocaleString()}</p>
+                        <p className="text-lg font-bold text-[#C99774]">₹{booking.totalPrice.toLocaleString()}</p>
                       </div>
                     </div>
-                    
+
                     <Button
                       size="sm"
-                      className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all"
+                      className="w-full bg-gradient-to-r from-[#772256] to-[#48285D] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(119,34,86,0.5)] transition-all"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownloadTicket(booking);
+                        fetchBookingTickets(booking);
                       }}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Ticket
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Tickets
                     </Button>
                   </CardContent>
                 </Card>
@@ -462,29 +612,29 @@ const MyBookings = () => {
       {/* All Bookings Section */}
       <div className="mb-4">
         <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 mb-4">
-          <Receipt className="h-6 w-6 text-[#60a5fa]" />
+          <Receipt className="h-6 w-6 text-[#772256]" />
           All Bookings
         </h2>
       </div>
 
       {/* Bookings List */}
       {loading ? (
-        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+        <Card className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[#48285D]/10 rounded-xl">
           <CardContent className="p-12 text-center">
-            <Loader2 className="w-10 h-10 mx-auto animate-spin text-[#D60024] mb-4" />
+            <Loader2 className="w-10 h-10 mx-auto animate-spin text-[#772256] mb-4" />
             <p className="text-[rgba(255,255,255,0.65)]">Loading your bookings...</p>
           </CardContent>
         </Card>
       ) : showEmptyState ? (
-        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+        <Card className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[#48285D]/10 rounded-xl">
           <CardContent className="p-12 text-center">
             <Ticket className="w-16 h-16 text-[rgba(255,255,255,0.4)] mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2 text-white">You don’t have any bookings yet</h3>
+            <h3 className="text-xl font-semibold mb-2 text-white">You don't have any bookings yet</h3>
             <p className="text-[rgba(255,255,255,0.65)] mb-6">
               Start exploring events and book your first ticket.
             </p>
             <Link to="/dashboard/browse-events">
-              <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold">
+              <Button className="bg-gradient-to-r from-[#772256] to-[#48285D] text-white font-semibold">
                 Browse Events
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
@@ -492,7 +642,7 @@ const MyBookings = () => {
           </CardContent>
         </Card>
       ) : !hasFilteredBookings ? (
-        <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+        <Card className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[#48285D]/10 rounded-xl">
           <CardContent className="p-12 text-center">
             <Search className="w-16 h-16 text-[rgba(255,255,255,0.4)] mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2 text-white">No matching bookings</h3>
@@ -506,9 +656,9 @@ const MyBookings = () => {
           {filteredBookings.map((booking) => (
             <Card
               key={booking.id}
-              className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden"
+              className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[#48285D]/05 to-[#772256]/05 rounded-xl hover:border-[#772256]/40 hover:shadow-[0_20px_50px_-20px_rgba(119,34,86,0.3)] transition-all duration-300 overflow-hidden"
             >
-              <CardHeader className="p-3 sm:p-4 border-b border-[rgba(100,200,255,0.15)]">
+              <CardHeader className="p-3 sm:p-4 border-b border-[#772256]/15">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Hash className="h-4 w-4 text-[rgba(255,255,255,0.65)]" />
@@ -520,11 +670,11 @@ const MyBookings = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className={`${booking.status === 'confirmed' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
+                    <Badge className={`${booking.status === 'confirmed' ? 'bg-[#772256]/20 text-[#C99774] border border-[#772256]/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       {booking.status === 'confirmed' ? 'Confirmed' : 'Pending'}
                     </Badge>
-                    <Badge className={`${booking.paymentStatus === 'success' ? 'bg-[#60a5fa]/20 text-[#bfdbfe] border border-[#60a5fa]/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
+                    <Badge className={`${booking.paymentStatus === 'success' ? 'bg-[#48285D]/20 text-[#C99774] border border-[#48285D]/30' : 'bg-amber-500/20 text-amber-200 border border-amber-500/30'} text-xs px-2 py-0.5`}>
                       <CreditCard className="h-3 w-3 mr-1" />
                       {booking.paymentStatus ? booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1) : 'Payment'}
                     </Badge>
@@ -536,7 +686,7 @@ const MyBookings = () => {
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* Event Info - Compact */}
                   <div className="flex gap-3 flex-1">
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[rgba(100,200,255,0.2)]">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[#772256]/20">
                       <img
                         src={booking.image}
                         alt={booking.eventTitle}
@@ -544,19 +694,19 @@ const MyBookings = () => {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <Badge className="bg-[#D60024] text-white text-xs mb-1.5 px-2 py-0.5">{booking.category}</Badge>
+                      <Badge className="bg-gradient-to-r from-[#772256] to-[#48285D] text-white text-xs mb-1.5 px-2 py-0.5">{booking.category}</Badge>
                       <h3 className="text-base sm:text-lg font-bold text-white mb-1.5 line-clamp-1">{booking.eventTitle}</h3>
                       <div className="space-y-1 text-xs text-[rgba(255,255,255,0.75)]">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-3.5 w-3.5 text-[#60a5fa] flex-shrink-0" />
+                          <Calendar className="h-3.5 w-3.5 text-[#C99774] flex-shrink-0" />
                           <span className="line-clamp-1">{formatDate(booking.eventDate)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 text-[#60a5fa] flex-shrink-0" />
+                          <Clock className="h-3.5 w-3.5 text-[#C99774] flex-shrink-0" />
                           <span>{booking.eventTime}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-[#60a5fa] flex-shrink-0" />
+                          <MapPin className="h-3.5 w-3.5 text-[#C99774] flex-shrink-0" />
                           <span className="line-clamp-1">{booking.location}</span>
                         </div>
                       </div>
@@ -564,20 +714,20 @@ const MyBookings = () => {
                   </div>
 
                   {/* Ticket Details - Inline */}
-                  <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.15)]">
+                  <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-gradient-to-r from-[#772256]/10 to-[#48285D]/10 border border-[#772256]/15">
                     <div className="text-center">
                       <p className="text-[rgba(255,255,255,0.65)] text-xs mb-0.5">Tickets</p>
                       <p className="font-semibold text-white text-sm">{booking.quantity}</p>
                     </div>
-                    <div className="h-8 w-px bg-[rgba(100,200,255,0.2)]"></div>
+                    <div className="h-8 w-px bg-[#772256]/20"></div>
                     <div className="text-center">
                       <p className="text-[rgba(255,255,255,0.65)] text-xs mb-0.5">Type</p>
                       <p className="font-semibold text-white text-sm line-clamp-1">{booking.ticketType}</p>
                     </div>
-                    <div className="h-8 w-px bg-[rgba(100,200,255,0.2)]"></div>
+                    <div className="h-8 w-px bg-[#772256]/20"></div>
                     <div className="text-center">
                       <p className="text-[rgba(255,255,255,0.65)] text-xs mb-0.5">Total</p>
-                      <p className="font-bold text-[#D60024] text-base">₹{booking.totalPrice.toLocaleString()}</p>
+                      <p className="font-bold text-[#C99774] text-base">₹{booking.totalPrice.toLocaleString()}</p>
                     </div>
                   </div>
 
@@ -585,16 +735,16 @@ const MyBookings = () => {
                   <div className="flex lg:flex-col gap-2 lg:w-auto">
                     <Button
                       size="sm"
-                      className="flex-1 lg:flex-none bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all text-xs px-3 py-2"
-                      onClick={() => handleDownloadTicket(booking)}
+                      className="flex-1 lg:flex-none bg-gradient-to-r from-[#772256] to-[#48285D] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(119,34,86,0.5)] transition-all text-xs px-3 py-2"
+                      onClick={() => fetchBookingTickets(booking)}
                     >
-                      <Download className="h-3.5 w-3.5 mr-1.5" />
-                      Download
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View Tickets
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="flex-1 lg:flex-none border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)] hover:border-[#60a5fa] text-xs px-3 py-2"
+                      className="flex-1 lg:flex-none border-[#772256]/30 text-white hover:bg-[#772256]/15 hover:border-[#772256] text-xs px-3 py-2"
                       onClick={() => setSelectedTicket(booking)}
                     >
                       <Ticket className="h-3.5 w-3.5 mr-1.5" />
@@ -604,10 +754,10 @@ const MyBookings = () => {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="flex-1 lg:flex-none border border-dashed border-[rgba(214,0,36,0.4)] text-[#ff6b81] hover:border-[#ff6b81] hover:bg-[rgba(214,0,36,0.08)] text-xs px-3 py-2"
+                        className="flex-1 lg:flex-none border border-dashed border-[#C99774]/40 text-[#C99774] hover:border-[#C99774] hover:bg-[#772256]/10 text-xs px-3 py-2"
                         onClick={() => handleOpenReview(booking)}
                       >
-                        <Star className="h-3.5 w-3.5 mr-1.5 fill-current text-[#ffb347]" />
+                        <Star className="h-3.5 w-3.5 mr-1.5 fill-current" />
                         {booking.review ? "Edit Feedback" : "Leave Feedback"}
                       </Button>
                     )}
@@ -619,20 +769,71 @@ const MyBookings = () => {
         </div>
       )}
 
-      {selectedTicket && (
-        <TicketModal
-          isOpen={!!selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-          ticket={selectedTicket}
-        />
-      )}
+      {/* Tickets Modal */}
+      <Dialog open={ticketsModalOpen} onOpenChange={closeTicketsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden bg-gradient-to-br from-[#0a0a0a] via-[#0f0f15] to-[#0a0a0a] text-white border border-[#772256]/30 shadow-[0_20px_60px_rgba(119,34,86,0.3)] rounded-2xl p-0">
+          <DialogHeader className="p-6 pb-4 border-b border-[#772256]/20">
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-[#772256] to-[#48285D]">
+                <Ticket className="h-5 w-5 text-[#C99774]" />
+              </div>
+              <div>
+                <span className="text-white">Your Tickets</span>
+                {selectedBookingForTickets && (
+                  <p className="text-sm font-normal text-[rgba(255,255,255,0.6)] mt-0.5">
+                    {selectedBookingForTickets.eventTitle}
+                  </p>
+                )}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+            {ticketsLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-10 h-10 animate-spin text-[#772256] mb-4" />
+                <p className="text-[rgba(255,255,255,0.65)]">Loading your tickets...</p>
+              </div>
+            ) : selectedBookingTickets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Ticket className="w-16 h-16 text-[rgba(255,255,255,0.3)] mb-4" />
+                <p className="text-[rgba(255,255,255,0.65)]">No tickets found for this booking.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {selectedBookingTickets.map((ticket, index) => (
+                  <div key={ticket.id} className="relative">
+                    <VintageTicket
+                      ticket={ticket}
+                      index={index}
+                      onClick={() => {}}
+                    />
+                    {/* Download button for each ticket */}
+                    <div className="flex justify-end mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-[#C99774]/30 text-[#C99774] hover:bg-[#772256]/20 hover:border-[#C99774]"
+                        onClick={() => handleDownloadTicket(ticket)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Feedback Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={handleReviewDialogChange}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-[#0f111a] text-white border border-[rgba(100,200,255,0.25)] shadow-[0_20px_60px_rgba(0,0,0,0.45)] rounded-2xl custom-scroll pr-2">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto bg-gradient-to-br from-[#0a0a0a] to-[#0f0f15] text-white border border-[#772256]/25 shadow-[0_20px_60px_rgba(119,34,86,0.3)] rounded-2xl custom-scroll pr-2">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <Star className="h-5 w-5 text-[#ffb347]" />
+              <Star className="h-5 w-5 text-[#C99774]" />
               {selectedBookingForReview?.review ? "Edit your feedback" : "Share your experience"}
             </DialogTitle>
             <p className="text-sm text-[rgba(255,255,255,0.7)]">
@@ -659,7 +860,7 @@ const MyBookings = () => {
                     key={tip}
                     type="button"
                     onClick={() => setReviewComment(tip.slice(0, 1000))}
-                    className="text-xs px-3 py-1 rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] hover:border-[#60a5fa] hover:text-white hover:bg-[rgba(96,165,250,0.08)] transition-colors"
+                    className="text-xs px-3 py-1 rounded-full border border-[#772256]/20 bg-[#772256]/10 hover:border-[#772256] hover:text-white hover:bg-[#772256]/20 transition-colors"
                   >
                     {tip}
                   </button>
@@ -674,7 +875,7 @@ const MyBookings = () => {
                   setReviewComment(value);
                 }}
                 rows={5}
-                className="bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.2)] focus-visible:ring-[#60a5fa]"
+                className="bg-[rgba(255,255,255,0.05)] border border-[#772256]/20 focus-visible:ring-[#772256]"
               />
               <div className="flex justify-between text-xs text-[rgba(255,255,255,0.6)]">
                 <span>Minimally 1–2 lines appreciated</span>
@@ -686,14 +887,14 @@ const MyBookings = () => {
           <DialogFooter className="pt-2 gap-2">
             <Button
               variant="outline"
-              className="border-[rgba(100,200,255,0.3)] text-white"
+              className="border-[#772256]/30 text-white hover:bg-[#772256]/20"
               onClick={handleCloseReview}
               disabled={isSubmittingReview}
             >
               Cancel
             </Button>
             <Button
-              className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
+              className="bg-gradient-to-r from-[#772256] to-[#48285D] text-white"
               onClick={handleSubmitReview}
               disabled={isSubmittingReview || reviewRating === 0}
             >
@@ -707,4 +908,3 @@ const MyBookings = () => {
 };
 
 export default MyBookings;
-

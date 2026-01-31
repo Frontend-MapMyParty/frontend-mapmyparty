@@ -1,7 +1,7 @@
 // const rawEnvBase = (import.meta?.env?.VITE_API_BASE_URL ?? "").trim();
 const rawEnvBase = import.meta.env.VITE_API_BASE_URL;
 
-const hostedDefault = "https://server2-e4si.onrender.com/api";
+const hostedDefault = "http://localhost:9090/api";
 
 // Prefer env; fallback to hosted default (never localhost)
 export const API_BASE_URL = (rawEnvBase || hostedDefault).replace(/\/+$/, "");

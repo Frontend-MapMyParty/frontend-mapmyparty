@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation, Outlet } from "react-router-dom";
 // Authentication handled by ProtectedRoute wrapper via UserDashboard
-import { 
-  Search, 
-  Bell, 
-  Menu, 
-  Home, 
-  Calendar, 
-  Settings, 
-  LogOut, 
-  Ticket, 
-  MapPin, 
+import {
+  Search,
+  Bell,
+  Menu,
+  Home,
+  Calendar,
+  Settings,
+  LogOut,
+  Ticket,
+  MapPin,
   Users,
   ChevronRight,
   ChevronLeft,
@@ -400,15 +400,15 @@ const NewUserDashboard = () => {
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-red-700" />
-                <DropdownMenuItem 
-                  onClick={() => navigate("/dashboard/bookings")} 
+                <DropdownMenuItem
+                  onClick={() => navigate("/dashboard/bookings")}
                   className="cursor-pointer hover:bg-red-800 transition-all"
                 >
                   <Ticket className="mr-2 h-4 w-4 text-red-600" />
                   My Bookings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-red-700" />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={handleLogout}
                   disabled={isLoggingOut}
                   className="text-red-600 focus:text-red-600 hover:bg-red-900 transition-all cursor-pointer disabled:opacity-60"
@@ -689,15 +689,15 @@ const NewUserDashboard = () => {
                     Profile
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
-                  <DropdownMenuItem 
-                    onClick={() => navigate("/dashboard/bookings")} 
+                  <DropdownMenuItem
+                    onClick={() => navigate("/dashboard/bookings")}
                     className="cursor-pointer hover:bg-[rgba(59,130,246,0.15)] transition-all duration-300"
                   >
                     <Ticket className="mr-2 h-4 w-4 text-[#60a5fa]" />
                     My Bookings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={handleLogout}
                     disabled={isLoggingOut}
                     className="text-[#FF5555] focus:text-[#FF5555] hover:bg-[rgba(255,0,0,0.1)] transition-all duration-300 cursor-pointer disabled:opacity-60"
