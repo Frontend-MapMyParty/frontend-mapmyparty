@@ -1307,9 +1307,10 @@ const OrganizerDashboardV2 = () => {
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <button
             onClick={() => handleNav("dashboard")}
-            className={`${sidebarOpen ? "block" : "hidden"} hover:opacity-80 transition`}
+            className={`${sidebarOpen ? "block" : "hidden"} hover:opacity-80 transition flex items-center gap-3`}
           >
             <img src={Logo} alt="MapMyParty" className="h-10 w-auto" />
+            <span className="font-league-gothic text-2xl font-bold text-white tracking-[0.02em] leading-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">MAPMYPARTY</span>
           </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
