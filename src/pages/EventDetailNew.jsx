@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from
 
 const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
+const TAB_PAUSE_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 
 const EventDetailNew = () => {
   const { id } = useParams();
@@ -28,6 +29,7 @@ const EventDetailNew = () => {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState("about");
+  const [autoRotatePausedUntil, setAutoRotatePausedUntil] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [ticketQuantities, setTicketQuantities] = useState({});
 
@@ -43,6 +45,9 @@ const EventDetailNew = () => {
   const [advisoryModalOpen, setAdvisoryModalOpen] = useState(false);
   const [tcOpen, setTcOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [aboutCanExpand, setAboutCanExpand] = useState(false);
+  const aboutRef = useRef(null);
   const normalizedFaqs = useMemo(() => {
     if (Array.isArray(event?.faqs) && event.faqs.length > 0) return event.faqs;
     if (Array.isArray(event?.questions) && event.questions.length > 0) return event.questions;
@@ -78,6 +83,12 @@ const EventDetailNew = () => {
     return visibleTabs;
   }, [visibleTabs]);
 
+  const pauseAutoRotate = () => setAutoRotatePausedUntil(Date.now() + TAB_PAUSE_DURATION_MS);
+  const handleTabSelect = (tab) => {
+    setActiveTab(tab);
+    pauseAutoRotate();
+  };
+
   useEffect(() => {
     if (visibleTabs.length === 0) return;
     if (!visibleTabs.includes(activeTab)) {
@@ -88,6 +99,7 @@ const EventDetailNew = () => {
   useEffect(() => {
     if (rotatingTabs.length <= 1) return undefined;
     const interval = setInterval(() => {
+      if (Date.now() < autoRotatePausedUntil) return;
       setActiveTab((prev) => {
         const idx = rotatingTabs.indexOf(prev);
         const next = rotatingTabs[(idx + 1) % rotatingTabs.length];
@@ -95,7 +107,7 @@ const EventDetailNew = () => {
       });
     }, 5000);
     return () => clearInterval(interval);
-  }, [rotatingTabs]);
+  }, [rotatingTabs, autoRotatePausedUntil]);
 
   const tabAnimationStyle = useMemo(() => ({ animation: "tabFadeSlide 0.6s ease" }), []);
   const pageCss = useMemo(
@@ -106,6 +118,24 @@ const EventDetailNew = () => {
       `,
     []
   );
+
+  useEffect(() => {
+    setAboutExpanded(false);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (aboutExpanded) {
+      setAboutCanExpand(true);
+      return;
+    }
+    const el = aboutRef.current;
+    if (!el) return;
+    const measure = () => {
+      const isOverflowing = el.scrollHeight - el.clientHeight > 2;
+      setAboutCanExpand(isOverflowing);
+    };
+    requestAnimationFrame(measure);
+  }, [event?.about, aboutExpanded, activeTab]);
 
   const renderTermsContent = () => {
     if (event?.termsHtml) {
@@ -1011,7 +1041,10 @@ const EventDetailNew = () => {
               {visibleTabs.map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => handleTabSelect(tab)}
+                  onMouseEnter={pauseAutoRotate}
+                  onFocus={pauseAutoRotate}
+                  onTouchStart={pauseAutoRotate}
                   className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
                     activeTab === tab
                       ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
@@ -1027,14 +1060,36 @@ const EventDetailNew = () => {
             {activeTab === "about" && (
               <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.04)] rounded-xl">
                 <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
-                  <div>
+                  <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
                       <Info className="h-6 w-6 text-[#D60024]" />
                       About This Event
                     </h2>
-                    <p className="text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-line">
+                    <div
+                      ref={aboutRef}
+                      className="text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-line transition-all duration-300"
+                      style={
+                        aboutExpanded
+                          ? {}
+                          : {
+                              display: "-webkit-box",
+                              WebkitLineClamp: 4,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                            }
+                      }
+                    >
                       {event.about}
-                    </p>
+                    </div>
+                    {aboutCanExpand && (
+                      <button
+                        type="button"
+                        onClick={() => setAboutExpanded((prev) => !prev)}
+                        className="text-sm font-semibold text-[#93c5fd] hover:text-white transition"
+                      >
+                        {aboutExpanded ? "See less" : "See more"}
+                      </button>
+                    )}
                   </div>
 
                   <div className="pt-2">

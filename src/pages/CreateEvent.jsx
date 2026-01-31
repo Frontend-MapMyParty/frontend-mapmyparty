@@ -2699,11 +2699,45 @@ const CreateEvent = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10">
-                  <div className="w-2 h-2 rounded-full bg-[#e11d48] animate-pulse" />
-                  <span className="text-xs text-gray-200">
-                    Step {currentStep} of {steps.length} • {steps[currentStep - 1].title}
-                  </span>
+                <div className="flex items-end sm:items-center gap-3 flex-col sm:flex-row sm:flex-wrap justify-end">
+                  
+                    
+                  <div className="flex items-center gap-3">
+                   
+                    <div className="relative flex rounded-full overflow-hidden border border-white/20 bg-white/[0.08] shadow-xl backdrop-blur-md p-1">
+                      <div
+                        className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#60a5fa] rounded-full transition-all duration-300 ease-out shadow-[0_0_30px_rgba(37,99,235,0.7)]"
+                        style={{
+                          transform: publishState === "PUBLISHED" ? "translateX(100%)" : "translateX(0)",
+                        }}
+                      />
+                      {["DRAFT", "PUBLISHED"].map((state) => {
+                        const isActive = publishState === state;
+                        return (
+                          <button
+                            key={state}
+                            type="button"
+                            className={`relative z-10 text-sm font-semibold px-5 py-2 transition-all duration-300 ${
+                              isActive
+                                ? "text-white drop-shadow-[0_0_8px_rgba(37,99,235,0.5)]"
+                                : "text-white/60 hover:text-white/80"
+                            }`}
+                            onClick={() => setPublishState(state)}
+                            disabled={isSubmitting}
+                          >
+                            {state === "DRAFT" ? "Draft" : "Publish"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10">
+                    <div className="w-2 h-2 rounded-full bg-[#e11d48] animate-pulse" />
+                    <span className="text-xs text-gray-200 whitespace-nowrap">
+                      Step {currentStep} of {steps.length} • {steps[currentStep - 1].title}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -3565,7 +3599,6 @@ const CreateEvent = () => {
                               <SelectItem value="MALE">Male</SelectItem>
                               <SelectItem value="FEMALE">Female</SelectItem>
                               <SelectItem value="OTHER">Other</SelectItem>
-                              <SelectItem value="PREFER_NOT_TO_SAY">Prefer not to say</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
