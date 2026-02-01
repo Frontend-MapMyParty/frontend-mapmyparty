@@ -297,18 +297,18 @@ const CreateEvent = () => {
   // Neon event theme colors (toned-down)
   const pageTheme = {
     background:
-      "radial-gradient(circle at 18% 20%, rgba(37,99,235,0.12), transparent 25%), radial-gradient(circle at 85% 0%, rgba(225,29,72,0.1), transparent 22%), #0b0f18",
+      "radial-gradient(circle at 15% 18%, rgba(37,99,235,0.18), transparent 30%), radial-gradient(circle at 82% 12%, rgba(225,29,72,0.2), transparent 28%), radial-gradient(circle at 20% 75%, rgba(94,234,212,0.18), transparent 34%), linear-gradient(135deg, #0a0f1f 0%, #0b1227 35%, #0a0f1c 70%)",
     card: "rgba(255,255,255,0.04)",
     border: "rgba(255,255,255,0.08)",
     red: "#e11d48",
     blue: "#2563eb",
-    glow: "0 20px 70px rgba(0,0,0,0.45)",
+    glow: "0 24px 80px rgba(0,0,0,0.5)",
   };
 
   const fieldClass =
     "bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0 focus-visible:border-[#2563eb]/60 transition-all duration-200";
   const cardBase =
-    "border-white/10 bg-[#0f172a]/85 backdrop-blur-sm shadow-lg";
+    "border-white/10 bg-[#0f172a]/85 backdrop-blur-sm shadow-2xl rounded-3xl";
   const selectMenuClass =
     "bg-[#0f1624] text-white border border-white/10 shadow-xl rounded-lg";
 
@@ -2624,19 +2624,21 @@ const CreateEvent = () => {
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-20 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+        <div className="absolute -left-32 top-1/4 h-64 w-64 rounded-full bg-[#2563eb]/10 blur-3xl" />
+        <div className="absolute -right-24 bottom-10 h-72 w-72 rounded-full bg-[#e11d48]/10 blur-3xl" />
       </div>
 
       <LoadingOverlay show={showLoading} message={loadingMessage} />
       <Header isAuthenticated userRole="organizer" />
 
-      <main className="flex-1 py-12 relative">
-        <div className="container max-w-6xl relative space-y-6">
+      <main className="flex-1 py-3 md:py-6 relative">
+        <div className="px-4 md:px-8 lg:px-10 w-full max-w-5xl mx-auto relative space-y-2">
           {/* Back Button and Clear Draft */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="absolute -left-4 -top-4 flex items-center gap-2">
+          <div className="flex items-center justify-between mb-0">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                className="text-white hover:bg-white/10 px-2"
+                className="text-white hover:bg-white/10 px-3"
                 onClick={() => navigate(-1)}
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -2673,10 +2675,10 @@ const CreateEvent = () => {
 
           {/* Progress Header */}
           <Card
-            className={`mb-6 -mt-2 border ${cardBase}`}
+            className={`mb-6 border ${cardBase}`}
             style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
           >
-            <CardContent className="p-6 space-y-5 rounded-xl">
+            <CardContent className="p-5 md:p-6 space-y-5 rounded-2xl">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-[0.2em] text-blue-200/80">

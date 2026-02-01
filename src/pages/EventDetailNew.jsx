@@ -215,10 +215,11 @@ const EventDetailNew = () => {
           <div className="border-t border-white/10 px-5 py-4 bg-white/[0.015]">
             {normalizedTerms.length > 0 ? (
               normalizedTerms.map((t, idx) => (
-                <div key={`term-${idx}`} className="mb-4 last:mb-0">
+                <div key={`term-${idx}`} className="mb-3 last:mb-0">
                   {t.content ? (
                     <div
-                      className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
+                      className="max-w-none text-white/85 text-sm leading-6 space-y-2 prose-headings:text-white"
+                      style={{ lineHeight: 1.6 }}
                       dangerouslySetInnerHTML={{ __html: t.content }}
                     />
                   ) : (
@@ -907,89 +908,105 @@ const EventDetailNew = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] text-white">
+    <div
+      className="min-h-screen text-white relative overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(circle at 18% 18%, rgba(37,99,235,0.12), transparent 26%), radial-gradient(circle at 80% 14%, rgba(225,29,72,0.12), transparent 30%), linear-gradient(145deg, #05060d 0%, #0a0f1f 38%, #0b1224 100%)",
+      }}
+    >
       <style>{pageCss}</style>
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-20 top-16 h-56 w-56 rounded-full bg-[#2563eb]/10 blur-3xl" />
+        <div className="absolute right-10 top-10 h-60 w-60 rounded-full bg-[#e11d48]/10 blur-[110px]" />
+        <div className="absolute right-16 bottom-0 h-72 w-72 rounded-full bg-[#5eead4]/10 blur-[130px]" />
+      </div>
 
       {/* Hero Section - compact split image/details */}
-      <div className="relative overflow-hidden pt-4 md:pt-6">
+      <div className="relative overflow-hidden pt-5 md:pt-7 pb-3">
         <div className="w-full relative px-3 md:px-6">
-          <div className="grid lg:grid-cols-[0.65fr,0.35fr] gap-0 items-stretch">
-            {/* Left: Hero Image full bleed */}
-            <div className="relative overflow-hidden min-h-[520px] h-full rounded-none lg:rounded-none bg-[#0a0c18]">
-              <img
-                src={event.image}
-                alt={event.title}
-                className="w-full h-full object-contain"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
-
-              <div className="absolute top-4 left-4 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate(-1)}
-                  className="bg-black/55 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md"
-                >
-                  <ChevronLeft className="h-5 w-5 mr-1" />
-                  Back
-                </Button>
-              </div>
-              <div className="absolute top-4 right-4 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={handleShare}
-                  className="bg-black/55 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md"
-                  title="Share event"
-                >
-                  <Share2 className="h-5 w-5" />
-                </Button>
-              </div>
-
-              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
-                {event.subCategory && (
-                  <Badge className="bg-[#D60024]/85 text-white border border-[#ff8da8]/40 px-3 py-1 rounded-full">
-                    {event.subCategory}
-                  </Badge>
-                )}
-                {event.category && (
-                  <Badge className="bg-white/15 text-white border border-white/20 px-3 py-1 rounded-full">
-                    {event.category}
-                  </Badge>
-                )}
-                {primarySponsor && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg ml-auto">
-                    <img
-                      src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
-                      alt={primarySponsor.name}
-                      className="h-10 w-10 object-contain rounded-full bg-white/10 p-1"
-                    />
-                    <span className="text-[11px] uppercase tracking-[0.15em] text-white/80">Powered by</span>
-                  </div>
-                )}
-              </div>
+          <div className="relative rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,25,0.9),rgba(8,11,22,0.92))] shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden backdrop-blur-xl">
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={handleShare}
+                className="bg-black/55 hover:bg-black/70 text-white border border-white/25 backdrop-blur-md rounded-full p-3"
+                title="Share event"
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
             </div>
+            <div className="grid lg:grid-cols-[0.65fr,0.35fr] gap-0 items-stretch">
+              {/* Left: Hero Image full bleed */}
+              <div className="relative overflow-hidden min-h-[460px] sm:min-h-[520px] h-full rounded-3xl lg:rounded-none lg:rounded-l-3xl bg-[#0a0c18] flex items-center justify-center">
+                <img
+                  src={event.image}
+                  alt={event.title}
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
 
-            {/* Right: Compact Details */}
-            <div className="relative bg-[linear-gradient(135deg,rgba(13,17,30,0.94),rgba(10,10,16,0.92))] backdrop-blur-xl shadow-[0_30px_90px_rgba(0,0,0,0.7)] p-7 md:p-10 space-y-7 rounded-none lg:rounded-none lg:border-l border-white/10 flex flex-col justify-center">
-              <div className="space-y-4 text-center lg:text-left">
-                <h1 className="text-4xl md:text-5xl font-extrabold leading-tight drop-shadow-[0_8px_24px_rgba(255,77,103,0.25)] text-white">{event.title}</h1>
-                <div className="w-20 h-1 rounded-full bg-gradient-to-r from-[#D60024] via-[#ff4d67] to-[#5ba2ff] mx-auto lg:mx-0" />
+                <div className="absolute top-4 left-4 flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate(-1)}
+                    className="bg-black/50 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md rounded-full px-4"
+                  >
+                    <ChevronLeft className="h-5 w-5 mr-1" />
+                    Back
+                  </Button>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
+                  {event.subCategory && (
+                    <Badge className="bg-[#d60024]/90 text-white border border-[#ff8da8]/40 px-3 py-1 rounded-full shadow-[0_10px_30px_rgba(214,0,36,0.3)]">
+                      {event.subCategory}
+                    </Badge>
+                  )}
+                  {event.category && (
+                    <Badge className="bg-white/12 text-white border border-white/20 px-3 py-1 rounded-full backdrop-blur">
+                      {event.category}
+                    </Badge>
+                  )}
+                  {primarySponsor && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg ml-auto">
+                      <img
+                        src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
+                        alt={primarySponsor.name}
+                        className="h-10 w-10 object-contain rounded-full bg-white/10 p-1"
+                      />
+                      <span className="text-[11px] uppercase tracking-[0.15em] text-white/80">Powered by</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                <div className="rounded-2xl border border-[#5ba2ff]/35 bg-[#0f1a2e]/80 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
-                  <Calendar className="h-10 w-10 text-[#5ba2ff] p-2 rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/35" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-white/55">Date & Time</p>
-                    <p className="text-white font-semibold">{formatDate(event.startDate)}</p>
-                    <p className="text-white/75 text-sm">{formatTime(event.startDate)}</p>
-                  </div>
+              {/* Right: Compact Details */}
+              <div className="relative bg-[linear-gradient(140deg,rgba(10,14,25,0.92),rgba(6,9,18,0.94))] backdrop-blur-xl shadow-[0_26px_90px_rgba(0,0,0,0.6)] p-7 md:p-9 space-y-7 lg:border-l border-white/10 rounded-3xl lg:rounded-none lg:rounded-r-3xl flex flex-col justify-center">
+                <div className="space-y-4 text-center lg:text-left">
+                  <h1 className="text-4xl md:text-5xl font-extrabold leading-tight text-white drop-shadow-[0_8px_24px_rgba(0,0,0,0.45)]">{event.title}</h1>
+                  <div className="w-24 h-1 rounded-full bg-gradient-to-r from-[#2563eb] via-[#e11d48] to-[#5eead4] mx-auto lg:mx-0" />
                 </div>
-                <div className="rounded-2xl border border-[#5ba2ff]/35 bg-[#0f1a2e]/80 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
-                  <MapPin className="h-10 w-10 text-[#5ba2ff] p-2 rounded-xl bg-[#0f1a2e] border border-[#5ba2ff]/35" />
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-white/55">Venue</p>
-                    <p className="text-white font-semibold">{event.venue}</p>
-                    <p className="text-white/75 text-sm line-clamp-2">{event.address}</p>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="rounded-2xl border border-white/12 bg-white/5 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
+                    <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563eb]/90 via-[#3b82f6]/85 to-[#5eead4]/70 border border-white/20 shadow-[0_10px_35px_rgba(37,99,235,0.35)]">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/55">Date & Time</p>
+                      <p className="text-white font-semibold">{formatDate(event.startDate)}</p>
+                      <p className="text-white/75 text-sm">{formatTime(event.startDate)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/12 bg-white/5 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
+                    <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#e11d48]/90 via-[#ff4d67]/80 to-[#f472b6]/70 border border-white/20 shadow-[0_10px_35px_rgba(225,29,72,0.35)]">
+                      <MapPin className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/55">Venue</p>
+                      <p className="text-white font-semibold">{event.venue}</p>
+                      <p className="text-white/75 text-sm line-clamp-2">{event.address}</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1037,7 +1054,7 @@ const EventDetailNew = () => {
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-8">
             {/* Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-[rgba(100,200,255,0.2)]">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-white/10">
               {visibleTabs.map((tab) => (
                 <button
                   key={tab}
@@ -1045,10 +1062,10 @@ const EventDetailNew = () => {
                   onMouseEnter={pauseAutoRotate}
                   onFocus={pauseAutoRotate}
                   onTouchStart={pauseAutoRotate}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all ${
+                  className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all ${
                     activeTab === tab
-                      ? "bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white"
-                      : "bg-[rgba(255,255,255,0.08)] text-[rgba(255,255,255,0.75)] hover:bg-[rgba(255,255,255,0.12)]"
+                      ? "bg-gradient-to-r from-[#d60024] to-[#ff4d67] text-white shadow-[0_10px_26px_rgba(214,0,36,0.25)]"
+                      : "bg-white/8 text-white/80 hover:bg-white/12"
                   }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1058,7 +1075,7 @@ const EventDetailNew = () => {
 
             {/* About Tab */}
             {activeTab === "about" && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.04)] rounded-xl">
+              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(8,12,22,0.9))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
                 <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
@@ -1067,7 +1084,7 @@ const EventDetailNew = () => {
                     </h2>
                     <div
                       ref={aboutRef}
-                      className="text-[rgba(255,255,255,0.85)] leading-relaxed whitespace-pre-line transition-all duration-300"
+                      className="text-white/85 text-sm md:text-base leading-6 md:leading-[1.7] whitespace-pre-line transition-all duration-300"
                       style={
                         aboutExpanded
                           ? {}
@@ -1218,7 +1235,7 @@ const EventDetailNew = () => {
 
             {/* Gallery Tab */}
             {activeTab === "gallery" && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
                 <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <ImageIcon className="h-6 w-6 text-[#D60024]" />
@@ -1249,7 +1266,7 @@ const EventDetailNew = () => {
 
             {/* Location Tab */}
             {activeTab === "location" && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
                 <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <Navigation className="h-6 w-6 text-[#D60024]" />
@@ -1274,7 +1291,7 @@ const EventDetailNew = () => {
                   </div>
 
                   {/* Map Placeholder */}
-                  <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.2)]">
+                  <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-white/5 border border-white/12">
                     <iframe
                       width="100%"
                       height="100%"
@@ -1286,13 +1303,16 @@ const EventDetailNew = () => {
                       className="grayscale"
                     ></iframe>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
-                    <Button
-                      className="absolute bottom-4 right-4 bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold"
-                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`, '_blank')}
-                    >
-                      <Navigation className="h-4 w-4 mr-2" />
-                      Get Directions
-                    </Button>
+                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/50 to-transparent" />
+                    <div className="absolute bottom-4 right-4">
+                      <Button
+                        className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white font-semibold shadow-lg"
+                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`, '_blank')}
+                      >
+                        <Navigation className="h-4 w-4 mr-2" />
+                        Get Directions
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1301,7 +1321,7 @@ const EventDetailNew = () => {
 
             {/* Organizer Tab */}
             {activeTab === "organizer" && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
+              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
                 <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <User className="h-6 w-6 text-[#D60024]" />
@@ -1373,7 +1393,7 @@ const EventDetailNew = () => {
             {activeTab === "organizer" && renderFaqTcBlock()}
 
             {activeTab === "artists" && event.artists?.length > 0 && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(15,23,42,0.9)] to-[rgba(30,41,59,0.7)] rounded-xl">
+              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
                 <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-6 w-6 text-[#D60024]" />
@@ -1467,21 +1487,21 @@ const EventDetailNew = () => {
           {/* Right Column - Booking Section */}
           <div className="lg:col-span-1">
             <div className="sticky top-6">
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6">
+              <Card className="border border-white/12 bg-[linear-gradient(150deg,rgba(10,14,25,0.92),rgba(8,12,22,0.9))] rounded-2xl shadow-[0_22px_70px_rgba(0,0,0,0.45)]">
+                <CardContent className="p-6 space-y-4">
                   <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                     <Ticket className="h-5 w-5 text-[#D60024]" />
                     Select Tickets
                   </h3>
                   
-                  <div className="space-y-4 mb-6">
+                  <div className="space-y-4">
                     {event.tickets.map((ticket) => {
                       const cap = getTicketCap(ticket);
                       const qty = ticketQuantities[ticket.id] || 0;
                       return (
                       <div
                         key={ticket.id}
-                        className={`p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)] ${
+                        className={`p-4 rounded-xl bg-white/6 border border-white/14 shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur ${
                           ticket.available === 0 ? "opacity-60" : ""
                         }`}
                       >
