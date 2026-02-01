@@ -64,11 +64,12 @@ const LiveEventPage = ({ embedded = false }) => {
   const lastFetchedIdRef = useRef(null);
   const isMountedRef = useRef(true);
 
-  // Real-time ticket and check-in analytics via Socket.IO
-  // This hook handles socket connection and receives real-time updates when bookings/check-ins happen
+  // Real-time ticket, check-in, and food/beverage analytics via Socket.IO
+  // This hook handles socket connection and receives real-time updates when bookings/check-ins/add-ons change
   const {
     tickets: realtimeTickets,
     checkIns: realtimeCheckIns,
+    addOns: realtimeAddOns,
     connected: socketConnected,
     error: socketError,
   } = useTicketAnalytics(id);
@@ -605,16 +606,57 @@ const LiveEventPage = ({ embedded = false }) => {
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/30 space-y-3">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-cyan-300" /> Scanning
-                </h3>
-                <p className="text-sm text-white/70">
-                  Use staff scanner for QR codes. Ensure split lanes per ticket type (VIP / GA / Guestlist).
-                </p>
-                <div className="text-xs text-white/60 space-y-1">
-                  <p>Guestlist: {ticketTypes.filter((t) => t.type === "GUESTLIST").length} types</p>
-                  <p>Paid tickets: {ticketTypes.filter((t) => t.price > 0).length} types</p>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CupSoda className="w-5 h-5 text-orange-300" /> Food & Beverages
+                  </h3>
+                  <span className="text-xs text-white/60 flex items-center gap-1">
+                    {socketConnected ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Live
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        Static
+                      </>
+                    )}
+                  </span>
                 </div>
+                {realtimeAddOns && realtimeAddOns.length > 0 ? (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {realtimeAddOns.slice(0, 4).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm">
+                        <span className="text-white/80 truncate flex-1">{item.name}</span>
+                        <div className="flex items-center gap-2 ml-2">
+                          <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-500 ${
+                                item.consumptionRate >= 80
+                                  ? "bg-red-400"
+                                  : item.consumptionRate >= 50
+                                  ? "bg-amber-400"
+                                  : "bg-emerald-400"
+                              }`}
+                              style={{ width: `${item.consumptionRate}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs font-medium w-10 text-right ${
+                            item.consumptionRate >= 80 ? "text-red-300" : "text-white/60"
+                          }`}>
+                            {item.consumptionRate}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {realtimeAddOns.length > 4 && (
+                      <p className="text-xs text-white/50">+{realtimeAddOns.length - 4} more items</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/50">No items tracked yet</p>
+                )}
               </div>
             </div>
 
@@ -1002,16 +1044,57 @@ const LiveEventPage = ({ embedded = false }) => {
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/30 space-y-3">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-cyan-300" /> Scanning
-                </h3>
-                <p className="text-sm text-white/70">
-                  Use staff scanner for QR codes. Ensure split lanes per ticket type (VIP / GA / Guestlist).
-                </p>
-                <div className="text-xs text-white/60 space-y-1">
-                  <p>Guestlist: {ticketTypes.filter((t) => t.type === "GUESTLIST").length} types</p>
-                  <p>Paid tickets: {ticketTypes.filter((t) => t.price > 0).length} types</p>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CupSoda className="w-5 h-5 text-orange-300" /> Food & Beverages
+                  </h3>
+                  <span className="text-xs text-white/60 flex items-center gap-1">
+                    {socketConnected ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        Live
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        Static
+                      </>
+                    )}
+                  </span>
                 </div>
+                {realtimeAddOns && realtimeAddOns.length > 0 ? (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {realtimeAddOns.slice(0, 4).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between text-sm">
+                        <span className="text-white/80 truncate flex-1">{item.name}</span>
+                        <div className="flex items-center gap-2 ml-2">
+                          <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                            <div
+                              className={`h-full transition-all duration-500 ${
+                                item.consumptionRate >= 80
+                                  ? "bg-red-400"
+                                  : item.consumptionRate >= 50
+                                  ? "bg-amber-400"
+                                  : "bg-emerald-400"
+                              }`}
+                              style={{ width: `${item.consumptionRate}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs font-medium w-10 text-right ${
+                            item.consumptionRate >= 80 ? "text-red-300" : "text-white/60"
+                          }`}>
+                            {item.consumptionRate}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {realtimeAddOns.length > 4 && (
+                      <p className="text-xs text-white/50">+{realtimeAddOns.length - 4} more items</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/50">No items tracked yet</p>
+                )}
               </div>
             </div>
 

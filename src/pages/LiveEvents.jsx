@@ -104,10 +104,10 @@ const LiveEvents = () => {
     setError(null);
 
     try {
-      // Fetch both ONGOING and UPCOMING events in parallel
+      // Fetch both ONGOING and UPCOMING events in parallel (organizer's own events only)
       const [liveResponse, upcomingResponse] = await Promise.all([
-        apiFetch("promoter/live-events?status=ONGOING"),
-        apiFetch("promoter/live-events?status=UPCOMING"),
+        apiFetch("event/my-events/live?status=ongoing"),
+        apiFetch("event/my-events/live?status=upcoming"),
       ]);
 
       // Only update state if component is still mounted

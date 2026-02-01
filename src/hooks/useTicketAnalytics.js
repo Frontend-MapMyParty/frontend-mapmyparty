@@ -9,14 +9,15 @@ import {
 } from "@/services/socketService";
 
 /**
- * Hook for real-time ticket and check-in analytics updates
+ * Hook for real-time ticket, check-in, and food/beverage analytics updates
  * @param {string} eventId - The event ID to subscribe to
  * @param {string} authToken - JWT token for authentication (optional, will try to get from sessionStorage)
- * @returns {{ tickets: Array, checkIns: Object, connected: boolean, error: string|null, refetch: Function }}
+ * @returns {{ tickets: Array, checkIns: Object, addOns: Array, connected: boolean, error: string|null, refetch: Function }}
  */
 export const useTicketAnalytics = (eventId, authToken = null) => {
   const [tickets, setTickets] = useState([]);
   const [checkIns, setCheckIns] = useState({ total: 0, totalBooked: 0, last15m: 0, checkInRate: 0 });
+  const [addOns, setAddOns] = useState([]);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
   const socketRef = useRef(null);
@@ -133,6 +134,22 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
         }
       };
 
+      // Handle initial add-ons stats
+      const handleAddOnsStats = (data) => {
+        console.log("[useTicketAnalytics] Received addons_stats:", data);
+        if (data.eventId === eventId) {
+          setAddOns(data.addOns || []);
+        }
+      };
+
+      // Handle real-time add-ons updates
+      const handleAddOnsUpdate = (data) => {
+        console.log("[useTicketAnalytics] Received addons_update:", data);
+        if (data.eventId === eventId) {
+          setAddOns(data.addOns || []);
+        }
+      };
+
       socket.on("connect", handleConnect);
       socket.on("disconnect", handleDisconnect);
       socket.on("connect_error", handleConnectError);
@@ -140,6 +157,8 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
       socket.on("ticket_update", handleTicketUpdate);
       socket.on("checkin_stats", handleCheckInStats);
       socket.on("checkin_update", handleCheckInUpdate);
+      socket.on("addons_stats", handleAddOnsStats);
+      socket.on("addons_update", handleAddOnsUpdate);
 
       // If already connected, join immediately
       if (socket.connected) {
@@ -155,6 +174,8 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
         socket.off("ticket_update", handleTicketUpdate);
         socket.off("checkin_stats", handleCheckInStats);
         socket.off("checkin_update", handleCheckInUpdate);
+        socket.off("addons_stats", handleAddOnsStats);
+        socket.off("addons_update", handleAddOnsUpdate);
 
         if (eventId) {
           leaveEventRoom(eventId);
@@ -178,7 +199,7 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
     };
   }, []);
 
-  return { tickets, checkIns, connected, error, refetch };
+  return { tickets, checkIns, addOns, connected, error, refetch };
 };
 
 export default useTicketAnalytics;
