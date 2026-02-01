@@ -5,16 +5,18 @@ import {
   disconnectTicketAnalytics,
   joinEventRoom,
   leaveEventRoom,
+  fetchSocketToken,
 } from "@/services/socketService";
 
 /**
- * Hook for real-time ticket analytics updates
+ * Hook for real-time ticket and check-in analytics updates
  * @param {string} eventId - The event ID to subscribe to
  * @param {string} authToken - JWT token for authentication (optional, will try to get from sessionStorage)
- * @returns {{ tickets: Array, connected: boolean, error: string|null, refetch: Function }}
+ * @returns {{ tickets: Array, checkIns: Object, connected: boolean, error: string|null, refetch: Function }}
  */
 export const useTicketAnalytics = (eventId, authToken = null) => {
   const [tickets, setTickets] = useState([]);
+  const [checkIns, setCheckIns] = useState({ total: 0, totalBooked: 0, last15m: 0, checkInRate: 0 });
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
   const socketRef = useRef(null);
@@ -44,73 +46,128 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
       return;
     }
 
-    const token = getAuthToken();
-    if (!token) {
-      setError("No authentication token available");
-      return;
-    }
+    let isCancelled = false;
+    let cleanupFn = null;
 
-    // Connect to socket
-    const socket = connectTicketAnalytics(token);
-    socketRef.current = socket;
+    const initSocket = async () => {
+      // First try to get token from storage
+      let token = getAuthToken();
+      console.log("[useTicketAnalytics] Auth token from storage:", token ? `${token.substring(0, 20)}...` : "NONE");
 
-    const handleConnect = async () => {
-      setConnected(true);
-      setError(null);
-
-      // Join the event room
-      const response = await joinEventRoom(eventId);
-      if (response.error) {
-        setError(response.error);
+      // If no token in storage, fetch from server (uses cookies)
+      if (!token) {
+        console.log("[useTicketAnalytics] Fetching socket token from server...");
+        token = await fetchSocketToken();
+        console.log("[useTicketAnalytics] Socket token from server:", token ? `${token.substring(0, 20)}...` : "NONE");
       }
-    };
 
-    const handleDisconnect = () => {
-      setConnected(false);
-    };
+      if (isCancelled) return;
 
-    const handleConnectError = (err) => {
-      setError(err.message);
-      setConnected(false);
-    };
+      if (!token) {
+        console.error("[useTicketAnalytics] No token available for socket auth");
+        setError("Authentication required for real-time updates");
+        return;
+      }
 
-    // Handle initial ticket stats
-    const handleTicketStats = (data) => {
-      if (data.eventId === eventId) {
-        setTickets(data.tickets || []);
+      // Connect to socket with the token
+      console.log("[useTicketAnalytics] Connecting to socket for eventId:", eventId);
+      const socket = connectTicketAnalytics(token);
+      socketRef.current = socket;
+
+      const handleConnect = async () => {
+        if (isCancelled) return;
+        console.log("[useTicketAnalytics] Socket connected, joining event room:", eventId);
+        setConnected(true);
         setError(null);
+
+        // Join the event room
+        const response = await joinEventRoom(eventId);
+        console.log("[useTicketAnalytics] joinEventRoom response:", response);
+        if (response.error) {
+          console.error("[useTicketAnalytics] Failed to join room:", response.error);
+          setError(response.error);
+        }
+      };
+
+      const handleDisconnect = () => {
+        setConnected(false);
+      };
+
+      const handleConnectError = (err) => {
+        setError(err.message);
+        setConnected(false);
+      };
+
+      // Handle initial ticket stats
+      const handleTicketStats = (data) => {
+        console.log("[useTicketAnalytics] Received ticket_stats:", data);
+        if (data.eventId === eventId) {
+          console.log("[useTicketAnalytics] Updating tickets state");
+          setTickets(data.tickets || []);
+          setError(null);
+        }
+      };
+
+      // Handle real-time ticket updates
+      const handleTicketUpdate = (data) => {
+        console.log("[useTicketAnalytics] Received ticket_update:", data);
+        if (data.eventId === eventId) {
+          console.log("[useTicketAnalytics] Updating tickets state");
+          setTickets(data.tickets || []);
+        }
+      };
+
+      // Handle initial check-in stats
+      const handleCheckInStats = (data) => {
+        console.log("[useTicketAnalytics] Received checkin_stats:", data);
+        if (data.eventId === eventId) {
+          setCheckIns(data.checkIns || { total: 0, totalBooked: 0, last15m: 0, checkInRate: 0 });
+        }
+      };
+
+      // Handle real-time check-in updates
+      const handleCheckInUpdate = (data) => {
+        console.log("[useTicketAnalytics] Received checkin_update:", data);
+        if (data.eventId === eventId) {
+          setCheckIns(data.checkIns || { total: 0, totalBooked: 0, last15m: 0, checkInRate: 0 });
+        }
+      };
+
+      socket.on("connect", handleConnect);
+      socket.on("disconnect", handleDisconnect);
+      socket.on("connect_error", handleConnectError);
+      socket.on("ticket_stats", handleTicketStats);
+      socket.on("ticket_update", handleTicketUpdate);
+      socket.on("checkin_stats", handleCheckInStats);
+      socket.on("checkin_update", handleCheckInUpdate);
+
+      // If already connected, join immediately
+      if (socket.connected) {
+        handleConnect();
       }
+
+      // Store cleanup function
+      cleanupFn = () => {
+        socket.off("connect", handleConnect);
+        socket.off("disconnect", handleDisconnect);
+        socket.off("connect_error", handleConnectError);
+        socket.off("ticket_stats", handleTicketStats);
+        socket.off("ticket_update", handleTicketUpdate);
+        socket.off("checkin_stats", handleCheckInStats);
+        socket.off("checkin_update", handleCheckInUpdate);
+
+        if (eventId) {
+          leaveEventRoom(eventId);
+        }
+      };
     };
 
-    // Handle real-time ticket updates
-    const handleTicketUpdate = (data) => {
-      if (data.eventId === eventId) {
-        setTickets(data.tickets || []);
-      }
-    };
-
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("connect_error", handleConnectError);
-    socket.on("ticket_stats", handleTicketStats);
-    socket.on("ticket_update", handleTicketUpdate);
-
-    // If already connected, join immediately
-    if (socket.connected) {
-      handleConnect();
-    }
+    initSocket();
 
     // Cleanup
     return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("connect_error", handleConnectError);
-      socket.off("ticket_stats", handleTicketStats);
-      socket.off("ticket_update", handleTicketUpdate);
-
-      if (eventId) {
-        leaveEventRoom(eventId);
-      }
+      isCancelled = true;
+      if (cleanupFn) cleanupFn();
     };
   }, [eventId, getAuthToken]);
 
@@ -121,7 +178,7 @@ export const useTicketAnalytics = (eventId, authToken = null) => {
     };
   }, []);
 
-  return { tickets, connected, error, refetch };
+  return { tickets, checkIns, connected, error, refetch };
 };
 
 export default useTicketAnalytics;

@@ -14,8 +14,16 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { apiFetch } from "@/config/api";
+import {
+  connectTicketAnalytics,
+  disconnectTicketAnalytics,
+  getTicketAnalyticsSocket,
+  fetchSocketToken,
+} from "@/services/socketService";
 
 const formatDateTime = (date) =>
   new Intl.DateTimeFormat("en-IN", {
@@ -72,11 +80,13 @@ const LiveEvents = () => {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   // Refs to prevent duplicate calls and track mounted state
   const isFetchingRef = useRef(false);
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
+  const joinedRoomsRef = useRef(new Set());
 
   const fetchEvents = useCallback(async (isManualRefresh = false) => {
     // Prevent duplicate simultaneous calls
@@ -146,6 +156,163 @@ const LiveEvents = () => {
       clearInterval(interval);
     };
   }, [fetchEvents]);
+
+  // Socket connection and real-time updates
+  useEffect(() => {
+    let isCancelled = false;
+    let cleanupFn = null;
+
+    const initSocket = async () => {
+      // Fetch socket token from server
+      console.log("[LiveEvents] Fetching socket token...");
+      const token = await fetchSocketToken();
+
+      if (isCancelled) return;
+
+      if (!token) {
+        console.error("[LiveEvents] No token available for socket auth");
+        return;
+      }
+
+      // Connect to socket with the token
+      const socket = connectTicketAnalytics(token);
+
+      const handleConnect = () => {
+        if (isCancelled) return;
+        console.log("[LiveEvents] Socket connected");
+        setSocketConnected(true);
+
+        // Join rooms for all live events
+        liveEvents.forEach((event) => {
+          if (!joinedRoomsRef.current.has(event.id)) {
+            socket.emit("join_event", { eventId: event.id }, (response) => {
+              if (response?.success) {
+                console.log(`[LiveEvents] Joined room for event ${event.id}`);
+                joinedRoomsRef.current.add(event.id);
+              }
+            });
+          }
+        });
+      };
+
+      const handleDisconnect = () => {
+        console.log("[LiveEvents] Socket disconnected");
+        setSocketConnected(false);
+        joinedRoomsRef.current.clear();
+      };
+
+      const handleTicketUpdate = (data) => {
+        console.log("[LiveEvents] Received ticket_update:", data);
+        if (!data?.eventId || !data?.tickets) return;
+
+        // Update the matching event's ticket data
+        setLiveEvents((prev) =>
+          prev.map((event) => {
+            if (event.id === data.eventId) {
+              const updatedTickets = event.ticketTypes.map((t) => {
+                const updated = data.tickets.find((u) => u.ticketId === t.id);
+                if (updated) {
+                  return { ...t, soldQty: updated.soldQty, totalQty: updated.totalQty };
+                }
+                return t;
+              });
+              return { ...event, ticketTypes: updatedTickets };
+            }
+            return event;
+          })
+        );
+
+        // Also update upcoming events if applicable
+        setUpcomingEvents((prev) =>
+          prev.map((event) => {
+            if (event.id === data.eventId) {
+              const updatedTickets = event.ticketTypes.map((t) => {
+                const updated = data.tickets.find((u) => u.ticketId === t.id);
+                if (updated) {
+                  return { ...t, soldQty: updated.soldQty, totalQty: updated.totalQty };
+                }
+                return t;
+              });
+              return { ...event, ticketTypes: updatedTickets };
+            }
+            return event;
+          })
+        );
+      };
+
+      const handleCheckinUpdate = (data) => {
+        console.log("[LiveEvents] Received checkin_update:", data);
+        if (!data?.eventId || !data?.checkIns) return;
+
+        setLiveEvents((prev) =>
+          prev.map((event) => {
+            if (event.id === data.eventId) {
+              return { ...event, checkIns: data.checkIns };
+            }
+            return event;
+          })
+        );
+      };
+
+      socket.on("connect", handleConnect);
+      socket.on("disconnect", handleDisconnect);
+      socket.on("ticket_update", handleTicketUpdate);
+      socket.on("ticket_stats", handleTicketUpdate);
+      socket.on("checkin_update", handleCheckinUpdate);
+      socket.on("checkin_stats", handleCheckinUpdate);
+
+      // If already connected, trigger connect handler
+      if (socket.connected) {
+        handleConnect();
+      }
+
+      // Store cleanup function
+      cleanupFn = () => {
+        socket.off("connect", handleConnect);
+        socket.off("disconnect", handleDisconnect);
+        socket.off("ticket_update", handleTicketUpdate);
+        socket.off("ticket_stats", handleTicketUpdate);
+        socket.off("checkin_update", handleCheckinUpdate);
+        socket.off("checkin_stats", handleCheckinUpdate);
+
+        joinedRoomsRef.current.forEach((eventId) => {
+          socket.emit("leave_event", { eventId });
+        });
+        joinedRoomsRef.current.clear();
+      };
+    };
+
+    initSocket();
+
+    return () => {
+      isCancelled = true;
+      if (cleanupFn) cleanupFn();
+    };
+  }, [liveEvents.length]);
+
+  // Join rooms for newly loaded live events
+  useEffect(() => {
+    const socket = getTicketAnalyticsSocket();
+    if (!socket?.connected) return;
+
+    liveEvents.forEach((event) => {
+      if (!joinedRoomsRef.current.has(event.id)) {
+        socket.emit("join_event", { eventId: event.id }, (response) => {
+          if (response?.success) {
+            console.log(`[LiveEvents] Joined room for event ${event.id}`);
+            joinedRoomsRef.current.add(event.id);
+          }
+        });
+      }
+    });
+  }, [liveEvents]);
+
+  // Cleanup socket on unmount
+  useEffect(() => {
+    return () => {
+      disconnectTicketAnalytics();
+    };
+  }, []);
 
   const handleManualRefresh = useCallback(() => {
     fetchEvents(true);
@@ -326,8 +493,19 @@ const LiveEvents = () => {
               </h2>
               <p className="text-sm text-white/60">Select a card to open the live board.</p>
             </div>
-            <div className="hidden md:flex items-center gap-2 text-xs text-white/60">
-              <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Auto-syncing every 30s
+            <div className="hidden md:flex items-center gap-4 text-xs text-white/60">
+              {socketConnected ? (
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <Wifi className="w-4 h-4" /> Real-time updates active
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-amber-400">
+                  <WifiOff className="w-4 h-4" /> Connecting...
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Auto-syncing every 30s
+              </span>
             </div>
           </div>
 

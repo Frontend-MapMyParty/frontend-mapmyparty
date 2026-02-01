@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import { buildUrl, apiFetch } from "@/config/api";
 import {
@@ -40,6 +40,7 @@ import OrganizerDash from "./OrganizerDash";
 import AudienceAnalytics from "./AudienceAnalytics";
 import MyEvents from "./MyEvents";
 import LiveEvents from "./LiveEvents";
+import LiveEventPage from "./LiveEventPage";
 import Reception from "./Reception";
 import FoodBeverages from "./FoodBeverages";
 import Logo from "@/assets/MMP logo.svg";
@@ -1187,6 +1188,7 @@ const OrganizerDashboardV2 = () => {
   const footerMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { id: liveEventId } = useParams();
 
   // Close footer menu when clicking outside
   useEffect(() => {
@@ -1415,7 +1417,8 @@ const OrganizerDashboardV2 = () => {
 
             {activeTab === "myevents" && <MyEvents />}
             {activeTab === "analytics" && <AudienceAnalytics />}
-            {activeTab === "live" && <LiveEvents />}
+            {activeTab === "live" && !liveEventId && <LiveEvents />}
+            {activeTab === "live" && liveEventId && <LiveEventPage embedded />}
             {activeTab === "reception" && <Reception />}
             {activeTab === "food-beverages" && <FoodBeverages />}
             {activeTab === "financial" && <FinancialReporting />}

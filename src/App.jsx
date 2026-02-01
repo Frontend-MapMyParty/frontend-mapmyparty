@@ -33,7 +33,6 @@ import PromoterProfile from "./pages/PromoterProfile";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
-import LiveEventPage from "./pages/LiveEventPage";
 import ReceptionDetail from "./pages/ReceptionDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
@@ -137,7 +136,7 @@ const App = () => {
             } />
             <Route path="/organizer/live/:id" element={
               <ProtectedRoute requiredRole="organizer">
-                <LiveEventPage />
+                <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
             <Route path="/organizer/dashboard-v2" element={<Navigate to="/organizer/dashboard" replace />} />
