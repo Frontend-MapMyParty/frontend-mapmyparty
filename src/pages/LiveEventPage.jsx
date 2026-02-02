@@ -629,24 +629,20 @@ const LiveEventPage = ({ embedded = false }) => {
                     {realtimeAddOns.slice(0, 4).map((item) => (
                       <div key={item.id} className="flex items-center justify-between text-sm">
                         <span className="text-white/80 truncate flex-1">{item.name}</span>
-                        <div className="flex items-center gap-2 ml-2">
-                          <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${
-                                item.consumptionRate >= 80
-                                  ? "bg-red-400"
-                                  : item.consumptionRate >= 50
-                                  ? "bg-amber-400"
-                                  : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${item.consumptionRate}%` }}
-                            />
+                        <div className="flex items-center gap-3 ml-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-white/60">
+                              <span className="text-emerald-300 font-medium">{item.receivedQty}</span>
+                              <span className="text-white/40"> / </span>
+                              <span className="text-white/70">{item.totalQty}</span>
+                            </span>
+                            <span className={`font-medium ${
+                              item.remainingQty <= 0 ? "text-red-300" :
+                              item.consumptionRate >= 80 ? "text-amber-300" : "text-white/50"
+                            }`}>
+                              ({item.remainingQty} left)
+                            </span>
                           </div>
-                          <span className={`text-xs font-medium w-10 text-right ${
-                            item.consumptionRate >= 80 ? "text-red-300" : "text-white/60"
-                          }`}>
-                            {item.consumptionRate}%
-                          </span>
                         </div>
                       </div>
                     ))}
@@ -1067,24 +1063,20 @@ const LiveEventPage = ({ embedded = false }) => {
                     {realtimeAddOns.slice(0, 4).map((item) => (
                       <div key={item.id} className="flex items-center justify-between text-sm">
                         <span className="text-white/80 truncate flex-1">{item.name}</span>
-                        <div className="flex items-center gap-2 ml-2">
-                          <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${
-                                item.consumptionRate >= 80
-                                  ? "bg-red-400"
-                                  : item.consumptionRate >= 50
-                                  ? "bg-amber-400"
-                                  : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${item.consumptionRate}%` }}
-                            />
+                        <div className="flex items-center gap-3 ml-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-white/60">
+                              <span className="text-emerald-300 font-medium">{item.receivedQty}</span>
+                              <span className="text-white/40"> / </span>
+                              <span className="text-white/70">{item.totalQty}</span>
+                            </span>
+                            <span className={`font-medium ${
+                              item.remainingQty <= 0 ? "text-red-300" :
+                              item.consumptionRate >= 80 ? "text-amber-300" : "text-white/50"
+                            }`}>
+                              ({item.remainingQty} left)
+                            </span>
                           </div>
-                          <span className={`text-xs font-medium w-10 text-right ${
-                            item.consumptionRate >= 80 ? "text-red-300" : "text-white/60"
-                          }`}>
-                            {item.consumptionRate}%
-                          </span>
                         </div>
                       </div>
                     ))}

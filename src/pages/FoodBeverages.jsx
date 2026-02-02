@@ -13,6 +13,20 @@ import { apiFetch } from "@/config/api";
 
 const formatNumber = (value) => new Intl.NumberFormat("en-IN").format(value || 0);
 
+// Inject keyframe animation for popup
+const popupStyles = `
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+`;
+
 const FoodBeverages = () => {
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState("");
@@ -22,9 +36,20 @@ const FoodBeverages = () => {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingAddOns, setLoadingAddOns] = useState(false);
   const [error, setError] = useState("");
+  const [itemError, setItemError] = useState({ id: null, message: "" });
   const [form, setForm] = useState({ name: "", unit: "", totalQty: "", notes: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const itemsTopRef = useRef(null);
+
+  // Auto-dismiss item error after 4 seconds
+  useEffect(() => {
+    if (itemError.id) {
+      const timer = setTimeout(() => {
+        setItemError({ id: null, message: "" });
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [itemError]);
 
   const publishedEvents = useMemo(
     () => events.filter((event) => event.publishStatus === "PUBLISHED"),
@@ -136,6 +161,7 @@ const FoodBeverages = () => {
     const payload = drafts[id];
     if (!payload) return;
     setError("");
+    setItemError({ id: null, message: "" });
     try {
       const response = await apiFetch(`event/${selectedEventId}/add-ons/${id}`, {
         method: "PATCH",
@@ -154,7 +180,7 @@ const FoodBeverages = () => {
       });
     } catch (err) {
       console.error("Failed to update add-on:", err);
-      setError(err.message || "Failed to update add-on");
+      setItemError({ id, message: err.message || "Failed to update add-on" });
     }
   };
 
@@ -197,6 +223,7 @@ const FoodBeverages = () => {
 
   return (
     <div className="space-y-6">
+      <style>{popupStyles}</style>
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/30">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -290,7 +317,27 @@ const FoodBeverages = () => {
                         const soldQty = item.receivedQty || 0;
                         const soldProgress = totalQty > 0 ? Math.min((soldQty / totalQty) * 100, 100) : 0;
                         return (
-                          <div key={item.id} className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                          <div key={item.id} className="relative rounded-2xl border border-white/10 bg-black/30 p-4">
+                            {/* Error popup */}
+                            {itemError.id === item.id && (
+                              <div
+                                className="absolute top-2 left-2 right-2 z-10 rounded-xl border border-red-400/40 bg-red-500/95 backdrop-blur-sm p-3 text-sm text-white shadow-lg"
+                                style={{ animation: "popIn 0.2s ease-out" }}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>{itemError.message}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => setItemError({ id: null, message: "" })}
+                                    className="text-white/80 hover:text-white transition flex-shrink-0"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                               <div>
                                 <p className="text-xs uppercase tracking-[0.2em] text-white/50">Item</p>
@@ -445,12 +492,6 @@ const FoodBeverages = () => {
                   </form>
                 </div>
 
-                {error && (
-                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 mt-0.5" />
-                    <span>{error}</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
