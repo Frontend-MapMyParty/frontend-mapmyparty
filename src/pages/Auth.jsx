@@ -22,65 +22,6 @@ const Auth = () => {
   const [otpEmail, setOtpEmail] = useState("");
   const [pendingSignupType, setPendingSignupType] = useState(null);
 
-  const persistUserProfile = (userData = {}, fallback = {}) => {
-    if (!userData || typeof userData !== "object") {
-      userData = {};
-    }
-
-    const merged = {
-      ...fallback,
-      ...userData,
-    };
-
-    const sanitized = Object.fromEntries(
-      Object.entries(merged).filter(([, value]) => value !== undefined && value !== null && value !== "")
-    );
-
-    if (Object.keys(sanitized).length === 0) {
-      return;
-    }
-
-    try {
-      sessionStorage.setItem("userProfile", JSON.stringify(sanitized));
-    } catch (storageError) {
-      console.warn("⚠️ Failed to persist user profile in sessionStorage", storageError);
-    }
-
-    if (sanitized.name) sessionStorage.setItem("userName", sanitized.name);
-    if (sanitized.email) sessionStorage.setItem("userEmail", sanitized.email);
-    if (sanitized.phone || sanitized.phoneNumber) {
-      sessionStorage.setItem("userPhone", sanitized.phone || sanitized.phoneNumber);
-    }
-    if (sanitized.authProvider) {
-      sessionStorage.setItem("authProvider", sanitized.authProvider);
-    }
-    if (sanitized.hasPassword !== undefined) {
-      sessionStorage.setItem("hasPassword", sanitized.hasPassword ? "true" : "false");
-    }
-  };
-
-  const extractUserFromResponse = (payload) => {
-    if (!payload || typeof payload !== "object") {
-      return null;
-    }
-
-    if (payload.user && typeof payload.user === "object") {
-      return payload.user;
-    }
-
-    if (payload.data && typeof payload.data === "object") {
-      if (payload.data.user && typeof payload.data.user === "object") {
-        return payload.data.user;
-      }
-
-      if (!Array.isArray(payload.data) && !payload.data.accessToken && !payload.data.token) {
-        return payload.data;
-      }
-    }
-
-    return null;
-  };
-
   const handleSubmit = async (e, type) => {
     e.preventDefault();
 
@@ -99,97 +40,34 @@ const Auth = () => {
           return;
         }
         setIsLoading(true);
-        const res = await apiFetch("auth/login", {
+
+        await apiFetch("auth/login", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: 'include',
           body: JSON.stringify({ email, password, role }),
         });
 
-        const userDataCandidate = extractUserFromResponse(res);
-        // Ensure role is included in user data
-        const userDataWithRole = userDataCandidate ? { ...userDataCandidate, role } : { email, role };
-        persistUserProfile(userDataWithRole, {
-          email,
-          role,
-          type,
-          authProvider: "password",
-          hasPassword: true,
-        });
-        resetSessionCache(); // ensure subsequent guards refetch session
-        if (role) sessionStorage.setItem("role", role);
-        sessionStorage.setItem("isAuthenticated", "true");
-        if (type) sessionStorage.setItem("userType", type);
-        sessionStorage.setItem("authProvider", "password");
-        sessionStorage.setItem("hasPassword", "true");
-        
-        // Wait a bit for cookies to be set by the browser
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        // Try to validate session, but don't fail if it doesn't work immediately
-        // (cookies might take a moment to propagate)
-        let sessionValidated = false;
-        let retryCount = 0;
-        const maxRetries = 2;
-        
-        while (!sessionValidated && retryCount < maxRetries) {
-          try {
-            console.log(`🔄 Validating session (attempt ${retryCount + 1}/${maxRetries})...`);
-            resetSessionCache(); // Force fresh fetch
-            const session = await fetchSession();
-            
-            if (session?.isAuthenticated) {
-              // Verify role matches
-              const sessionRole = (session.user?.role || session.role || role || "").toString().toUpperCase();
-              const expectedRole = role.toString().toUpperCase();
-              
-              console.log(`✅ Session validated - Role: ${sessionRole}, Expected: ${expectedRole}`);
-              
-              if (sessionRole === expectedRole || retryCount === maxRetries - 1) {
-                sessionValidated = true;
-              } else {
-                console.warn(`⚠️ Role mismatch, retrying... (got ${sessionRole}, expected ${expectedRole})`);
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
-              }
-            } else {
-              // If fetchSession failed but we have sessionStorage data, trust it for now
-              // The ProtectedRoute will re-validate when it mounts
-              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
-                                    sessionStorage.getItem("role") === role;
-              if (hasStorageData && retryCount === maxRetries - 1) {
-                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
-                sessionValidated = true; // Trust sessionStorage as fallback
-              } else {
-                console.warn(`⚠️ Session not authenticated, retrying... (attempt ${retryCount + 1})`);
-                retryCount++;
-                await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
-              }
-            }
-          } catch (err) {
-            console.warn(`⚠️ Session fetch error (attempt ${retryCount + 1}):`, err);
-            retryCount++;
-            if (retryCount < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms before retry
-            } else {
-              // Final attempt failed, but if we have sessionStorage, trust it
-              const hasStorageData = sessionStorage.getItem("isAuthenticated") === "true" && 
-                                    sessionStorage.getItem("role") === role;
-              if (hasStorageData) {
-                console.warn("⚠️ fetchSession failed but sessionStorage indicates auth, proceeding...");
-                sessionValidated = true; // Trust sessionStorage as fallback
-              }
-            }
-          }
+        // Reset cache and fetch fresh session from backend
+        resetSessionCache();
+
+        // Validate session - backend cookies are now set
+        const session = await fetchSession(true);
+
+        if (!session?.isAuthenticated) {
+          throw new Error("Login succeeded but session validation failed");
         }
-        
-        if (!sessionValidated) {
-          console.error("❌ Failed to validate session after login, but proceeding with navigation");
-        }
-        
+
         toast.success("Logged in successfully!");
+
+        // Navigate after session is established
+        const dashboardPath =
+          type === "organizer"
+            ? "/organizer/dashboard-v2"
+            : type === "promoter"
+              ? "/promoter"
+              : "/dashboard";
+
+        navigate(dashboardPath, { replace: true });
+        return;
       } else {
         // SIGNUP FLOW - Send OTP first for email verification
         const name = form.querySelector("#name")?.value?.trim();
@@ -207,16 +85,19 @@ const Auth = () => {
         }
 
         // Validate password requirements
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        const passwordRegex =
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
         if (!passwordRegex.test(password)) {
-          toast.error("Password must be at least 8 characters with uppercase, lowercase, number, and special character (@$!%*?&)");
+          toast.error(
+            "Password must be at least 8 characters with uppercase, lowercase, number, and special character (@$!%*?&)"
+          );
           return;
         }
 
         setIsLoading(true);
 
         // Send OTP for email verification
-        const res = await apiFetch("auth/send-signup-otp", {
+        await apiFetch("auth/send-signup-otp", {
           method: "POST",
           body: JSON.stringify({ name, email, phone: phoneDigits, password, role }),
         });
@@ -230,19 +111,6 @@ const Auth = () => {
         toast.success("Verification code sent to your email!");
         return; // Don't proceed further - wait for OTP verification
       }
-
-      // Small delay to ensure cookies are set and propagated
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Navigate after session is established
-      const dashboardPath = type === "organizer" 
-        ? "/organizer/dashboard-v2" 
-        : type === "promoter" 
-        ? "/promoter" 
-        : "/dashboard";
-      
-      console.log(`🚀 Navigating to dashboard: ${dashboardPath}`);
-      navigate(dashboardPath, { replace: true });
     } catch (err) {
       toast.error(err?.message || "Authentication failed");
     } finally {
@@ -275,121 +143,42 @@ const Auth = () => {
   };
 
   const handleGoogleLogin = () => {
-    // Simple redirect to backend Google OAuth endpoint
+    // Redirect to backend Google OAuth endpoint
     // Backend will handle OAuth and redirect to /dashboard?auth=success
-    const googleAuthUrl = buildUrl("api/auth/google");
+    const googleAuthUrl = buildUrl("auth/google");
     window.location.href = googleAuthUrl;
   };
 
   // Handle OTP verification success
-  const handleOtpVerificationSuccess = async (response) => {
-    const roleMap = { user: "USER", organizer: "ORGANIZER", promoter: "PROMOTER" };
-    const signupType = pendingSignupType; // Store before clearing
-    const role = roleMap[signupType] || "USER";
-    const verifiedEmail = otpEmail;
-
-    const signupUserData = extractUserFromResponse(response) || {
-      email: verifiedEmail,
-      role,
-    };
-
-    // Ensure role and type are included in user data
-    const signupDataWithRole = { ...signupUserData, role, type: signupType };
-    persistUserProfile(signupDataWithRole, {
-      email: verifiedEmail,
-      role,
-      type: signupType,
-      authProvider: "password",
-      hasPassword: true,
-    });
-
-    resetSessionCache();
-    if (role) sessionStorage.setItem("role", role);
-    sessionStorage.setItem("isAuthenticated", "true");
-    if (signupType) sessionStorage.setItem("userType", signupType);
-    sessionStorage.setItem("authProvider", "password");
-    sessionStorage.setItem("hasPassword", "true");
+  const handleOtpVerificationSuccess = async () => {
+    const signupType = pendingSignupType;
 
     // Close OTP modal
     setShowOtpModal(false);
     setOtpEmail("");
     setPendingSignupType(null);
 
-    // Wait a bit for cookies to be set by the browser
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Reset cache and fetch fresh session from backend
+    resetSessionCache();
 
-    // Try to validate session
-    let sessionValidated = false;
-    let retryCount = 0;
-    const maxRetries = 2;
+    // Validate session - backend cookies are now set after OTP verification
+    const session = await fetchSession(true);
 
-    while (!sessionValidated && retryCount < maxRetries) {
-      try {
-        console.log(`Validating session (attempt ${retryCount + 1}/${maxRetries})...`);
-        resetSessionCache();
-        const session = await fetchSession();
-
-        if (session?.isAuthenticated) {
-          const sessionRole = (session.user?.role || session.role || role || "").toString().toUpperCase();
-          const expectedRole = role.toString().toUpperCase();
-
-          console.log(`Session validated - Role: ${sessionRole}, Expected: ${expectedRole}`);
-
-          if (sessionRole === expectedRole || retryCount === maxRetries - 1) {
-            sessionValidated = true;
-          } else {
-            console.warn(`Role mismatch, retrying... (got ${sessionRole}, expected ${expectedRole})`);
-            retryCount++;
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
-        } else {
-          const hasStorageData =
-            sessionStorage.getItem("isAuthenticated") === "true" &&
-            sessionStorage.getItem("role") === role;
-          if (hasStorageData && retryCount === maxRetries - 1) {
-            console.warn("fetchSession failed but sessionStorage indicates auth, proceeding...");
-            sessionValidated = true;
-          } else {
-            console.warn(`Session not authenticated, retrying... (attempt ${retryCount + 1})`);
-            retryCount++;
-            await new Promise((resolve) => setTimeout(resolve, 300));
-          }
-        }
-      } catch (err) {
-        console.warn(`Session fetch error (attempt ${retryCount + 1}):`, err);
-        retryCount++;
-        if (retryCount < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        } else {
-          const hasStorageData =
-            sessionStorage.getItem("isAuthenticated") === "true" &&
-            sessionStorage.getItem("role") === role;
-          if (hasStorageData) {
-            console.warn("fetchSession failed but sessionStorage indicates auth, proceeding...");
-            sessionValidated = true;
-          }
-        }
-      }
-    }
-
-    if (!sessionValidated) {
-      console.error("Failed to validate session after signup, but proceeding with navigation");
+    if (!session?.isAuthenticated) {
+      toast.error("Signup succeeded but session validation failed. Please try logging in.");
+      return;
     }
 
     toast.success("Account created successfully!");
-
-    // Small delay to ensure cookies are set
-    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Navigate to dashboard
     const dashboardPath =
       signupType === "organizer"
         ? "/organizer/dashboard-v2"
         : signupType === "promoter"
-        ? "/promoter/dashboard"
-        : "/dashboard";
+          ? "/promoter/dashboard"
+          : "/dashboard";
 
-    console.log(`Navigating to dashboard: ${dashboardPath}`);
     navigate(dashboardPath, { replace: true });
   };
 

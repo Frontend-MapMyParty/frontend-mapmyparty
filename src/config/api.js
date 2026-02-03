@@ -1,17 +1,12 @@
-// const rawEnvBase = (import.meta?.env?.VITE_API_BASE_URL ?? "").trim();
 const rawEnvBase = import.meta.env.VITE_API_BASE_URL;
-
 const hostedDefault = "http://localhost:9090/api";
 
-// Prefer env; fallback to hosted default (never localhost)
+// Prefer env; fallback to hosted default
 export const API_BASE_URL = (rawEnvBase || hostedDefault).replace(/\/+$/, "");
 
-if (!rawEnvBase) {
-  console.warn(
-    `VITE_API_BASE_URL is not set. Falling back to hosted default ${hostedDefault}. Add it to your .env to override.`
-  );
-} else {
-  console.info("Using API base from .env:", API_BASE_URL);
+// Only log in development
+if (import.meta.env.DEV && !rawEnvBase) {
+  console.warn(`VITE_API_BASE_URL is not set. Using default: ${hostedDefault}`);
 }
 
 export function buildUrl(path = "") {
@@ -25,122 +20,78 @@ export function buildUrl(path = "") {
   return `${API_BASE_URL}/${cleanPath}`;
 }
 
+// Lazy import to avoid circular dependency
+let tryRefreshToken = null;
+let clearSessionData = null;
+
+async function getAuthUtils() {
+  if (!tryRefreshToken || !clearSessionData) {
+    const authModule = await import("@/utils/auth");
+    tryRefreshToken = authModule.tryRefreshToken;
+    clearSessionData = authModule.clearSessionData;
+  }
+  return { tryRefreshToken, clearSessionData };
+}
+
 // Create a custom fetch function with default options
 const customFetch = async (url, options = {}) => {
-  // Destructure headers separately to avoid overwriting them
   const { headers = {}, body, ...otherOptions } = options;
-  
+
   // Only set Content-Type header if body is not FormData
-  // (FormData sets its own Content-Type with boundary)
   const isFormData = body instanceof FormData;
-  
+
   const fetchOptions = {
-    credentials: 'include', // This is crucial for sending/receiving cookies
-    headers: isFormData ? {
-      ...headers,
-    } : {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
+    credentials: "include",
+    headers: isFormData
+      ? { ...headers }
+      : { "Content-Type": "application/json", ...headers },
     body,
     ...otherOptions,
-  };
-
-  console.log(`🌐 Fetching ${url}`);
-  console.log(`📋 Method: ${fetchOptions.method || 'GET'}`);
-  console.log(`📋 Headers:`, fetchOptions.headers);
-  console.log(`📋 Body type:`, typeof fetchOptions.body);
-  console.log(`📋 Is FormData:`, fetchOptions.body instanceof FormData);
-  console.log(`📋 Body preview:`, 
-    fetchOptions.body instanceof FormData ? '[FormData]' : 
-    typeof fetchOptions.body === 'string' ? fetchOptions.body.substring(0, 200) : 
-    fetchOptions.body
-  );
-  
-  // Validate body for non-GET requests
-  if (fetchOptions.method && fetchOptions.method !== 'GET' && fetchOptions.method !== 'HEAD') {
-    if (!fetchOptions.body) {
-      console.error('⚠️ Warning: No body provided for', fetchOptions.method, 'request');
-    } else if (typeof fetchOptions.body === 'string' && fetchOptions.body.length === 0) {
-      console.error('⚠️ Warning: Empty string body for', fetchOptions.method, 'request');
-    }
-  }
-
-  const tryRefresh = async () => {
-    try {
-      const refreshRes = await fetch(buildUrl("auth/refresh"), {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!refreshRes.ok) return false;
-      return true;
-    } catch (e) {
-      console.error("Failed to refresh session:", e);
-      return false;
-    }
   };
 
   const doFetch = async (retrying = false) => {
     const res = await fetch(url, fetchOptions);
 
+    // Handle 401 with token refresh (only once)
     if (res.status === 401 && !retrying) {
-      console.warn("401 detected, attempting refresh...");
-      const refreshed = await tryRefresh();
+      const { tryRefreshToken: refresh } = await getAuthUtils();
+      const refreshed = await refresh();
       if (refreshed) {
         return doFetch(true);
       }
     }
-    
-    // Handle response
+
     if (!res.ok) {
       let errorData = {};
-      const contentType = res.headers.get('content-type');
-      
+      const contentType = res.headers.get("content-type");
+
       try {
-        if (contentType && contentType.includes('application/json')) {
+        if (contentType && contentType.includes("application/json")) {
           errorData = await res.json();
         } else {
           const textError = await res.text();
           errorData = { message: textError };
         }
       } catch (parseError) {
-        console.error('Failed to parse error response:', parseError);
-        errorData = { message: 'Failed to parse error response' };
+        errorData = { message: "Failed to parse error response" };
       }
-      
-      // Handle 401 Unauthorized - session is invalid or expired
+
+      // Handle 401 - clear session data
       if (res.status === 401) {
-        console.error('🔴 401 UNAUTHORIZED after refresh attempt: Session is invalid or expired!');
-        // Import and use clearSessionData from auth utils (avoid circular dependency by using dynamic import if needed)
-        // For now, clear sessionStorage here
-        sessionStorage.removeItem("isAuthenticated");
-        sessionStorage.removeItem("role");
-        sessionStorage.removeItem("userType");
-        sessionStorage.removeItem("userProfile");
-        sessionStorage.removeItem("authToken");
-        sessionStorage.removeItem("accessToken");
-        localStorage.removeItem("userProfile");
-        // Don't redirect here - let ProtectedRoute handle it
+        const { clearSessionData: clearSession } = await getAuthUtils();
+        clearSession();
       }
-      
-      // Handle 500 Internal Server Error - log details
-      if (res.status === 500) {
-        console.error('🔴 500 INTERNAL SERVER ERROR:');
-        console.error('   URL:', url);
-        console.error('   Method:', fetchOptions.method || 'GET');
-        console.error('   Error data:', errorData);
-        console.error('   Backend message:', errorData.errorMessage || errorData.message);
-        console.error('');
-        console.error('💡 Common causes:');
-        console.error('   1. Backend validation failed (check required fields)');
-        console.error('   2. Database connection issue');
-        console.error('   3. File upload size exceeded');
-        console.error('   4. Missing backend middleware (multer for files)');
-        console.error('   5. Backend code error (check backend logs)');
+
+      // Log 500 errors in development only
+      if (res.status === 500 && import.meta.env.DEV) {
+        console.error("500 Error:", url, errorData);
       }
-      
-      // Backend uses 'errorMessage' field
-      const errorMessage = errorData.errorMessage || errorData.message || errorData.error || `HTTP ${res.status}: An error occurred`;
+
+      const errorMessage =
+        errorData.errorMessage ||
+        errorData.message ||
+        errorData.error ||
+        `HTTP ${res.status}: An error occurred`;
       const error = new Error(errorMessage);
       error.status = res.status;
       error.data = errorData;
@@ -152,8 +103,8 @@ const customFetch = async (url, options = {}) => {
   const res = await doFetch(false);
 
   // Handle different response types
-  const contentType = res.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
+  const contentType = res.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
     return res.json();
   }
   return res.text();

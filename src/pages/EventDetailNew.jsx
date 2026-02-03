@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from "@/utils/auth";
+import BillingDetailsModal from "@/components/BillingDetailsModal";
 
 const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
@@ -34,6 +35,7 @@ const EventDetailNew = () => {
   const [ticketQuantities, setTicketQuantities] = useState({});
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -649,38 +651,6 @@ const EventDetailNew = () => {
     return "";
   }, [isSalesClosed, isSoldOut]);
 
-  const persistUserProfile = (userData = {}, fallback = {}) => {
-    const merged = { ...fallback, ...(userData || {}) };
-    const sanitized = Object.fromEntries(
-      Object.entries(merged).filter(([, value]) => value !== undefined && value !== null && value !== "")
-    );
-    if (Object.keys(sanitized).length === 0) return;
-    try {
-      sessionStorage.setItem("userProfile", JSON.stringify(sanitized));
-      if (sanitized.name) sessionStorage.setItem("userName", sanitized.name);
-      if (sanitized.email) sessionStorage.setItem("userEmail", sanitized.email);
-      if (sanitized.phone || sanitized.phoneNumber) {
-        sessionStorage.setItem("userPhone", sanitized.phone || sanitized.phoneNumber);
-      }
-      if (sanitized.role) sessionStorage.setItem("role", sanitized.role);
-      sessionStorage.setItem("isAuthenticated", "true");
-    } catch (storageError) {
-      console.warn("⚠️ Failed to persist user profile", storageError);
-    }
-  };
-
-  const extractUserFromResponse = (payload) => {
-    if (!payload || typeof payload !== "object") return null;
-    if (payload.user && typeof payload.user === "object") return payload.user;
-    if (payload.data && typeof payload.data === "object") {
-      if (payload.data.user && typeof payload.data.user === "object") return payload.data.user;
-      if (!Array.isArray(payload.data) && !payload.data.accessToken && !payload.data.token) {
-        return payload.data;
-      }
-    }
-    return null;
-  };
-
   const ensureSession = async () => {
     setAuthLoading(true);
     try {
@@ -722,6 +692,20 @@ const EventDetailNew = () => {
       return;
     }
 
+    // Check if user is authenticated
+    if (!isSessionAuthed) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    // Ensure we have fresh session data
+    await ensureSession();
+
+    // Show billing modal to collect address details
+    setBillingModalOpen(true);
+  };
+
+  const handleBillingSubmit = async (billingData) => {
     const selectedTickets = event.tickets
       .map((ticket) => ({
         ...ticket,
@@ -729,35 +713,10 @@ const EventDetailNew = () => {
       }))
       .filter((t) => t.quantity > 0);
 
-    const profileRaw = sessionStorage.getItem("userProfile");
-    const profile = profileRaw ? JSON.parse(profileRaw) : {};
-    const user = {
-      ...profile,
-      ...sessionUser,
-    };
-
-    const userDetails = {
-      fullName: user.fullName || user.name,
-      email: user.email,
-      phone: user.phone || user.contact,
-      addressLine1: user.addressLine1 || user.address,
-      addressLine2: user.addressLine2 || "",
-      state: user.state,
-      city: user.city,
-      pincode: user.pincode,
-    };
-
-    const missingRequired =
-      !userDetails.fullName || !userDetails.email || !userDetails.phone || !userDetails.addressLine1;
-    if (missingRequired) {
-      toast.error("Please complete your profile (name, email, phone, address) before booking.");
-      return;
-    }
-
     const payload = {
       eventId: event.id || event.eventId || id,
       tickets: selectedTickets.map((t) => ({ ticketId: t.id, quantity: t.quantity })),
-      userDetails,
+      userDetails: billingData,
     };
 
     try {
@@ -771,6 +730,10 @@ const EventDetailNew = () => {
         throw new Error(booking?.message || "Booking failed");
       }
 
+      // Close billing modal
+      setBillingModalOpen(false);
+
+      // Navigate to payment checkout
       navigate(`/events/${id}/checkout`, {
         state: {
           eventSummary: {
@@ -788,7 +751,6 @@ const EventDetailNew = () => {
       });
     } catch (err) {
       toast.error(err?.message || "Unable to create booking. Please try again.");
-    } finally {
       setBookingLoading(false);
     }
   };
@@ -802,19 +764,20 @@ const EventDetailNew = () => {
     }
     setAuthLoading(true);
     try {
-      const res = await apiFetch("auth/login", {
+      await apiFetch("auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email, password, role: "USER" }),
       });
-      const userDataCandidate = extractUserFromResponse(res);
-      const userWithRole = userDataCandidate ? { ...userDataCandidate, role: "USER" } : { email, role: "USER" };
-      persistUserProfile(userWithRole, { email, role: "USER", authProvider: "password", hasPassword: true });
+
       resetSessionCache();
-      const session = await fetchSession().catch(() => null);
+      const session = await fetchSession(true);
+
+      if (!session?.isAuthenticated) {
+        throw new Error("Login succeeded but session validation failed");
+      }
+
       setIsSessionAuthed(true);
-      setSessionUser(session?.user || userWithRole);
+      setSessionUser(session.user);
       setAuthModalOpen(false);
       await bookTickets();
     } catch (err) {
@@ -838,23 +801,20 @@ const EventDetailNew = () => {
     }
     setAuthLoading(true);
     try {
-      const res = await apiFetch("auth/signup", {
+      await apiFetch("auth/signup", {
         method: "POST",
         body: JSON.stringify({ name, email, phone: phoneDigits, password, role: "USER" }),
       });
-      const signupUserData = extractUserFromResponse(res) || { name, email, phone: phoneDigits, role: "USER" };
-      persistUserProfile(signupUserData, {
-        name,
-        email,
-        phone: phoneDigits,
-        role: "USER",
-        authProvider: "password",
-        hasPassword: true,
-      });
+
       resetSessionCache();
-      const session = await fetchSession().catch(() => null);
+      const session = await fetchSession(true);
+
+      if (!session?.isAuthenticated) {
+        throw new Error("Signup succeeded but session validation failed");
+      }
+
       setIsSessionAuthed(true);
-      setSessionUser(session?.user || signupUserData);
+      setSessionUser(session.user);
       setAuthModalOpen(false);
       await bookTickets();
     } catch (err) {
@@ -866,7 +826,7 @@ const EventDetailNew = () => {
 
   const handleGoogleLogin = () => {
     const redirect = encodeURIComponent(window.location.href);
-    const googleAuthUrl = buildUrl(`api/auth/google?redirect=${redirect}`);
+    const googleAuthUrl = buildUrl(`auth/google?redirect=${redirect}`);
     window.location.href = googleAuthUrl;
   };
 
@@ -1835,6 +1795,15 @@ const EventDetailNew = () => {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {/* Billing Details Modal */}
+      <BillingDetailsModal
+        isOpen={billingModalOpen}
+        onClose={() => setBillingModalOpen(false)}
+        onSubmit={handleBillingSubmit}
+        isLoading={bookingLoading}
+        user={sessionUser}
+      />
     </div>
   );
 };

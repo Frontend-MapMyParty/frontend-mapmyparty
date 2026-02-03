@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,10 @@ import {
   ScanLine,
   Wallet2,
   Globe,
+  Loader2,
 } from "lucide-react";
+import { apiFetch } from "@/config/api";
+import { toast } from "sonner";
 
 const paymentMethods = [
   { label: "UPI", icon: Smartphone, accent: "from-emerald-500/80 to-teal-500/60" },
@@ -34,12 +37,49 @@ const PaymentCheckout = () => {
   const summary = state?.eventSummary;
   const tickets = state?.tickets || [];
   const bookingData = state?.bookingData;
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState(null);
 
   useEffect(() => {
     if (!summary || !tickets.length || !bookingData) {
       navigate(`/events/${id}`);
     }
   }, [summary, tickets.length, bookingData, id, navigate]);
+
+  const handlePayment = async () => {
+    if (!bookingData?.bookingId) {
+      toast.error("Booking ID not found");
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Process test payment (creates payment + confirms booking)
+      const response = await apiFetch("/api/payment/test/process", {
+        method: "POST",
+        body: JSON.stringify({
+          bookingId: bookingData.bookingId,
+          paymentMethod: selectedMethod || "TEST",
+        }),
+      });
+
+      if (response?.success) {
+        toast.success("Payment successful! Redirecting...");
+        // Redirect to success page with booking ID
+        setTimeout(() => {
+          navigate(`/booking-success?bookingId=${bookingData.bookingId}`);
+        }, 1000);
+      } else {
+        toast.error(response?.errorMessage || "Payment failed");
+        setIsProcessing(false);
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error(error?.message || "Payment failed. Please try again.");
+      setIsProcessing(false);
+    }
+  };
 
   const totalsSafe = useMemo(() => {
     const t = bookingData?.totals || {};
@@ -120,14 +160,25 @@ const PaymentCheckout = () => {
               {paymentMethods.map(({ label, icon: Icon, accent }) => (
                 <div
                   key={label}
-                  className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 transition"
+                  onClick={() => setSelectedMethod(label.toUpperCase())}
+                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition ${
+                    selectedMethod === label.toUpperCase()
+                      ? "border-[#D60024] bg-[#D60024]/10"
+                      : "border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10"
+                  }`}
                 >
-                  <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-white`}>
+                  <div
+                    className={`h-11 w-11 rounded-xl bg-gradient-to-br ${accent} flex items-center justify-center text-white`}
+                  >
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
                     <p className="font-semibold text-white">{label}</p>
-                    <p className="text-xs text-white/60">Continue to pay with {label}</p>
+                    <p className="text-xs text-white/60">
+                      {selectedMethod === label.toUpperCase()
+                        ? "Selected"
+                        : `Continue to pay with ${label}`}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -195,10 +246,29 @@ const PaymentCheckout = () => {
                 <span className="text-[#D60024]">{formatCurrency(totalsSafe.total || 0)}</span>
               </div>
 
-              <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold py-5">
-                Pay & Confirm
+              <Button
+                onClick={handlePayment}
+                disabled={isProcessing}
+                className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold py-5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing Payment...
+                  </>
+                ) : (
+                  "Pay & Confirm"
+                )}
               </Button>
-              <p className="text-xs text-center text-white/60">You’ll receive instant confirmation after payment.</p>
+              <p className="text-xs text-center text-white/60">
+                {isProcessing
+                  ? "Please wait while we process your payment..."
+                  : "You'll receive instant confirmation after payment."}
+              </p>
+              <p className="text-xs text-center text-amber-300/80 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 mt-2">
+                ⚠️ Test Mode: This is a simulated payment for testing purposes.
+                No actual charges will be made.
+              </p>
             </CardContent>
           </Card>
         </div>

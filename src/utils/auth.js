@@ -1,153 +1,163 @@
 import { buildUrl } from "@/config/api";
 
 let sessionPromise = null;
+let isRefreshing = false;
+let refreshSubscribers = [];
 
 /**
- * Attempt to refresh the access token using refresh token from cookie
+ * Subscribe to token refresh completion
  */
-async function tryRefreshToken() {
+function subscribeToRefresh(callback) {
+  refreshSubscribers.push(callback);
+}
+
+/**
+ * Notify all subscribers of refresh result
+ */
+function notifyRefreshSubscribers(success) {
+  refreshSubscribers.forEach(callback => callback(success));
+  refreshSubscribers = [];
+}
+
+/**
+ * Attempt to refresh the access token using refresh token from cookie.
+ * Handles concurrent refresh requests by queuing them.
+ * @returns {Promise<boolean>} Whether the refresh was successful
+ */
+export async function tryRefreshToken() {
+  // If already refreshing, wait for the result
+  if (isRefreshing) {
+    return new Promise(resolve => {
+      subscribeToRefresh(resolve);
+    });
+  }
+
+  isRefreshing = true;
+
   try {
     const refreshRes = await fetch(buildUrl("auth/refresh"), {
       method: "POST",
       credentials: "include",
     });
-    return refreshRes.ok;
+    const success = refreshRes.ok;
+    notifyRefreshSubscribers(success);
+    return success;
   } catch (e) {
     console.error("Failed to refresh token:", e);
+    notifyRefreshSubscribers(false);
     return false;
+  } finally {
+    isRefreshing = false;
   }
 }
 
 /**
  * Fetch the current authenticated session from the backend.
  * Relies on HttpOnly cookies (credentials: include).
- * 
+ *
  * Flow:
  * 1. Always try /auth/me first (uses cookies automatically)
  * 2. If 401, try token refresh
  * 3. If still fails, clear session and return unauthenticated
- * 4. Only fallback to sessionStorage if /auth/me endpoint doesn't exist (404)
  */
-export async function fetchSession() {
-  // Temporary promoter-guest bypass (no backend session required)
-  const promoterGuest = sessionStorage.getItem("promoterGuest") === "true";
-  const storedRole = (sessionStorage.getItem("role") || "").toUpperCase();
-
-  if (promoterGuest && storedRole === "PROMOTER") {
-    const storedProfileRaw = sessionStorage.getItem("userProfile");
-    let storedProfile = null;
-    try {
-      storedProfile = storedProfileRaw ? JSON.parse(storedProfileRaw) : null;
-    } catch {
-      storedProfile = null;
-    }
-
-    const user = storedProfile || {
-      role: "PROMOTER",
-      type: sessionStorage.getItem("userType") || "promoter",
-      authProvider: sessionStorage.getItem("authProvider") || "promoter-guest",
-      name: sessionStorage.getItem("userName") || "Promoter Guest",
-    };
-
-    return {
-      isAuthenticated: true,
-      user,
-      role: "PROMOTER",
-    };
+export async function fetchSession(forceRefresh = false) {
+  // Clear cache if force refresh requested
+  if (forceRefresh) {
+    sessionPromise = null;
   }
 
   if (!sessionPromise) {
-    sessionPromise = (async () => {
-      // Fallback function - only used if /auth/me endpoint is unavailable (404)
-      const fromStorage = () => {
-        const storedProfile = sessionStorage.getItem("userProfile");
-        const storedRole = sessionStorage.getItem("role") || "USER";
-        const storedType = sessionStorage.getItem("userType") || null;
-        const isAuth = sessionStorage.getItem("isAuthenticated") === "true";
-        let parsedProfile = null;
-        try {
-          parsedProfile = storedProfile ? JSON.parse(storedProfile) : null;
-        } catch {
-          parsedProfile = null;
-        }
-        return {
-          isAuthenticated: isAuth,
-          user: parsedProfile ? { ...parsedProfile, role: storedRole, type: storedType } : null,
-          role: storedRole,
-        };
-      };
+    sessionPromise = fetchSessionInternal();
+  }
 
-      // Step 1: Try /auth/me endpoint (primary authentication method)
-      let res = await fetch(buildUrl("auth/me"), {
+  try {
+    return await sessionPromise;
+  } catch (error) {
+    // Reset cache on error so next call retries
+    sessionPromise = null;
+    throw error;
+  }
+}
+
+/**
+ * Internal session fetch logic - separated to handle caching properly
+ */
+async function fetchSessionInternal() {
+  // Step 1: Try /auth/me endpoint (primary authentication method)
+  let res;
+  try {
+    res = await fetch(buildUrl("auth/me"), {
+      method: "GET",
+      credentials: "include",
+    });
+  } catch (networkError) {
+    console.error("Network error fetching session:", networkError);
+    throw new Error("Network error: Unable to verify session");
+  }
+
+  // Step 2: If 401, try refreshing the token
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+
+    if (refreshed) {
+      // Retry /auth/me after successful refresh
+      res = await fetch(buildUrl("auth/me"), {
         method: "GET",
         credentials: "include",
       });
-
-      // Step 2: If 401, try refreshing the token
-      if (res.status === 401) {
-        console.log("🔄 Session expired, attempting token refresh...");
-        const refreshed = await tryRefreshToken();
-        
-        if (refreshed) {
-          // Retry /auth/me after successful refresh
-          res = await fetch(buildUrl("auth/me"), {
-            method: "GET",
-            credentials: "include",
-          });
-        } else {
-          // Refresh failed - clear session and return unauthenticated
-          console.warn("❌ Token refresh failed, clearing session");
-          clearSessionData();
-          sessionPromise = null;
-          return { isAuthenticated: false, user: null };
-        }
-      }
-
-      // Step 3: Handle response
-      if (res.status === 401) {
-        // Still 401 after refresh attempt - session is invalid
-        clearSessionData();
-        sessionPromise = null;
-        return { isAuthenticated: false, user: null };
-      }
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          // Backend doesn't have /auth/me endpoint - fallback to storage
-          console.warn("⚠️ /auth/me endpoint not found, using sessionStorage fallback");
-          return fromStorage();
-        }
-        sessionPromise = null;
-        throw new Error(`Failed to fetch session: ${res.status}`);
-      }
-
-      // Step 4: Parse successful response
-      const data = await res.json().catch(() => ({}));
-      const user = data?.user || data?.data?.user || data?.data || null;
-      const role = (data?.role || data?.data?.role || user?.role || "USER").toString().toUpperCase();
-      const userWithRole = user ? { ...user, role } : null;
-
-      const normalized = {
-        isAuthenticated: true,
-        user: userWithRole,
-        role,
-      };
-
-      // Step 5: Update sessionStorage for UI hints (cookies are source of truth)
-      try {
-        sessionStorage.setItem("isAuthenticated", "true");
-        if (role) sessionStorage.setItem("role", role);
-        if (userWithRole?.type) sessionStorage.setItem("userType", userWithRole.type);
-        if (userWithRole) sessionStorage.setItem("userProfile", JSON.stringify(userWithRole));
-      } catch (e) {
-        // best-effort; ignore storage errors
-      }
-
-      return normalized;
-    })();
+    } else {
+      // Refresh failed - clear session and return unauthenticated
+      clearSessionData();
+      return { isAuthenticated: false, user: null, role: null };
+    }
   }
 
-  return sessionPromise;
+  // Step 3: Handle response
+  if (res.status === 401) {
+    // Still 401 after refresh attempt - session is invalid
+    clearSessionData();
+    return { isAuthenticated: false, user: null, role: null };
+  }
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch session: ${res.status}`);
+  }
+
+  // Step 4: Parse successful response
+  const data = await res.json().catch(() => ({}));
+  const user = data?.user || data?.data?.user || data?.data || null;
+  const role = (data?.role || data?.data?.role || user?.role || "USER").toString().toUpperCase();
+  const userWithRole = user ? { ...user, role } : null;
+
+  const normalized = {
+    isAuthenticated: true,
+    user: userWithRole,
+    role,
+  };
+
+  // Step 5: Update sessionStorage for UI hints (cookies are source of truth)
+  syncSessionStorage(normalized);
+
+  return normalized;
+}
+
+/**
+ * Sync session data to sessionStorage for UI hints only.
+ * Backend cookies remain the source of truth for authentication.
+ */
+function syncSessionStorage(session) {
+  try {
+    if (session.isAuthenticated) {
+      sessionStorage.setItem("isAuthenticated", "true");
+      if (session.role) sessionStorage.setItem("role", session.role);
+      if (session.user?.type) sessionStorage.setItem("userType", session.user.type);
+      if (session.user) sessionStorage.setItem("userProfile", JSON.stringify(session.user));
+    } else {
+      clearSessionData();
+    }
+  } catch (e) {
+    // Ignore storage errors - sessionStorage is just for UI hints
+  }
 }
 
 /**
@@ -162,8 +172,8 @@ export function clearSessionData() {
   sessionStorage.removeItem("userName");
   sessionStorage.removeItem("userEmail");
   sessionStorage.removeItem("userPhone");
-  sessionStorage.removeItem("authToken");
-  sessionStorage.removeItem("accessToken");
+  sessionStorage.removeItem("authProvider");
+  sessionStorage.removeItem("hasPassword");
   localStorage.removeItem("userProfile");
   sessionPromise = null;
 }

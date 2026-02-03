@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Events from "./pages/Events";
 import EventDetail from "./pages/EventDetailNew";
 import PaymentCheckout from "./pages/PaymentCheckout";
+import BookingSuccess from "./pages/BookingSuccess";
 import Auth from "./pages/Auth";
 import GoogleCallback from "./pages/GoogleCallback";
 import UserDashboard from "./pages/NewUserDashboard";
@@ -66,6 +67,11 @@ const App = () => {
               <Route path="/events/:id" element={<EventDetail />} />
               <Route path="/events/:id/checkout" element={<PaymentCheckout />} />
               <Route path="/events/:id/overview" element={<EventOverviewPage />} />
+              <Route path="/booking-success" element={
+                <ProtectedRoute>
+                  <BookingSuccess />
+                </ProtectedRoute>
+              } />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/policies" element={<Policies />} />

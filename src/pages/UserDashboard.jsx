@@ -23,6 +23,7 @@ import eventPlaceholder from "@/assets/event-music.jpg";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { apiFetch } from "@/config/api";
+import { fetchSession, resetSessionCache } from "@/utils/auth";
 import { toast } from "sonner";
 
 const UserDashboard = () => {
@@ -38,78 +39,19 @@ const UserDashboard = () => {
   const [reviewComment, setReviewComment] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const persistUserProfile = (userData = {}) => {
-    if (!userData || typeof userData !== "object") {
-      return;
-    }
-
+  const validateSession = useCallback(async () => {
     try {
-      sessionStorage.setItem("userProfile", JSON.stringify(userData));
-    } catch (storageError) {
-      console.warn("⚠️ Failed to persist user profile in sessionStorage", storageError);
-    }
+      resetSessionCache();
+      const session = await fetchSession(true);
 
-    if (userData.name) {
-      sessionStorage.setItem("userName", userData.name);
-    }
-    if (userData.email) {
-      sessionStorage.setItem("userEmail", userData.email);
-    }
-    if (userData.phone || userData.phoneNumber) {
-      sessionStorage.setItem("userPhone", userData.phone || userData.phoneNumber);
-    }
-  };
-
-  const fetchUserProfile = useCallback(async () => {
-    try {
-      console.log("🔄 Fetching user profile after Google OAuth...");
-      const response = await apiFetch("/api/user/profile", {
-        method: "GET",
-        credentials: 'include',
-      });
-
-      console.log("👤 User profile response:", response);
-
-      if (response?.success && response?.data) {
-        const userData = response.data;
-        
-        // Store user profile
-        persistUserProfile(userData);
-        
-        // Store user type and role
-        const role = userData.role || userData.roles?.[0] || userData.user_roles?.[0]?.roles?.name || "USER";
-        sessionStorage.setItem("userType", "user");
-        sessionStorage.setItem("role", role);
-        sessionStorage.setItem("isAuthenticated", "true");
-
-        // Extract and store token if available in response
-        if (response.data.token) {
-          sessionStorage.setItem("authToken", response.data.token);
-          console.log("💾 Token saved to sessionStorage from profile response");
-        } else if (response.token) {
-          sessionStorage.setItem("authToken", response.token);
-          console.log("💾 Token saved to sessionStorage from response root");
-        } else {
-          // Token might be in HTTP-only cookie, check if we can read it
-          // If not, the getAuthToken() function will check cookies
-          console.log("ℹ️ Token not in response - checking cookies (backend may have set HTTP-only cookie)");
-        }
-
-        console.log("✅ User profile stored:", {
-          name: userData.name,
-          email: userData.email,
-          role: role,
-          hasToken: !!(response.data.token || response.token || sessionStorage.getItem("authToken"))
-        });
-
+      if (session?.isAuthenticated) {
         toast.success("Google authentication successful!");
       } else {
-        console.error("❌ Failed to fetch user profile:", response?.errorMessage || response?.message);
-        toast.error(response?.errorMessage || "Failed to fetch user profile");
+        toast.error("Session validation failed");
       }
     } catch (err) {
-      console.error("❌ Error fetching user profile:", err);
-      toast.error(err?.message || "Failed to fetch user profile");
+      console.error("Error validating session:", err);
+      toast.error(err?.message || "Failed to validate session");
     }
   }, []);
 
@@ -134,16 +76,15 @@ const UserDashboard = () => {
   // Check if redirected from OAuth
   useEffect(() => {
     const authParam = searchParams.get("auth");
-    
+
     if (authParam === "success") {
-      console.log("✅ Detected OAuth success redirect");
-      // Fetch user profile
-      fetchUserProfile();
-      
+      // Validate session (backend already set cookies)
+      validateSession();
+
       // Clean up URL - remove query params
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, fetchUserProfile, setSearchParams]);
+  }, [searchParams, validateSession, setSearchParams]);
 
   const fetchUserReview = useCallback(async (eventId) => {
     try {
