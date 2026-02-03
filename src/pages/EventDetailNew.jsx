@@ -972,44 +972,48 @@ const EventDetailNew = () => {
               </div>
             </div>
           </div>
+
+          {showSponsorStrip && (
+            <div className="relative isolate overflow-hidden">
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(15,20,35,0.98) 0%, rgba(20,25,40,0.99) 50%, rgba(15,20,35,0.98) 100%)",
+                }}
+              />
+              <div className="w-full px-0 py-6 relative">
+                <div className="flex items-center justify-center">
+                  <div className="relative flex-1 overflow-hidden">
+                    <div className="flex items-center gap-16 min-w-max animate-[sponsorMarquee_20s_linear_infinite]">
+                      {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
+                        <div
+                          key={`${s.id || s.name || "sponsor"}-${idx}`}
+                          className="flex items-center gap-4 opacity-90 hover:opacity-100 transition-all duration-300 hover:scale-105"
+                        >
+                          <div className="h-14 w-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden backdrop-blur-sm shadow-lg">
+                            <img
+                              src={s.logo || SPONSOR_PLACEHOLDER}
+                              alt={s.name || "Sponsor"}
+                              className="h-full w-full object-contain filter brightness-110"
+                            />
+                          </div>
+                          <span className="text-base font-semibold whitespace-nowrap text-white/90">
+                            {s.name || "Sponsor"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {showSponsorStrip && (
-        <div className="relative isolate border-y border-white/10 bg-white text-slate-900 overflow-hidden">
-          <div className="absolute inset-y-0 left-0 w-20 pointer-events-none bg-gradient-to-r from-white via-white/80 to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-20 pointer-events-none bg-gradient-to-l from-white via-white/80 to-transparent" />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 relative flex items-center gap-6">
-            <p className="text-xs md:text-sm font-semibold uppercase tracking-[0.22em] text-slate-600 whitespace-nowrap">
-              Our trusted company and partners
-            </p>
-            <div className="relative flex-1 overflow-hidden">
-              <div className="flex items-center gap-10 min-w-max animate-[sponsorMarquee_18s_linear_infinite]">
-                {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
-                  <div
-                    key={`${s.id || s.name || "sponsor"}-${idx}`}
-                    className="flex items-center gap-3 sm:gap-4"
-                  >
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-white shadow-md ring-1 ring-slate-200 flex items-center justify-center overflow-hidden">
-                      <img
-                        src={s.logo || SPONSOR_PLACEHOLDER}
-                        alt={s.name || "Sponsor"}
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                    <span className="text-sm sm:text-base font-semibold whitespace-nowrap text-slate-800">
-                      {s.name || "Sponsor"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-8">
