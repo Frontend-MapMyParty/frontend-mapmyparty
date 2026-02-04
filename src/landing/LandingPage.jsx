@@ -21,6 +21,8 @@ import eventFood from "@/assets/event-food.jpg";
 const featuredEvents = [
   {
     id: "1",
+    organizerSlug: "demo-organizer",
+    eventSlug: "summer-music-festival-2024",
     title: "Summer Music Festival 2024",
     date: "July 15, 2024",
     location: "Central Park, New York",
@@ -31,6 +33,8 @@ const featuredEvents = [
   },
   {
     id: "2",
+    organizerSlug: "demo-organizer",
+    eventSlug: "tech-innovation-conference",
     title: "Tech Innovation Conference",
     date: "August 22, 2024",
     location: "Convention Center, San Francisco",
@@ -41,6 +45,8 @@ const featuredEvents = [
   },
   {
     id: "3",
+    organizerSlug: "demo-organizer",
+    eventSlug: "food-wine-tasting-festival",
     title: "Food & Wine Tasting Festival",
     date: "September 10, 2024",
     location: "Riverside Park, Chicago",

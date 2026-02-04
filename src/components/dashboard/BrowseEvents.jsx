@@ -344,7 +344,7 @@ export default function BrowseEvents({ showPublicHeader = false }) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {trendingEvents.map((event) => (
-                <Link to={`/events/${event.slug || event.id}`} key={event.id} className="group">
+                <Link to={`/events/${event.organizer?.slug}/${event.slug}`} key={event.id} className="group">
                   <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden h-full">
                     <div className="relative h-48 overflow-hidden">
                       <img
@@ -421,7 +421,7 @@ export default function BrowseEvents({ showPublicHeader = false }) {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {cat.events.map((event) => (
-                      <Link to={`/events/${event.slug || event.id}`} key={event.id} className="group">
+                      <Link to={`/events/${event.organizer?.slug}/${event.slug}`} key={event.id} className="group">
                         <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl hover:border-[rgba(100,200,255,0.4)] hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.3)] transition-all duration-300 overflow-hidden h-full">
                           <div className="relative h-48 overflow-hidden">
                             <img

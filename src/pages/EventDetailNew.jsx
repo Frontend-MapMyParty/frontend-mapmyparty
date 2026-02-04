@@ -24,7 +24,7 @@ const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
 const TAB_PAUSE_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 
 const EventDetailNew = () => {
-  const { id } = useParams();
+  const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -532,25 +532,15 @@ const EventDetailNew = () => {
         setLoading(true);
         let raw = null;
 
-        // Use slug-first endpoint; fallback to main only if that fails
-        try {
-          raw = await tryFetch(`/api/event/slug/${encodeURIComponent(id)}`);
-        } catch (errSlug) {
-          console.warn("Slug fetch failed, falling back to id endpoint", errSlug);
-        }
-
-        if (!raw) {
-          try {
-            raw = await tryFetch(`/api/event/${encodeURIComponent(id)}`);
-          } catch (errMain) {
-            console.warn("Primary fetch failed", errMain);
-          }
+        if (organizerSlug && eventSlug) {
+          raw = await tryFetch(
+            `/api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
+          );
         }
 
         if (raw) {
           const normalized = normalizeEvent(raw);
           setEvent(normalized);
-          // Do not auto-open lightbox; show hero directly
           setSelectedImage(null);
         } else {
           setEvent(null);
@@ -563,10 +553,10 @@ const EventDetailNew = () => {
       }
     };
 
-    if (id) {
+    if (organizerSlug && eventSlug) {
       fetchEvent();
     }
-  }, [id]);
+  }, [organizerSlug, eventSlug]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -734,10 +724,10 @@ const EventDetailNew = () => {
       setBillingModalOpen(false);
 
       // Navigate to payment checkout
-      navigate(`/events/${id}/checkout`, {
+      navigate(`/events/${organizerSlug}/${eventSlug}/checkout`, {
         state: {
           eventSummary: {
-            id,
+            id: event?.id,
             title: event.title || event.eventTitle || event.name || "Event",
             date: event.startDate,
             time: event.time,

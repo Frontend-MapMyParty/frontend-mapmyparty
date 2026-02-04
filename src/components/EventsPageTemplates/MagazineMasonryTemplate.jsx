@@ -169,11 +169,11 @@ const MagazineMasonryTemplate = ({
                       const eventId = event.id || event.eventId;
                       const imageSrc = imageSrcs[eventId] || getEventImage(event);
                       const isLarge = index % 7 === 0; // Make every 7th item larger
-                      
+
                       return (
-                        <Link 
+                        <Link
                           key={eventId}
-                          to={`/events/${eventId}`}
+                          to={`/events/${event.organizer?.slug || 'organizer'}/${event.slug || eventId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                         >

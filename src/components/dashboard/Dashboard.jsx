@@ -357,34 +357,89 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="flex gap-2 pt-1">
-                    <Link to={`/events/${nextEvent.slug || nextEvent.id}`} className="flex-1">
-                      <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
+                    {nextEvent.organizer?.slug && nextEvent.slug ? (
+                      <Link to={`/events/${nextEvent.organizer.slug}/${nextEvent.slug}`} className="flex-1">
+                        <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
+                          View Details
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Button size="sm" className="w-full bg-gray-500 text-white text-xs" disabled>
                         View Details
                       </Button>
-                    </Link>
-                    <Button size="sm" variant="outline" className="border-[rgba(100,200,255,0.3)] text-[#93c5fd] hover:bg-[rgba(59,130,246,0.15)] hover:border-[#60a5fa] transition-all duration-300">
-                      <Heart className="h-3.5 w-3.5" />
-                    </Button>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="py-4 sm:py-6 text-center space-y-2 sm:space-y-3">
-                  <div className="inline-flex items-center justify-center h-10 sm:h-12 w-10 sm:w-12 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.2)]">
-                    <Calendar className="h-5 sm:h-6 w-5 sm:w-6 text-[rgba(214,0,36,0.4)]" />
-                  </div>
-                  <div>
-                    <p className="text-white font-semibold text-sm">No Events Yet</p>
-                    <p className="text-[rgba(255,255,255,0.6)] text-xs mt-0.5">Book your first event!</p>
-                  </div>
-                  <Link to="/dashboard/browse-events">
-                    <Button size="sm" className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold text-xs">
-                      Browse Events
-                    </Button>
-                  </Link>
-                </div>
-              )}
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Calendar className="h-12 w-12 text-[rgba(100,200,255,0.3)] mb-3" />
+              <p className="text-sm text-[rgba(255,255,255,0.6)]">No upcoming events</p>
             </div>
+          )}
+        </div>
+
+        </div>
+      </div>
+
+        {/* Popular Events Carousel */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-[#93c5fd] via-[#60a5fa] to-[#D60024] bg-clip-text text-transparent">Popular Events</h2>
           </div>
+          {upcomingEvents.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
+              {upcomingEvents.map((event) => {
+                if (event.organizer?.slug && event.slug) {
+                  return (
+                    <div key={event.id} className="group flex-shrink-0 w-80">
+                      <div className="flex items-center gap-2">
+                        <Link to={`/events/${event.organizer.slug}/${event.slug}`} className="flex-1">
+                          <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
+                            View Details
+                          </Button>
+                        </Link>
+                        <Button size="sm" variant="outline" className="border-[rgba(100,200,255,0.3)] text-[#93c5fd] hover:bg-[rgba(59,130,246,0.15)] hover:border-[#60a5fa] transition-all duration-300">
+                          <Heart className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={event.id} className="py-4 sm:py-6 text-center space-y-2 sm:space-y-3">
+                    <div className="inline-flex items-center justify-center h-10 sm:h-12 w-10 sm:w-12 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.2)]">
+                      <Calendar className="h-5 sm:h-6 w-5 sm:w-6 text-[rgba(214,0,36,0.4)]" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold text-sm">No Events Yet</p>
+                      <p className="text-[rgba(255,255,255,0.6)] text-xs mt-0.5">Book your first event!</p>
+                    </div>
+                    <Link to="/dashboard/browse-events">
+                      <Button size="sm" className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold text-xs">
+                        Browse Events
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-4 sm:py-6 text-center space-y-2 sm:space-y-3">
+              <div className="inline-flex items-center justify-center h-10 sm:h-12 w-10 sm:w-12 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.2)]">
+                <Calendar className="h-5 sm:h-6 w-5 sm:w-6 text-[rgba(214,0,36,0.4)]" />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">No Events Yet</p>
+                <p className="text-[rgba(255,255,255,0.6)] text-xs mt-0.5">Book your first event!</p>
+              </div>
+              <Link to="/dashboard/browse-events">
+                <Button size="sm" className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold text-xs">
+                  Browse Events
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -436,7 +491,8 @@ const Dashboard = () => {
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
               {upcomingEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.slug || event.id}`} className="group flex-shrink-0 w-80">
+                event.organizer?.slug && event.slug ? (
+                  <Link key={event.id} to={`/events/${event.organizer.slug}/${event.slug}`} className="group flex-shrink-0 w-80">
                   <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] hover:border-[#60a5fa]/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(100,180,255,0.3)]">
                     {/* Image Section */}
                     <div className="relative h-52 overflow-hidden bg-[rgba(255,255,255,0.05)]">
@@ -509,6 +565,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </Link>
+                ) : null
               ))}
             </div>
           )}
@@ -558,7 +615,8 @@ const Dashboard = () => {
           ) : (
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
               {bookedEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.slug || event.id}`} className="group flex-shrink-0 w-80">
+                event.organizer?.slug && event.slug ? (
+                  <Link key={event.id} to={`/events/${event.organizer.slug}/${event.slug}`} className="group flex-shrink-0 w-80">
                   <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] hover:border-[rgba(100,200,255,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.35)]">
                     {/* Image Section */}
                     <div className="relative h-48 overflow-hidden bg-[rgba(255,255,255,0.05)]">
@@ -638,6 +696,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </Link>
+                ) : null
               ))}
             </div>
           )}
@@ -739,7 +798,8 @@ const Dashboard = () => {
                 <div className="flex flex-col flex-1">
                   <div className="space-y-3 flex-1">
                     {upcomingEvents.slice(0, 4).map((event, idx) => (
-                      <Link key={`cal-${event.id}`} to={`/events/${event.slug || event.id}`} className="block group">
+                      event.organizer?.slug && event.slug ? (
+                        <Link key={`cal-${event.id}`} to={`/events/${event.organizer.slug}/${event.slug}`} className="block group">
                         <div className="flex items-start p-3 bg-gradient-to-r from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-lg hover:from-[rgba(59,130,246,0.15)] hover:to-[rgba(214,0,36,0.1)] transition-all border border-[rgba(100,200,255,0.15)] hover:border-[#60a5fa]/60 group-hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]">
                           <div className="bg-gradient-to-br from-[rgba(59,130,246,0.3)] via-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.15)] p-2 rounded-lg mr-3 text-center min-w-[60px] border border-[#60a5fa]/40 group-hover:from-[rgba(59,130,246,0.5)] group-hover:to-[rgba(214,0,36,0.3)] transition-all">
                             <div className="text-[#60a5fa] text-xs font-bold uppercase">
@@ -759,6 +819,7 @@ const Dashboard = () => {
                           <ChevronRight className="h-4 w-4 text-[rgba(255,255,255,0.4)] group-hover:text-[#60a5fa] transition-all group-hover:translate-x-1 flex-shrink-0" />
                         </div>
                       </Link>
+                      ) : null
                     ))}
                   </div>
                   <Link to="/dashboard/browse-events" className="mt-4">

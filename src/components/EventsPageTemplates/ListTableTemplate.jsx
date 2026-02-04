@@ -156,11 +156,11 @@ const ListTableTemplate = ({
                         {sortedEvents.map((event) => {
                           const eventId = event.id || event.eventId;
                           const imageSrc = imageSrcs[eventId] || getEventImage(event);
-                          
+
                           return (
-                            <Link 
+                            <Link
                               key={eventId}
-                              to={`/events/${eventId}`}
+                              to={`/events/${event.organizer?.slug || 'organizer'}/${event.slug || eventId}`}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

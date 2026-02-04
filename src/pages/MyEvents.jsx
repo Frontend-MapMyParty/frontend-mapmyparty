@@ -389,7 +389,7 @@ const MyEvents = () => {
                     <div className="flex gap-2 pt-4 border-t border-white/10">
                       <button
                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white text-gray-900 rounded-lg hover:bg-white/90 transition-colors text-sm font-semibold"
-                        onClick={() => navigate(`/events/${event.slug || event.id}`)}
+                        onClick={() => event.organizer?.slug && event.slug && navigate(`/events/${event.organizer.slug}/${event.slug}`)}
                       >
                         <Eye className="w-4 h-4" />
                         View

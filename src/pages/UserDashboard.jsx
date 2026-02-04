@@ -208,7 +208,7 @@ const UserDashboard = () => {
       return {
         id: booking.id,
         eventId: event.id,
-        eventLink: event.id ? `/events/${event.id}` : "/events",
+        eventLink: event.organizer?.slug && event.slug ? `/events/${event.organizer.slug}/${event.slug}` : "/events",
         eventTitle: event.title || "Untitled Event",
         eventDate: date,
         eventTime: time,

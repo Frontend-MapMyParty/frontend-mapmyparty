@@ -7,9 +7,9 @@ import { Link } from "react-router-dom";
 import eventFallback from "@/assets/event-music.jpg";
 
 // Template 1: Classic Card (Original design)
-const ClassicCardTemplate = ({ id, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
+const ClassicCardTemplate = ({ organizerSlug, eventSlug, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
   return (
-    <Link to={`/events/${id}`} target="_blank" rel="noopener noreferrer">
+    <Link to={`/events/${organizerSlug}/${eventSlug}`} target="_blank" rel="noopener noreferrer">
       <Card className="group overflow-hidden border-border hover:shadow-elegant transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full">
         <div className="relative overflow-hidden aspect-[16/9]">
           <img
@@ -63,9 +63,9 @@ const ClassicCardTemplate = ({ id, title, date, location, imageSrc, category, at
 };
 
 // Template 2: Modern Horizontal
-const ModernHorizontalTemplate = ({ id, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
+const ModernHorizontalTemplate = ({ organizerSlug, eventSlug, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
   return (
-    <Link to={`/events/${id}`} target="_blank" rel="noopener noreferrer">
+    <Link to={`/events/${organizerSlug}/${eventSlug}`} target="_blank" rel="noopener noreferrer">
       <Card className="group overflow-hidden border-border hover:shadow-elegant transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full">
         <div className="flex flex-col md:flex-row h-full">
           <div className="relative w-full md:w-2/5 h-48 md:h-auto overflow-hidden">
@@ -123,9 +123,9 @@ const ModernHorizontalTemplate = ({ id, title, date, location, imageSrc, categor
 };
 
 // Template 3: Minimalist Banner
-const MinimalistBannerTemplate = ({ id, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
+const MinimalistBannerTemplate = ({ organizerSlug, eventSlug, title, date, location, imageSrc, category, attendees, price, handleImageError }) => {
   return (
-    <Link to={`/events/${id}`} target="_blank" rel="noopener noreferrer">
+    <Link to={`/events/${organizerSlug}/${eventSlug}`} target="_blank" rel="noopener noreferrer">
       <Card className="group overflow-hidden border-border hover:shadow-elegant transition-all duration-300 hover:-translate-y-1 cursor-pointer h-full">
         <div className="relative overflow-hidden aspect-[16/9]">
           <img
@@ -180,6 +180,8 @@ const MinimalistBannerTemplate = ({ id, title, date, location, imageSrc, categor
 
 const EventCard = ({
   id,
+  organizerSlug,
+  eventSlug,
   title,
   date,
   location,
@@ -197,7 +199,8 @@ const EventCard = ({
   };
 
   const props = {
-    id,
+    organizerSlug,
+    eventSlug,
     title,
     date,
     location,

@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useNavigate, useParams } from "react-router-dom";
 
 const EventHero = ({ title, date, location, image, onLocationClick }) => {
-  const { id } = useParams();
+  const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
   const [scrollY, setScrollY] = useState(0);
 
@@ -97,7 +97,7 @@ const EventHero = ({ title, date, location, image, onLocationClick }) => {
               variant="secondary"
               size="lg"
               className="backdrop-blur-sm bg-white/20 hover:bg-white/30 text-white border-white/30 hover-scale"
-              onClick={() => navigate(`/events/${id}/overview`)}
+              onClick={() => navigate(`/events/${organizerSlug}/${eventSlug}/overview`)}
             >
               <BookOpen className="w-4 h-4 mr-2" />
               Overview

@@ -64,9 +64,9 @@ const App = () => {
               <Route path="/my-bookings" element={<Navigate to="/dashboard/bookings" replace />} />
               {/* <Route path="/events" element={<Events />} /> */}
               <Route path="/browse-events" element={<BrowseEvents showPublicHeader />} />
-              <Route path="/events/:id" element={<EventDetail />} />
-              <Route path="/events/:id/checkout" element={<PaymentCheckout />} />
-              <Route path="/events/:id/overview" element={<EventOverviewPage />} />
+              <Route path="/events/:organizerSlug/:eventSlug" element={<EventDetail />} />
+              <Route path="/events/:organizerSlug/:eventSlug/checkout" element={<PaymentCheckout />} />
+              <Route path="/events/:organizerSlug/:eventSlug/overview" element={<EventOverviewPage />} />
               <Route path="/booking-success" element={
                 <ProtectedRoute>
                   <BookingSuccess />

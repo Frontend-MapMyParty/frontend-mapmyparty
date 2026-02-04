@@ -460,10 +460,17 @@ const OrganizerDashboard = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem asChild>
-                                      <Link to={`/events/${event.id || event.eventId}`} target="_blank" rel="noopener noreferrer" className="w-full flex items-center">
+                                      {event.organizer?.slug && event.slug ? (
+                                        <Link to={`/events/${event.organizer.slug}/${event.slug}`} target="_blank" rel="noopener noreferrer" className="w-full flex items-center">
                                         <Eye className="w-4 h-4 mr-2" />
                                         View Details
                                       </Link>
+                                      ) : (
+                                        <span className="w-full flex items-center text-gray-400">
+                                          <Eye className="w-4 h-4 mr-2" />
+                                          View Details
+                                        </span>
+                                      )}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() =>

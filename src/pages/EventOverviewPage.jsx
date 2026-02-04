@@ -10,7 +10,7 @@ import expect2 from "@/assets/expect2.jpg";
 import expect3 from "@/assets/expect3.jpg";
 
 const EventOverviewPage = () => {
-  const { id } = useParams();
+  const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,8 @@ const EventOverviewPage = () => {
   useEffect(() => {
     // Use local dummy data for overview; no API calls required
     const dummyEvent = {
-      id,
+      organizerSlug,
+      eventSlug,
       title: "Step Into the Pulse; Where Music, Light & Energy Collide",
       description:
         "Lose yourself in a night of electrifying rhythms, neon vibes, and pure energy. Experience top DJs, immersive visuals, and a crowd that moves as one. The pulse is calling; are you ready?",
@@ -28,7 +29,7 @@ const EventOverviewPage = () => {
 
     setEvent(dummyEvent);
     setLoading(false);
-  }, [id]);
+  }, [organizerSlug, eventSlug]);
 
   const handleShare = () => {
     if (navigator.share) {

@@ -31,7 +31,7 @@ const paymentMethods = [
 ];
 
 const PaymentCheckout = () => {
-  const { id } = useParams();
+  const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation();
   const summary = state?.eventSummary;
@@ -42,9 +42,9 @@ const PaymentCheckout = () => {
 
   useEffect(() => {
     if (!summary || !tickets.length || !bookingData) {
-      navigate(`/events/${id}`);
+      navigate(`/events/${organizerSlug}/${eventSlug}`);
     }
-  }, [summary, tickets.length, bookingData, id, navigate]);
+  }, [summary, tickets.length, bookingData, organizerSlug, eventSlug, navigate]);
 
   const handlePayment = async () => {
     if (!bookingData?.bookingId) {

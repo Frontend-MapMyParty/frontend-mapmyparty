@@ -130,9 +130,11 @@ const ClassicGridTemplate = ({
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {sortedEvents.map((event) => (
-                      <EventCard 
-                        key={event.id || event.eventId} 
+                      <EventCard
+                        key={event.id || event.eventId}
                         id={event.id || event.eventId}
+                        organizerSlug={event.organizer?.slug}
+                        eventSlug={event.slug}
                         title={getEventTitle(event)}
                         date={formatDate(event.startDate || event.date)}
                         location={getEventLocation(event)}
