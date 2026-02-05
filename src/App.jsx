@@ -39,6 +39,7 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Policies from "./pages/Policies";
 import Footer from "./components/Footer";
+import EventAttendees from "./pages/EventAttendees";
 
 const queryClient = new QueryClient();
 
@@ -156,7 +157,12 @@ const App = () => {
                 <CreateEvent />
               </ProtectedRoute>
             } />
-            
+            <Route path="/organizer/events/:eventId/attendees" element={
+              <ProtectedRoute requiredRole="organizer">
+                <EventAttendees />
+              </ProtectedRoute>
+            } />
+
             {/* Protected Promoter Routes */}
             <Route path="/promoter" element={
               <ProtectedRoute requiredRole="promoter">

@@ -418,6 +418,13 @@ const MyEvents = () => {
                         Edit
                       </button>
                       <button
+                        className="px-3 py-2 bg-amber-500/15 text-amber-200 rounded-lg hover:bg-amber-500/25 border border-amber-500/20 transition-colors text-sm font-semibold"
+                        onClick={() => navigate(`/organizer/events/${event.id}/attendees`)}
+                        title="View Attendees"
+                      >
+                        <Users className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => setConfirmDelete(event)}
                         className="px-3 py-2 bg-red-500/15 text-red-200 rounded-lg hover:bg-red-500/25 border border-red-500/20 transition-colors text-sm font-semibold"
                       >
