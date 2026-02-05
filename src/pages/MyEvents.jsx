@@ -73,6 +73,7 @@ const MyEvents = () => {
         venues: event.venues || [],
         stats: event.stats || {},
         _count: event._count || {},
+        organizer: event.organizer || event.event_organizer || {},
         // Formatted display values
         formattedDate: startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'TBD',
         formattedTime: startDate ? startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
@@ -389,7 +390,18 @@ const MyEvents = () => {
                     <div className="flex gap-2 pt-4 border-t border-white/10">
                       <button
                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white text-gray-900 rounded-lg hover:bg-white/90 transition-colors text-sm font-semibold"
-                        onClick={() => event.organizer?.slug && event.slug && navigate(`/events/${event.organizer.slug}/${event.slug}`)}
+                        onClick={() => {
+                          if (event.organizer?.slug && event.slug) {
+                            navigate(`/events/${event.organizer.slug}/${event.slug}`);
+                          } else {
+                            console.error("Missing slug data:", {
+                              organizerSlug: event.organizer?.slug,
+                              eventSlug: event.slug,
+                              eventId: event.id
+                            });
+                            toast.error("Unable to view event. Event URL data is missing.");
+                          }
+                        }}
                       >
                         <Eye className="w-4 h-4" />
                         View
