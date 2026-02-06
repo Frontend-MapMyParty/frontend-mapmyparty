@@ -77,19 +77,32 @@ const FoodBeverages = () => {
   };
 
   const fetchAddOns = async (eventId) => {
-    if (!eventId) return;
+    if (!eventId) {
+      console.log("fetchAddOns: No eventId provided");
+      return;
+    }
+    console.log(`[fetchAddOns] Starting fetch for eventId: ${eventId}`);
     setLoadingAddOns(true);
     setError("");
     try {
+      console.log(`[fetchAddOns] Calling API: event/${eventId}/add-ons`);
       const response = await apiFetch(`event/${eventId}/add-ons`);
+      console.log("[fetchAddOns] Raw response:", response);
       const data = response.data || response;
+      console.log("[fetchAddOns] Extracted data:", data);
       const items = data.items || [];
+      console.log(`[fetchAddOns] Items array (${items.length} items):`, items);
       setAddOns(items);
+      console.log("[fetchAddOns] Successfully set add-ons");
     } catch (err) {
-      console.error("Failed to load add-ons:", err);
+      console.error("[fetchAddOns] ERROR:", err);
+      console.error("[fetchAddOns] Error message:", err.message);
+      console.error("[fetchAddOns] Error stack:", err.stack);
+      console.error("[fetchAddOns] Full error object:", JSON.stringify(err, null, 2));
       setError(err.message || "Failed to load add-ons");
     } finally {
       setLoadingAddOns(false);
+      console.log("[fetchAddOns] Completed (loading set to false)");
     }
   };
 
@@ -361,11 +374,17 @@ const FoodBeverages = () => {
                                 <span>Sold progress</span>
                                 <span>{Math.round(soldProgress)}%</span>
                               </div>
-                              <div className="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-emerald-400/60 transition-all"
-                                  style={{ width: `${soldProgress}%` }}
-                                />
+                              <div className="mt-2 h-2 w-full rounded-full bg-white/10 overflow-hidden relative">
+                                {totalQty === 0 ? (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-[10px] text-white/40">No stock set</span>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="h-full rounded-full bg-emerald-400/60 transition-all"
+                                    style={{ width: `${soldProgress}%` }}
+                                  />
+                                )}
                               </div>
                             </div>
 
@@ -485,7 +504,8 @@ const FoodBeverages = () => {
                     />
                     <button
                       type="submit"
-                      className="w-full px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 transition text-sm flex items-center justify-center gap-2"
+                      disabled={!form.name.trim()}
+                      className="w-full px-4 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/25 transition text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/20"
                     >
                       <Plus className="w-4 h-4" /> Add item
                     </button>
