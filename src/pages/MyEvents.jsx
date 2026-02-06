@@ -70,6 +70,7 @@ const MyEvents = () => {
         startDate: startDate,
         endDate: endDate,
         createdAt: createdOn,
+        organizer: event.organizer || event.eventOrganizer || null,
         venues: event.venues || [],
         stats: event.stats || {},
         _count: event._count || {},

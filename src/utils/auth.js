@@ -125,14 +125,17 @@ async function fetchSessionInternal() {
 
   // Step 4: Parse successful response
   const data = await res.json().catch(() => ({}));
-  const user = data?.user || data?.data?.user || data?.data || null;
-  const role = (data?.role || data?.data?.role || user?.role || "USER").toString().toUpperCase();
+  const payload = data?.data || data || {};
+  const user = payload?.user || data?.user || null;
+  const role = (payload?.role || data?.role || user?.role || "USER").toString().toUpperCase();
   const userWithRole = user ? { ...user, role } : null;
+  const organizer = payload?.organizer || data?.organizer || null;
 
   const normalized = {
     isAuthenticated: true,
     user: userWithRole,
     role,
+    organizer,
   };
 
   // Step 5: Update sessionStorage for UI hints (cookies are source of truth)

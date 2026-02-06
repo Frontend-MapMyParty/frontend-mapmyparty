@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { clearSessionData, resetSessionCache } from "@/utils/auth";
+import { clearSessionData, resetSessionCache, fetchSession } from "@/utils/auth";
 import { buildUrl, apiFetch } from "@/config/api";
 import {
   Calendar,
@@ -46,7 +46,7 @@ import FoodBeverages from "./FoodBeverages";
 import Logo from "@/assets/MMP logo.svg";
 
 // Profile Content Component
-const OrganizerProfileContent = ({ user }) => {
+const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) => {
   const buildInitialData = (payload = {}, owner = {}) => ({
     id: payload.id || "",
     name: payload.name || "",
@@ -91,6 +91,18 @@ const OrganizerProfileContent = ({ user }) => {
     },
   });
 
+  // "create" when no profile exists, "view" when profile is loaded
+  const [profileMode, setProfileMode] = useState(() =>
+    organizerProfile === null ? "create" : "view"
+  );
+  const [createData, setCreateData] = useState({
+    name: "", email: "", contact: "", state: "", address: "",
+    description: "", gstNumber: "",
+    instagram: "", linkedin: "", facebook: "", x: "", reddit: "", snapchat: "",
+  });
+  const [createError, setCreateError] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
   const [profileData, setProfileData] = useState(() => buildInitialData(user?.organizer || {}, user));
   const [editData, setEditData] = useState(() => buildInitialData(user?.organizer || {}, user));
   const [bankDraft, setBankDraft] = useState(() => buildInitialData(user?.organizer || {}, user).bankDetails);
@@ -123,6 +135,15 @@ const OrganizerProfileContent = ({ user }) => {
     setOwnerDraft(user || {});
   }, [user]);
 
+  // Sync profileMode when organizerProfile prop changes
+  useEffect(() => {
+    if (organizerProfile === null) {
+      setProfileMode("create");
+    } else if (organizerProfile && typeof organizerProfile === "object") {
+      setProfileMode("view");
+    }
+  }, [organizerProfile]);
+
   const fetchProfileData = useCallback(async () => {
     setLoadingProfile(true);
     try {
@@ -135,14 +156,25 @@ const OrganizerProfileContent = ({ user }) => {
 
       let organizerPayload = authData.organizer;
       if (!organizerPayload) {
-        const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
-        organizerPayload = orgRes?.data || orgRes || {};
+        try {
+          const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
+          organizerPayload = orgRes?.data || orgRes || {};
+        } catch (orgError) {
+          if (orgError?.status === 404) {
+            // No profile exists — stay in create mode
+            setProfileMode("create");
+            setLoadingProfile(false);
+            return;
+          }
+          throw orgError;
+        }
       }
 
       const normalized = buildInitialData(organizerPayload, ownerData);
       setProfileData(normalized);
       setEditData(normalized);
       setBankDraft(normalized.bankDetails);
+      setProfileMode("view");
     } catch (error) {
       console.error("Failed to load organizer profile:", error);
     } finally {
@@ -212,6 +244,48 @@ const OrganizerProfileContent = ({ user }) => {
   const handleCancel = () => {
     setIsEditing(false);
     setEditData(profileData);
+  };
+
+  const handleCreateInputChange = (field, value) => {
+    setCreateData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateProfile = async () => {
+    if (isCreating) return;
+    if (!createData.name.trim()) {
+      setCreateError("Organization name is required.");
+      return;
+    }
+    setIsCreating(true);
+    setCreateError("");
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(createData).filter(
+          ([, v]) => v !== undefined && v !== null && String(v).trim() !== ""
+        )
+      );
+      const res = await apiFetch("organizer/me/profile", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const data = res?.data || res || {};
+      const normalized = buildInitialData(data, owner);
+      setProfileData(normalized);
+      setEditData(normalized);
+      setBankDraft(normalized.bankDetails);
+      setProfileMode("view");
+      if (onProfileCreated) onProfileCreated(data);
+      resetSessionCache();
+    } catch (error) {
+      if (error?.status === 409) {
+        setCreateError("An organizer profile already exists for this account.");
+      } else {
+        setCreateError(error?.message || "Failed to create profile. Please try again.");
+      }
+      console.error("Failed to create organizer profile:", error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleOpenBankPanel = async () => {
@@ -421,6 +495,146 @@ const OrganizerProfileContent = ({ user }) => {
     stopOwnerCameraStream();
     setOwnerCapturedPhoto(null);
   };
+
+  // Create mode form
+  if (profileMode === "create") {
+    return (
+      <div className="space-y-6 text-white">
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-[0.25em] text-white/50">New Organizer</p>
+          <h2 className="text-3xl font-extrabold">Set Up Your Profile</h2>
+          <p className="text-sm text-white/60">Fill in your organization details to get started.</p>
+        </div>
+
+        {createError && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {createError}
+          </div>
+        )}
+
+        <div className="bg-[#0f1628] rounded-2xl border border-white/10 shadow-lg shadow-black/30 overflow-hidden backdrop-blur">
+          <div className="p-8 space-y-6 bg-[#0b1220]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">Organization Name <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={createData.name}
+                  onChange={(e) => handleCreateInputChange("name", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="Your organization name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">Email Address</label>
+                <input
+                  type="email"
+                  value={createData.email}
+                  onChange={(e) => handleCreateInputChange("email", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="org@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">Contact</label>
+                <input
+                  type="text"
+                  value={createData.contact}
+                  onChange={(e) => handleCreateInputChange("contact", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="+1234567890"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">State</label>
+                <input
+                  type="text"
+                  value={createData.state}
+                  onChange={(e) => handleCreateInputChange("state", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="e.g. Maharashtra"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">Address</label>
+                <input
+                  type="text"
+                  value={createData.address}
+                  onChange={(e) => handleCreateInputChange("address", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="Full address"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-white/80">GST Number</label>
+                <input
+                  type="text"
+                  value={createData.gstNumber}
+                  onChange={(e) => handleCreateInputChange("gstNumber", e.target.value)}
+                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                  placeholder="22AAAAA0000A1Z5"
+                />
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <label className="block text-sm font-medium text-white/80">Description</label>
+                <textarea
+                  value={createData.description}
+                  onChange={(e) => handleCreateInputChange("description", e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none min-h-[120px]"
+                  maxLength={2000}
+                  placeholder="Tell attendees about your organization"
+                />
+              </div>
+            </div>
+
+            {/* Social handles */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Social Handles</h3>
+                <span className="text-xs text-white/50">Optional</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { key: "instagram", label: "Instagram URL" },
+                  { key: "linkedin", label: "LinkedIn URL" },
+                  { key: "facebook", label: "Facebook URL" },
+                  { key: "x", label: "X (Twitter) URL" },
+                  { key: "reddit", label: "Reddit handle or URL" },
+                  { key: "snapchat", label: "Snapchat handle" },
+                ].map((social) => (
+                  <div className="space-y-2" key={social.key}>
+                    <label className="block text-sm font-medium text-white/80">{social.label}</label>
+                    <input
+                      type="text"
+                      value={createData[social.key]}
+                      onChange={(e) => handleCreateInputChange(social.key, e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Create button */}
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={handleCreateProfile}
+                disabled={isCreating}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-semibold shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isCreating ? (
+                  <span className="h-4 w-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {isCreating ? "Creating..." : "Create Profile"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-white">
@@ -744,10 +958,15 @@ const OrganizerProfileContent = ({ user }) => {
               <div className="text-white space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-2xl font-semibold">{editData.name}</h2>
-                  {editData.isVerified && (
+                  {editData.isVerified ? (
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-100 text-xs font-semibold border border-emerald-500/30">
                       <BadgeCheck className="w-4 h-4" />
                       Verified
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/15 text-amber-100 text-xs font-semibold border border-amber-500/30">
+                      <Shield className="w-4 h-4" />
+                      Pending Verification
                     </span>
                   )}
                 </div>
@@ -1207,11 +1426,13 @@ const OrganizerDashboardV2 = () => {
 
   // Organizer profile from session - will be populated after ProtectedRoute validates
   const [user, setUser] = useState({ name: "Organizer", email: "" });
+  // false = loading, null = no profile, object = profile exists
+  const [organizerProfile, setOrganizerProfile] = useState(false);
+
   useEffect(() => {
     // Fetch user data from validated session (ProtectedRoute ensures we're authenticated)
     const loadUserData = async () => {
       try {
-        const { fetchSession } = await import("@/utils/auth");
         const session = await fetchSession();
         if (session?.user) {
           setUser({
@@ -1226,8 +1447,11 @@ const OrganizerDashboardV2 = () => {
           const email = sessionStorage.getItem("userEmail") || profile.email || "";
           setUser({ name, email });
         }
+        // Extract organizer profile from session
+        setOrganizerProfile(session?.organizer || null);
       } catch (err) {
         console.warn("Failed to load user data:", err);
+        setOrganizerProfile(null);
         // Fallback to sessionStorage
         try {
           const profileRaw = sessionStorage.getItem("userProfile");
@@ -1264,6 +1488,19 @@ const OrganizerDashboardV2 = () => {
     setIsLoggingOut(false);
   };
 
+
+  // Auto-redirect to profile tab when no organizer profile exists
+  useEffect(() => {
+    if (organizerProfile === null) {
+      setActiveTab("profile");
+      navigate("/organizer/profile");
+    }
+  }, [organizerProfile, navigate]);
+
+  // Called from OrganizerProfileContent after successful profile creation
+  const handleProfileCreated = (newProfile) => {
+    setOrganizerProfile(newProfile);
+  };
 
   // Navigation items with their corresponding tab values
   const navItems = [
@@ -1406,7 +1643,46 @@ const OrganizerDashboardV2 = () => {
         <main className="flex-1 overflow-y-auto">
           {/* Tab Content */}
           <div className="p-4 lg:p-5 space-y-5">
-            {activeTab === "dashboard" && (
+            {/* Pending verification banner */}
+            {organizerProfile && !organizerProfile.isVerified && activeTab !== "profile" && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-center gap-3 text-sm text-amber-100">
+                <Shield className="w-5 h-5 flex-shrink-0 text-amber-300" />
+                Your organizer profile is pending admin verification.
+              </div>
+            )}
+
+            {/* Loading state */}
+            {organizerProfile === false && activeTab !== "profile" && (
+              <div className="flex items-center justify-center py-24">
+                <span className="h-8 w-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </div>
+            )}
+
+            {/* Gating: no profile exists and not on profile tab */}
+            {organizerProfile === null && activeTab !== "profile" && (
+              <div className="flex items-center justify-center py-24">
+                <div className="bg-[#0f1628] rounded-2xl border border-white/10 shadow-lg shadow-black/30 p-10 text-center max-w-md">
+                  <div className="w-16 h-16 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto mb-5">
+                    <User className="w-8 h-8 text-rose-200" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Create Your Organizer Profile</h3>
+                  <p className="text-sm text-white/60 mb-6">Set up your organizer profile to access dashboard features, create events, and manage your audience.</p>
+                  <button
+                    onClick={() => {
+                      setActiveTab("profile");
+                      navigate("/organizer/profile");
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-semibold shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Go to Profile Setup
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Normal tab content - shown when profile exists or still loading */}
+            {organizerProfile !== null && activeTab === "dashboard" && (
               <OrganizerDash
                 user={user}
                 handleLogout={handleLogout}
@@ -1415,14 +1691,20 @@ const OrganizerDashboardV2 = () => {
               />
             )}
 
-            {activeTab === "myevents" && <MyEvents />}
-            {activeTab === "analytics" && <AudienceAnalytics />}
-            {activeTab === "live" && !liveEventId && <LiveEvents />}
-            {activeTab === "live" && liveEventId && <LiveEventPage embedded />}
-            {activeTab === "reception" && <Reception />}
-            {activeTab === "food-beverages" && <FoodBeverages />}
-            {activeTab === "financial" && <FinancialReporting />}
-            {activeTab === "profile" && <OrganizerProfileContent user={user} />}
+            {organizerProfile !== null && activeTab === "myevents" && <MyEvents />}
+            {organizerProfile !== null && activeTab === "analytics" && <AudienceAnalytics />}
+            {organizerProfile !== null && activeTab === "live" && !liveEventId && <LiveEvents />}
+            {organizerProfile !== null && activeTab === "live" && liveEventId && <LiveEventPage embedded />}
+            {organizerProfile !== null && activeTab === "reception" && <Reception />}
+            {organizerProfile !== null && activeTab === "food-beverages" && <FoodBeverages />}
+            {organizerProfile !== null && activeTab === "financial" && <FinancialReporting />}
+            {activeTab === "profile" && (
+              <OrganizerProfileContent
+                user={user}
+                organizerProfile={organizerProfile}
+                onProfileCreated={handleProfileCreated}
+              />
+            )}
           </div>
         </main>
       </div>
