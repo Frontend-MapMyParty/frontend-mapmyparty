@@ -1,38 +1,41 @@
- import { useOutletContext } from "react-router-dom";
+ import { Link, useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Mail, Phone, Building2, Users, Wallet2, Ticket } from "lucide-react";
+import { Building2, CalendarClock, ChevronRight, MapPin, Wallet2 } from "lucide-react";
 
 const PromoterOrganizers = () => {
   const { data, currency, statusBadge } = useOutletContext();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">Organizers</h2>
-          <p className="text-white/70">Ownership, bank details, events, bookings, payouts.</p>
+          <p className="text-muted-foreground">Ownership snapshot, recent performance, and status.</p>
         </div>
-        <Badge variant="outline" className="text-sm py-1 px-3 border-white/20">
+        <Badge variant="outline" className="text-sm py-1 px-3 border-border/70">
           {data.organizers.length} Active
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {data.organizers.map((org) => (
-          <Card key={org.name} className="bg-white/5 border-white/10">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-11 w-11">
+          <Card key={org.id} className="bg-card/70 border-border/60">
+            <CardHeader className="pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-12 w-12">
                     <AvatarFallback>{org.name.slice(0, 2)}</AvatarFallback>
                   </Avatar>
                   <div>
                     <CardTitle className="text-lg">{org.name}</CardTitle>
-                    <CardDescription className="text-white/70 flex items-center gap-2">
+                    <CardDescription className="flex items-center gap-2 text-muted-foreground">
                       <Building2 className="w-4 h-4" />
                       {org.state}
+                      <span className="text-muted-foreground/70">•</span>
+                      <MapPin className="w-4 h-4" />
+                      {org.city || org.address?.split(",")[0] || "Head Office"}
                     </CardDescription>
                   </div>
                 </div>
@@ -40,72 +43,39 @@ const PromoterOrganizers = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <p className="text-white/60 text-xs">Owner</p>
-                  <p className="font-semibold">{org.owner.name}</p>
-                  <p className="text-white/60 flex items-center gap-2 text-xs mt-1"><Mail className="w-3 h-3" />{org.owner.email}</p>
-                  <p className="text-white/60 flex items-center gap-2 text-xs"><Phone className="w-3 h-3" />{org.owner.phone}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1 text-sm">
-                  <p className="text-white/60 text-xs">Bank</p>
-                  <p className="font-semibold">{org.bank.bankName}</p>
-                  <p className="text-white/70 text-xs">A/C •••• {org.bank.accountNumber}</p>
-                  <p className="text-white/70 text-xs">IFSC {org.bank.ifsc}</p>
-                  <p className="text-white/70 text-xs">GST {org.bank.gstNumber}</p>
-                </div>
-              </div>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground line-clamp-2">{org.description}</p>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex items-center gap-2 text-white/60 text-xs">
-                    <Users className="w-4 h-4" /> Events
-                  </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4" /> Events
+                  </p>
                   <p className="text-lg font-semibold">{org.events.length}</p>
                 </div>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex items-center gap-2 text-white/60 text-xs">
-                    <Ticket className="w-4 h-4" /> Bookings
-                  </div>
+                <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                  <p className="text-xs text-muted-foreground">Bookings</p>
                   <p className="text-lg font-semibold">{org.bookings.toLocaleString()}</p>
                 </div>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex items-center gap-2 text-white/60 text-xs">
+                <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                  <p className="text-xs text-muted-foreground flex items-center gap-2">
                     <Wallet2 className="w-4 h-4" /> Gross
-                  </div>
-                  <p className="text-lg font-semibold">{currency(org.gross)}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                  <div className="flex items-center gap-2 text-white/60 text-xs">
-                    <Wallet2 className="w-4 h-4" /> Platform fee
-                  </div>
-                  <p className="text-lg font-semibold text-emerald-400">{currency(org.platformFee)}</p>
+                  </p>
+                  <p className="text-lg font-semibold text-accent">{currency(org.gross)}</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-white/60">Payout due</span>
-                <Badge variant="outline" className="border-white/20">{currency(org.payoutDue)}</Badge>
-              </div>
-              <div className="flex items-center justify-between text-xs text-white/60">
-                <span>Last payout</span>
-                <span>{org.lastPayout}</span>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs text-white/60 uppercase tracking-wide">Events</p>
-                <div className="space-y-2">
-                  {org.events.map((ev) => (
-                    <div key={ev.title} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/5 px-3 py-2 text-sm">
-                      <div>
-                        <p className="font-semibold">{ev.title}</p>
-                        <p className="text-white/60 text-xs">Tickets {ev.tickets.toLocaleString()} • Gross {currency(ev.gross)}</p>
-                      </div>
-                      <Badge variant={statusBadge(ev.status)}>{ev.status}</Badge>
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-muted-foreground">Owner</p>
+                  <p className="font-medium">{org.owner.name}</p>
                 </div>
+                <Link
+                  to={`/promoter/organizers/${org.slug}`}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:text-accent/80 transition"
+                >
+                  View more <ChevronRight className="w-4 h-4" />
+                </Link>
               </div>
             </CardContent>
           </Card>

@@ -12,6 +12,15 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   useEffect(() => {
     let mounted = true;
+    const guestRole = sessionStorage.getItem("role");
+    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
+
+    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
+      setState({ loading: false, isAuthenticated: false, user: null });
+      return () => {
+        mounted = false;
+      };
+    }
 
     const validateSession = async () => {
       try {
@@ -52,6 +61,13 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   if (!state.isAuthenticated) {
+    const guestRole = sessionStorage.getItem("role");
+    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
+
+    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
+      return children;
+    }
+
     return (
       <Navigate
         to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}

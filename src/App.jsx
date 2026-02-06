@@ -20,10 +20,13 @@ import PromoterDashboard from "./pages/PromoterDashboard";
 import PromoterEventDetail from "./pages/PromoterEventDetail";
 import PromoterOverview from "./components/promoter/PromoterOverview";
 import PromoterOrganizers from "./components/promoter/PromoterOrganizers";
+import PromoterOrganizerDetail from "./components/promoter/PromoterOrganizerDetail";
 import PromoterEvents from "./components/promoter/PromoterEvents";
 import PromoterAnalytics from "./components/promoter/PromoterAnalytics";
 import PromoterLiveEvents from "./components/promoter/PromoterLiveEvents";
+import PromoterLiveEventDetail from "./components/promoter/PromoterLiveEventDetail";
 import PromoterUsers from "./components/promoter/PromoterUsers";
+import PromoterUserDetail from "./components/promoter/PromoterUserDetail";
 import PromoterBookings from "./components/promoter/PromoterBookings";
 import PromoterPayouts from "./components/promoter/PromoterPayouts";
 import CreateEvent from "./pages/CreateEvent.jsx";
@@ -166,11 +169,15 @@ const App = () => {
               <Route index element={<Navigate to="/promoter/overview" replace />} />
               <Route path="overview" element={<PromoterOverview />} />
               <Route path="organizers" element={<PromoterOrganizers />} />
+              <Route path="organizers/:slug" element={<PromoterOrganizerDetail />} />
               <Route path="events" element={<PromoterEvents />} />
+              <Route path="events/:id" element={<PromoterEventDetail />} />
               <Route path="users" element={<PromoterUsers />} />
+              <Route path="users/:id" element={<PromoterUserDetail />} />
               <Route path="bookings" element={<PromoterBookings />} />
               <Route path="payouts" element={<PromoterPayouts />} />
               <Route path="live" element={<PromoterLiveEvents />} />
+              <Route path="live/:id" element={<PromoterLiveEventDetail />} />
               <Route path="analytics" element={<PromoterAnalytics />} />
             </Route>
             <Route path="/promoter/dashboard" element={
