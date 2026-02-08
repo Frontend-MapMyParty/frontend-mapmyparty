@@ -23,6 +23,8 @@ import {
   User,
   LogOut,
   ChevronDown,
+  FileText,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -32,8 +34,10 @@ const navItems = [
   { label: "Users", to: "/promoter/users", icon: Users },
   { label: "Bookings", to: "/promoter/bookings", icon: Ticket },
   { label: "Payouts", to: "/promoter/payouts", icon: Wallet2 },
-  { label: "Live", to: "/promoter/live", icon: Activity },
+  // { label: "Live", to: "/promoter/live", icon: Activity },
   { label: "Analytics", to: "/promoter/analytics", icon: BarChart3 },
+  { label: "Reports", to: "/promoter/reports", icon: FileText },
+  { label: "Billing", to: "/promoter/billing", icon: CreditCard },
 ];
 
 const PromoterDashboard = () => {
