@@ -130,12 +130,14 @@ async function fetchSessionInternal() {
   const role = (payload?.role || data?.role || user?.role || "USER").toString().toUpperCase();
   const userWithRole = user ? { ...user, role } : null;
   const organizer = payload?.organizer || data?.organizer || null;
+  const organizerWarning = payload?.organizerWarning || data?.organizerWarning || null;
 
   const normalized = {
     isAuthenticated: true,
     user: userWithRole,
     role,
     organizer,
+    organizerWarning,
   };
 
   // Step 5: Update sessionStorage for UI hints (cookies are source of truth)

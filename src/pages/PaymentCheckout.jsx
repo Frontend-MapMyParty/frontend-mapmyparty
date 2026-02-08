@@ -65,11 +65,8 @@ const PaymentCheckout = () => {
       });
 
       if (response?.success) {
-        toast.success("Payment successful! Redirecting...");
-        // Redirect to success page with booking ID
-        setTimeout(() => {
-          navigate(`/booking-success?bookingId=${bookingData.bookingId}`);
-        }, 1000);
+        toast.success("Payment successful!");
+        navigate(`/booking-success?bookingId=${bookingData.bookingId}`);
       } else {
         toast.error(response?.errorMessage || "Payment failed");
         setIsProcessing(false);
@@ -222,7 +219,7 @@ const PaymentCheckout = () => {
                 <div className="flex justify-between"><span>Platform fee</span><span className="text-white">{formatCurrency(totalsSafe.platformFee || 0)}</span></div>
                 <div className="flex justify-between">
                   <span>
-                    GST {totalsSafe.gstType ? `(${totalsSafe.gstType})` : ""}
+                    GST {totalsSafe.gstType ? `(${totalsSafe.gstType.replace(/_/g, " + ")})` : ""}
                   </span>
                   <span className="text-white">{formatCurrency(totalsSafe.gst || 0)}</span>
                 </div>
@@ -248,7 +245,7 @@ const PaymentCheckout = () => {
 
               <Button
                 onClick={handlePayment}
-                disabled={isProcessing}
+                disabled={isProcessing || !selectedMethod}
                 className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold py-5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? (
@@ -256,6 +253,8 @@ const PaymentCheckout = () => {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Processing Payment...
                   </>
+                ) : !selectedMethod ? (
+                  "Select a payment method"
                 ) : (
                   "Pay & Confirm"
                 )}

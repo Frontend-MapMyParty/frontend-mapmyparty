@@ -12,6 +12,7 @@ const OrganizerProfile = () => {
     email: "",
     phone: "+91 9876543210",
     location: "Mumbai, India",
+    state: "Maharashtra",
     joinDate: "January 2024",
     bio: "Professional event organizer with 5+ years of experience",
     paymentDetails: {
@@ -171,6 +172,15 @@ const OrganizerProfile = () => {
                       </div>
                     </div>
                     <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">State</p>
+                        <p className="text-base font-medium text-gray-900 mt-1">{user.state}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
                         <Calendar className="w-5 h-5 text-green-600" />
                       </div>
@@ -317,6 +327,16 @@ const OrganizerProfile = () => {
                     type="text"
                     value={editData.location}
                     onChange={(e) => handleInputChange("location", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={editData.state}
+                    onChange={(e) => handleInputChange("state", e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
                   />
                 </div>

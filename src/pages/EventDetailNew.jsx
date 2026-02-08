@@ -715,9 +715,9 @@ const EventDetailNew = () => {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      const booking = res?.data || res;
-      if (!booking?.success) {
-        throw new Error(booking?.message || "Booking failed");
+
+      if (!res?.success) {
+        throw new Error(res?.errorMessage || res?.message || "Booking failed");
       }
 
       // Close billing modal
@@ -736,9 +736,10 @@ const EventDetailNew = () => {
             banner: event.flyerImage || event.coverImage || FALLBACK_IMAGE,
           },
           tickets: selectedTickets,
-          bookingData: booking.data,
+          bookingData: res.data,
         },
       });
+      setBookingLoading(false);
     } catch (err) {
       toast.error(err?.message || "Unable to create booking. Please try again.");
       setBookingLoading(false);
@@ -769,7 +770,7 @@ const EventDetailNew = () => {
       setIsSessionAuthed(true);
       setSessionUser(session.user);
       setAuthModalOpen(false);
-      await bookTickets();
+      setBillingModalOpen(true);
     } catch (err) {
       toast.error(err?.message || "Login failed");
     } finally {
@@ -806,7 +807,7 @@ const EventDetailNew = () => {
       setIsSessionAuthed(true);
       setSessionUser(session.user);
       setAuthModalOpen(false);
-      await bookTickets();
+      setBillingModalOpen(true);
     } catch (err) {
       toast.error(err?.message || "Signup failed");
     } finally {

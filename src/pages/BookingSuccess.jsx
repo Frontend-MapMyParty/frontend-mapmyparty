@@ -194,7 +194,7 @@ const BookingSuccess = () => {
                 </span>
               </div>
               <div className="flex justify-between text-sm text-white/70">
-                <span>GST ({booking?.gstType || "IGST"})</span>
+                <span>GST ({(booking?.gstType || "IGST").replace(/_/g, " + ")})</span>
                 <span className="text-white">
                   {formatCurrency(booking?.gstTotal || 0)}
                 </span>

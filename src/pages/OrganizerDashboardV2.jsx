@@ -1428,6 +1428,7 @@ const OrganizerDashboardV2 = () => {
   const [user, setUser] = useState({ name: "Organizer", email: "" });
   // false = loading, null = no profile, object = profile exists
   const [organizerProfile, setOrganizerProfile] = useState(false);
+  const [organizerWarning, setOrganizerWarning] = useState(null);
 
   useEffect(() => {
     // Fetch user data from validated session (ProtectedRoute ensures we're authenticated)
@@ -1449,9 +1450,11 @@ const OrganizerDashboardV2 = () => {
         }
         // Extract organizer profile from session
         setOrganizerProfile(session?.organizer || null);
+        setOrganizerWarning(session?.organizerWarning || null);
       } catch (err) {
         console.warn("Failed to load user data:", err);
         setOrganizerProfile(null);
+        setOrganizerWarning(null);
         // Fallback to sessionStorage
         try {
           const profileRaw = sessionStorage.getItem("userProfile");
@@ -1500,6 +1503,12 @@ const OrganizerDashboardV2 = () => {
   // Called from OrganizerProfileContent after successful profile creation
   const handleProfileCreated = (newProfile) => {
     setOrganizerProfile(newProfile);
+    // Profile created but not yet verified
+    if (newProfile && !newProfile.isVerified) {
+      setOrganizerWarning('Your event organizer profile is pending verification');
+    } else {
+      setOrganizerWarning(null);
+    }
   };
 
   // Navigation items with their corresponding tab values
@@ -1643,11 +1652,11 @@ const OrganizerDashboardV2 = () => {
         <main className="flex-1 overflow-y-auto">
           {/* Tab Content */}
           <div className="p-4 lg:p-5 space-y-5">
-            {/* Pending verification banner */}
-            {organizerProfile && !organizerProfile.isVerified && activeTab !== "profile" && (
+            {/* Organizer warning banner */}
+            {organizerWarning && activeTab !== "profile" && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-center gap-3 text-sm text-amber-100">
                 <Shield className="w-5 h-5 flex-shrink-0 text-amber-300" />
-                Your organizer profile is pending admin verification.
+                {organizerWarning}
               </div>
             )}
 
