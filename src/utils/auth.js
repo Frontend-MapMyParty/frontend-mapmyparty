@@ -1,8 +1,14 @@
 import { buildUrl } from "@/config/api";
 
 let sessionPromise = null;
+let cachedSession = null;
+let sessionCacheTime = 0;
 let isRefreshing = false;
 let refreshSubscribers = [];
+
+// Session cache TTL: 5 minutes. Within this window, fetchSession() returns
+// the cached result instantly without hitting /auth/me.
+const SESSION_CACHE_TTL = 5 * 60 * 1000;
 
 /**
  * Subscribe to token refresh completion
@@ -55,28 +61,65 @@ export async function tryRefreshToken() {
  * Fetch the current authenticated session from the backend.
  * Relies on HttpOnly cookies (credentials: include).
  *
- * Flow:
- * 1. Always try /auth/me first (uses cookies automatically)
- * 2. If 401, try token refresh
- * 3. If still fails, clear session and return unauthenticated
+ * Uses a TTL-based cache: within SESSION_CACHE_TTL the cached result is
+ * returned instantly without a network call. Pass forceRefresh=true only
+ * after explicit auth actions (login, signup, OAuth callback).
  */
 export async function fetchSession(forceRefresh = false) {
   // Clear cache if force refresh requested
   if (forceRefresh) {
     sessionPromise = null;
+    cachedSession = null;
+    sessionCacheTime = 0;
+  }
+
+  // Return cached result if still fresh
+  if (cachedSession && (Date.now() - sessionCacheTime) < SESSION_CACHE_TTL) {
+    return cachedSession;
   }
 
   if (!sessionPromise) {
-    sessionPromise = fetchSessionInternal();
+    sessionPromise = fetchSessionInternal().then(result => {
+      cachedSession = result;
+      sessionCacheTime = Date.now();
+      return result;
+    }).catch(error => {
+      // Reset cache on error so next call retries
+      sessionPromise = null;
+      throw error;
+    });
   }
 
-  try {
-    return await sessionPromise;
-  } catch (error) {
-    // Reset cache on error so next call retries
-    sessionPromise = null;
-    throw error;
+  return sessionPromise;
+}
+
+/**
+ * Get the cached session synchronously (no network call).
+ * Returns the in-memory cached session if available, otherwise falls back
+ * to sessionStorage hints. Returns null if nothing is available.
+ *
+ * Use this for instant UI rendering in ProtectedRoute to avoid the
+ * "Checking your session..." loading flash on every navigation.
+ */
+export function getCachedSession() {
+  // Prefer in-memory cache
+  if (cachedSession && (Date.now() - sessionCacheTime) < SESSION_CACHE_TTL) {
+    return cachedSession;
   }
+
+  // Fall back to sessionStorage hints
+  try {
+    const isAuth = sessionStorage.getItem("isAuthenticated") === "true";
+    if (isAuth) {
+      const role = sessionStorage.getItem("role") || "USER";
+      const profileRaw = sessionStorage.getItem("userProfile");
+      const user = profileRaw ? JSON.parse(profileRaw) : null;
+      return { isAuthenticated: true, user: user ? { ...user, role } : null, role };
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
 }
 
 /**
@@ -181,14 +224,19 @@ export function clearSessionData() {
   sessionStorage.removeItem("hasPassword");
   localStorage.removeItem("userProfile");
   sessionPromise = null;
+  cachedSession = null;
+  sessionCacheTime = 0;
 }
 
 /**
- * Clear cached session so the next call refetches from backend.
- * Use this when you want to force a refetch but keep sessionStorage.
+ * Invalidate the session cache so the next fetchSession() call hits the
+ * backend. Use after actions that change server-side session state
+ * (e.g. profile creation, role change) but DON'T need a full data wipe.
  */
 export function resetSessionCache() {
   sessionPromise = null;
+  cachedSession = null;
+  sessionCacheTime = 0;
 }
 
 /**
@@ -199,4 +247,3 @@ export function resetSessionCache() {
 export function isAuthenticated() {
   return sessionStorage.getItem("isAuthenticated") === "true";
 }
-

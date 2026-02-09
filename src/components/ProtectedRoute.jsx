@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { fetchSession } from "@/utils/auth";
+import { fetchSession, getCachedSession } from "@/utils/auth";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const location = useLocation();
+
+  // Use cached session for instant render (no loading flash)
+  const cached = getCachedSession();
   const [state, setState] = useState({
-    loading: true,
-    isAuthenticated: false,
-    user: null,
+    loading: !cached,
+    isAuthenticated: cached?.isAuthenticated || false,
+    user: cached?.user || null,
   });
 
   useEffect(() => {
@@ -15,8 +18,8 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
     const validateSession = async () => {
       try {
-        // Always fetch fresh session from backend
-        const session = await fetchSession(true);
+        // Uses TTL-based cache — no force refresh, no redundant /auth/me calls
+        const session = await fetchSession();
 
         if (!mounted) return;
 
@@ -38,7 +41,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     return () => {
       mounted = false;
     };
-  }, [location.pathname]);
+  }, []); // Only validate once on mount — cache handles freshness
 
   if (state.loading) {
     return (

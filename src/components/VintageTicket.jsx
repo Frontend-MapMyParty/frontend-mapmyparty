@@ -143,10 +143,10 @@ const VintageTicket = ({ ticket, index = 0, onClick, compact = false }) => {
                   </p>
                 </div>
 
-                {/* Ticket number badge */}
+                {/* Ticket quantity badge */}
                 <div className="hidden md:flex flex-col items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-[#772256] to-[#48285D] shadow-lg transform -rotate-6">
-                  <span className="text-[9px] font-bold text-[#C99774] uppercase">No.</span>
-                  <span className="text-lg font-black text-white">{ticket.ticketNumber || 1}</span>
+                  <span className="text-[9px] font-bold text-[#C99774] uppercase">Qty</span>
+                  <span className="text-lg font-black text-white">{ticket.quantity || 1}</span>
                 </div>
               </div>
 
@@ -188,10 +188,10 @@ const VintageTicket = ({ ticket, index = 0, onClick, compact = false }) => {
                 </div>
               </div>
 
-              {/* Ticket number (mobile) */}
+              {/* Ticket quantity (mobile) */}
               <div className="flex md:hidden items-center justify-between mt-4 pt-3 border-t border-dashed border-[#C99774]/40">
-                <span className="text-xs text-[#772256]/60 uppercase tracking-wide">Ticket #</span>
-                <span className="text-xl font-black text-[#772256]">{ticket.ticketNumber || 1}</span>
+                <span className="text-xs text-[#772256]/60 uppercase tracking-wide">Quantity</span>
+                <span className="text-xl font-black text-[#772256]">{ticket.quantity || 1}</span>
               </div>
 
               {/* Organizer */}

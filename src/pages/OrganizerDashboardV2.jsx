@@ -147,14 +147,13 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
   const fetchProfileData = useCallback(async () => {
     setLoadingProfile(true);
     try {
-      // Fetch authenticated user (owner) plus organizer snapshot
-      const authRes = await apiFetch("auth/me", { method: "GET" });
-      const authData = authRes?.data || authRes || {};
-      const ownerData = authData.user || {};
+      // Use cached session instead of redundant /auth/me call
+      const session = await fetchSession();
+      const ownerData = session?.user || {};
       setOwner(ownerData);
       setOwnerDraft(ownerData);
 
-      let organizerPayload = authData.organizer;
+      let organizerPayload = session?.organizer;
       if (!organizerPayload) {
         try {
           const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });

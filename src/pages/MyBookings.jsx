@@ -148,38 +148,35 @@ const MyBookings = () => {
         const bookingTickets = response.data.items.filter(t => t.bookingId === booking.id);
         setSelectedBookingTickets(bookingTickets);
       } else {
-        // Fallback: construct tickets from booking data
+        // Fallback: construct tickets from booking data (one per booking_item)
         const tickets = [];
         const bookingTicketsData = booking.tickets || [];
 
         bookingTicketsData.forEach((ticketGroup, groupIndex) => {
-          for (let i = 0; i < (ticketGroup.quantity || 1); i++) {
-            tickets.push({
-              id: `${booking.id}-${groupIndex}-${i}`,
-              bookingId: booking.id,
-              bookingStatus: booking.status?.toUpperCase(),
-              bookingDate: booking.bookingDate,
-              ticketName: ticketGroup.name || "Ticket",
-              ticketType: ticketGroup.type || "STANDARD_TICKET",
-              ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
-              ticketNumber: i + 1,
-              totalTickets: ticketGroup.quantity || 1,
-              qrCode: null,
-              manualCheckInCode: null,
-              checkedIn: false,
-              eventId: booking.eventId,
-              eventTitle: booking.eventTitle,
-              eventImage: booking.image,
-              eventStartDate: booking.eventDate,
-              eventEndDate: booking.eventEndDate,
-              eventStatus: booking.eventStatus,
-              eventCategory: booking.category,
-              venueName: booking.venue?.name || null,
-              venueCity: booking.venue?.city || null,
-              venueState: booking.venue?.state || null,
-              organizerName: booking.organizer?.name || null,
-            });
-          }
+          tickets.push({
+            id: `${booking.id}-${groupIndex}`,
+            bookingId: booking.id,
+            bookingStatus: booking.status?.toUpperCase(),
+            bookingDate: booking.bookingDate,
+            ticketName: ticketGroup.name || "Ticket",
+            ticketType: ticketGroup.type || "STANDARD_TICKET",
+            ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
+            quantity: ticketGroup.quantity || 1,
+            qrCode: null,
+            manualCheckInCode: null,
+            checkedIn: false,
+            eventId: booking.eventId,
+            eventTitle: booking.eventTitle,
+            eventImage: booking.image,
+            eventStartDate: booking.eventDate,
+            eventEndDate: booking.eventEndDate,
+            eventStatus: booking.eventStatus,
+            eventCategory: booking.category,
+            venueName: booking.venue?.name || null,
+            venueCity: booking.venue?.city || null,
+            venueState: booking.venue?.state || null,
+            organizerName: booking.organizer?.name || null,
+          });
         });
 
         setSelectedBookingTickets(tickets);
@@ -188,30 +185,28 @@ const MyBookings = () => {
       console.error("Failed to fetch tickets", err);
       toast.error("Failed to load tickets");
 
-      // Fallback to basic ticket data
+      // Fallback to basic ticket data (one per booking_item)
       const tickets = [];
       const bookingTicketsData = booking.tickets || [];
 
       bookingTicketsData.forEach((ticketGroup, groupIndex) => {
-        for (let i = 0; i < (ticketGroup.quantity || 1); i++) {
-          tickets.push({
-            id: `${booking.id}-${groupIndex}-${i}`,
-            bookingId: booking.id,
-            bookingStatus: booking.status?.toUpperCase(),
-            ticketName: ticketGroup.name || "Ticket",
-            ticketType: ticketGroup.type || "STANDARD_TICKET",
-            ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
-            ticketNumber: i + 1,
-            eventId: booking.eventId,
-            eventTitle: booking.eventTitle,
-            eventStartDate: booking.eventDate,
-            eventEndDate: booking.eventEndDate,
-            eventCategory: booking.category,
-            venueName: null,
-            venueCity: booking.location?.split(", ")[0] || null,
-            organizerName: null,
-          });
-        }
+        tickets.push({
+          id: `${booking.id}-${groupIndex}`,
+          bookingId: booking.id,
+          bookingStatus: booking.status?.toUpperCase(),
+          ticketName: ticketGroup.name || "Ticket",
+          ticketType: ticketGroup.type || "STANDARD_TICKET",
+          ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
+          quantity: ticketGroup.quantity || 1,
+          eventId: booking.eventId,
+          eventTitle: booking.eventTitle,
+          eventStartDate: booking.eventDate,
+          eventEndDate: booking.eventEndDate,
+          eventCategory: booking.category,
+          venueName: null,
+          venueCity: booking.location?.split(", ")[0] || null,
+          organizerName: null,
+        });
       });
 
       setSelectedBookingTickets(tickets);
@@ -270,7 +265,7 @@ const MyBookings = () => {
       doc.setTextColor(119, 34, 86);
 
       doc.text(`Ticket Type: ${ticket.ticketName}`, 20, 80);
-      doc.text(`Ticket #: ${ticket.ticketNumber}`, 20, 90);
+      doc.text(`Quantity: ${ticket.quantity || 1}`, 20, 90);
       doc.text(`Date: ${ticket.eventStartDate ? new Date(ticket.eventStartDate).toLocaleDateString() : 'TBA'}`, 20, 100);
 
       const venue = [ticket.venueName, ticket.venueCity].filter(Boolean).join(', ') || 'TBA';
@@ -305,7 +300,7 @@ const MyBookings = () => {
       doc.setLineWidth(0.5);
       doc.line(20, 270, pageWidth - 20, 270);
 
-      const fileName = `ticket-${ticket.eventTitle?.replace(/\s+/g, '-') || 'event'}-${ticket.ticketNumber || 1}.pdf`;
+      const fileName = `ticket-${ticket.eventTitle?.replace(/\s+/g, '-') || 'event'}-${ticket.id}.pdf`;
       doc.save(fileName);
       toast.success('Ticket downloaded successfully!');
     } catch (err) {
