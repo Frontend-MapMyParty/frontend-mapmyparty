@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  ChevronLeft, ChevronDown, Calendar, MapPin, Clock, Users, Share2, Heart, 
-  Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram, 
+import {
+  ChevronLeft, ChevronDown, ChevronRight, Calendar, MapPin, Clock, Users, Share2, Heart,
+  Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram,
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
   Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles,
   AlertTriangle, Megaphone
@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from "@/utils/auth";
 import BillingDetailsModal from "@/components/BillingDetailsModal";
+import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
 
 const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
@@ -50,6 +51,8 @@ const EventDetailNew = () => {
   const [aboutExpanded, setAboutExpanded] = useState(false);
   const [aboutCanExpand, setAboutCanExpand] = useState(false);
   const aboutRef = useRef(null);
+  const [organizerNoteExpanded, setOrganizerNoteExpanded] = useState(false);
+  const [organizerNoteCanExpand, setOrganizerNoteCanExpand] = useState(true);
   const normalizedFaqs = useMemo(() => {
     if (Array.isArray(event?.faqs) && event.faqs.length > 0) return event.faqs;
     if (Array.isArray(event?.questions) && event.questions.length > 0) return event.questions;
@@ -143,7 +146,7 @@ const EventDetailNew = () => {
     if (event?.termsHtml) {
       return (
         <div
-          className="prose prose-invert max-w-none text-white/85 prose-p:my-2 prose-li:my-1 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white"
+          className="prose prose-invert max-w-none text-gray-400 prose-p:my-1 prose-li:my-0.5 prose-ol:list-decimal prose-ul:list-disc prose-headings:text-white text-[11px] leading-4"
           dangerouslySetInnerHTML={{ __html: event.termsHtml }}
         />
       );
@@ -156,7 +159,7 @@ const EventDetailNew = () => {
 
     if (termsLines?.length) {
       return (
-        <ul className="space-y-2 pl-5 list-disc text-white/85 text-sm leading-relaxed">
+        <ul className="space-y-1 pl-4 list-disc text-gray-400 text-[11px] leading-4">
           {termsLines.map((line, idx) => (
             <li key={`term-line-${idx}`}>{line}</li>
           ))}
@@ -164,34 +167,34 @@ const EventDetailNew = () => {
       );
     }
 
-    return <p className="text-white/60 text-sm">No terms provided.</p>;
+    return <p className="text-gray-500 text-[11px]">No terms provided.</p>;
   };
 
   const renderFaqTc = () => (
     <div className="space-y-4">
       {normalizedFaqs.length > 0 && (
-        <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_50px_rgba(0,0,0,0.4)] overflow-hidden">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
           <button
-            className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.05] transition"
+            className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-gray-800 transition"
             onClick={() => setFaqOpen((prev) => !prev)}
           >
-            <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
-              <Megaphone className="h-5 w-5 text-sky-300" />
+            <span className="flex items-center gap-2 text-white font-medium text-base">
+              <Megaphone className="h-5 w-5 text-red-600" />
               Frequently Asked Questions
             </span>
             <ChevronDown
-              className={`h-5 w-5 text-white/70 transition-transform ${faqOpen ? "rotate-180" : ""}`}
+              className={`h-5 w-5 text-gray-400 transition-transform ${faqOpen ? "rotate-180" : ""}`}
             />
           </button>
           {faqOpen && (
-            <div className="border-t border-white/10 divide-y divide-white/5">
+            <div className="border-t border-gray-800 divide-y divide-gray-800">
               {normalizedFaqs.map((qa, idx) => (
                 <div key={`faq-${idx}`} className="px-5 py-4">
-                  <p className="text-white font-semibold text-sm md:text-base mb-1">{qa.question}</p>
+                  <p className="text-white font-medium text-sm mb-1">{qa.question}</p>
                   {qa.answer ? (
-                    <p className="text-white/80 text-sm leading-relaxed">{qa.answer}</p>
+                    <p className="text-gray-300 text-sm leading-relaxed">{qa.answer}</p>
                   ) : (
-                    <p className="text-white/50 text-xs">No answer provided.</p>
+                    <p className="text-gray-500 text-xs">No answer provided.</p>
                   )}
                 </div>
               ))}
@@ -200,27 +203,27 @@ const EventDetailNew = () => {
         </div>
       )}
 
-      <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden">
+      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <button
-          className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-white/[0.06] transition"
+          className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 hover:bg-gray-800 transition"
           onClick={() => setTcOpen((prev) => !prev)}
         >
-          <span className="flex items-center gap-2 text-white font-semibold text-base tracking-wide">
-            <ShieldCheck className="h-5 w-5 text-emerald-300" />
+          <span className="flex items-center gap-2 text-white font-medium text-base">
+            <ShieldCheck className="h-5 w-5 text-green-600" />
             Terms & Conditions
           </span>
           <ChevronDown
-            className={`h-5 w-5 text-white/70 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+            className={`h-5 w-5 text-gray-400 transition-transform ${tcOpen ? "rotate-180" : ""}`}
           />
         </button>
         {tcOpen && (
-          <div className="border-t border-white/10 px-5 py-4 bg-white/[0.015]">
+          <div className="border-t border-gray-800 px-5 py-4 bg-gray-800">
             {normalizedTerms.length > 0 ? (
               normalizedTerms.map((t, idx) => (
                 <div key={`term-${idx}`} className="mb-3 last:mb-0">
                   {t.content ? (
                     <div
-                      className="max-w-none text-white/85 text-sm leading-6 space-y-2 prose-headings:text-white"
+                      className="text-gray-300 text-sm leading-6 space-y-2"
                       style={{ lineHeight: 1.6 }}
                       dangerouslySetInnerHTML={{ __html: t.content }}
                     />
@@ -228,7 +231,7 @@ const EventDetailNew = () => {
                     renderTermsContent()
                   )}
                   {t.lastUpdated && (
-                    <p className="text-[11px] text-white/50 mt-2">Last updated: {new Date(t.lastUpdated).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500 mt-2">Last updated: {new Date(t.lastUpdated).toLocaleDateString()}</p>
                   )}
                 </div>
               ))
@@ -246,8 +249,8 @@ const EventDetailNew = () => {
       {showFaqTc ? (
         renderFaqTc()
       ) : (
-        <div className="w-full rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_14px_45px_rgba(0,0,0,0.4)] p-5">
-          <p className="text-sm text-white/60">No FAQs or terms provided for this event.</p>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <p className="text-sm text-gray-500">No FAQs or terms provided for this event.</p>
         </div>
       )}
     </div>
@@ -339,59 +342,58 @@ const EventDetailNew = () => {
     const startDate = data.startDate || data.date || data.start_time || data.start;
     const endDate = data.endDate || data.end_time || data.end;
     const venue = data.venue || (data.venues && data.venues[0]) || {};
-    const cityState = `${data.city || venue.city || ""}${
-      (data.city || venue.city) && (data.state || venue.state) ? ", " : ""
-    }${data.state || venue.state || ""}`.trim();
+    const cityState = `${data.city || venue.city || ""}${(data.city || venue.city) && (data.state || venue.state) ? ", " : ""
+      }${data.state || venue.state || ""}`.trim();
 
     const galleryImages = Array.isArray(data.galleryImages)
       ? data.galleryImages
       : Array.isArray(data.images)
-      ? data.images
+        ? data.images
           .filter((img) =>
             typeof img === "object" ? (img.type || "").toUpperCase() === "EVENT_GALLERY" : true
           )
           .map((img) => (typeof img === "object" ? img.url : img))
-      : data.gallery || [];
+        : data.gallery || [];
 
     const tickets = Array.isArray(data.tickets)
       ? data.tickets.map((t) => ({
-          id: t.id || t._id,
-          name: t.name || t.title || "Ticket",
-          description: t.info || t.description || "",
-          price: Number(t.price) || 0,
-          available: Math.max(
-            0,
-            (Number(t.totalQty) || 0) -
-              (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
-          ),
-          maxPerUser:
-            t.maxPerUser !== undefined && t.maxPerUser !== null
-              ? Number(t.maxPerUser)
-              : null,
-        }))
+        id: t.id || t._id,
+        name: t.name || t.title || "Ticket",
+        description: t.info || t.description || "",
+        price: Number(t.price) || 0,
+        available: Math.max(
+          0,
+          (Number(t.totalQty) || 0) -
+          (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
+        ),
+        maxPerUser:
+          t.maxPerUser !== undefined && t.maxPerUser !== null
+            ? Number(t.maxPerUser)
+            : null,
+      }))
       : [];
 
     const sponsors = Array.isArray(data.sponsors)
       ? data.sponsors.map((s) => {
-          const nested = s.sponsor || {};
-          return {
-            id: s.id || s._id || s.sponsorId || nested.id || nested._id || nested.name || nested.logoUrl || s.name || s.logoUrl || s.logo || s.image,
-            name: s.name || nested.name || s.brandName || "Sponsor",
-            logo:
-              s.logoUrl ||
-              nested.logoUrl ||
-              s.logo ||
-              nested.logo ||
-              s.image ||
-              nested.image ||
-              s.flyerImage ||
-              s.flyerImageUrl ||
-              SPONSOR_PLACEHOLDER,
-            website: s.websiteUrl || nested.websiteUrl || s.website || nested.website || s.url || nested.url || s.link || "",
-            isPrimary: !!(s.isPrimary ?? s.primary ?? nested.isPrimary),
-            description: s.description || nested.description || s.about || nested.about || "",
-          };
-        })
+        const nested = s.sponsor || {};
+        return {
+          id: s.id || s._id || s.sponsorId || nested.id || nested._id || nested.name || nested.logoUrl || s.name || s.logoUrl || s.logo || s.image,
+          name: s.name || nested.name || s.brandName || "Sponsor",
+          logo:
+            s.logoUrl ||
+            nested.logoUrl ||
+            s.logo ||
+            nested.logo ||
+            s.image ||
+            nested.image ||
+            s.flyerImage ||
+            s.flyerImageUrl ||
+            SPONSOR_PLACEHOLDER,
+          website: s.websiteUrl || nested.websiteUrl || s.website || nested.website || s.url || nested.url || s.link || "",
+          isPrimary: !!(s.isPrimary ?? s.primary ?? nested.isPrimary),
+          description: s.description || nested.description || s.about || nested.about || "",
+        };
+      })
       : [];
 
     const reviewsCount = Array.isArray(data.reviews)
@@ -447,29 +449,29 @@ const EventDetailNew = () => {
       tickets,
       organizer: data.organizer
         ? {
-            name: data.organizer.name || "Organizer",
-            email: data.organizer.email || "",
-            phone: data.organizer.phone || "",
-            website: data.organizer.website || "",
-            logo:
-              data.organizer.logo ||
-              "https://via.placeholder.com/200x200?text=Organizer",
-            verified: !!data.organizer.isVerified,
-            bio: data.organizer.description || "",
-            eventsOrganized: data.organizer.eventsOrganized || 0,
-            followers: data.organizer.followers || 0,
-          }
+          name: data.organizer.name || "Organizer",
+          email: data.organizer.email || "",
+          phone: data.organizer.phone || "",
+          website: data.organizer.website || "",
+          logo:
+            data.organizer.logo ||
+            "https://via.placeholder.com/200x200?text=Organizer",
+          verified: !!data.organizer.isVerified,
+          bio: data.organizer.description || "",
+          eventsOrganized: data.organizer.eventsOrganized || 0,
+          followers: data.organizer.followers || 0,
+        }
         : {
-            name: data.organizerName || "Organizer",
-            email: data.organizerEmail || "",
-            phone: data.organizerPhone || "",
-            website: data.organizerWebsite || "",
-            logo: "https://via.placeholder.com/200x200?text=Organizer",
-            verified: false,
-            bio: "",
-            eventsOrganized: 0,
-            followers: 0,
-          },
+          name: data.organizerName || "Organizer",
+          email: data.organizerEmail || "",
+          phone: data.organizerPhone || "",
+          website: data.organizerWebsite || "",
+          logo: "https://via.placeholder.com/200x200?text=Organizer",
+          verified: false,
+          bio: "",
+          eventsOrganized: 0,
+          followers: 0,
+        },
       tags: data.tags || [],
       ageRestriction: data.TC?.ageRestriction || data.ageRestriction || data.age_limit || "Not specified",
       dresscode: data.dresscode || "Not specified",
@@ -483,13 +485,13 @@ const EventDetailNew = () => {
       termsUpdated: data.TC?.lastUpdated || data.termsUpdated || "",
       reviewsList: Array.isArray(data.reviews)
         ? data.reviews.map((r) => ({
-            user: r.user?.name || "Guest",
-            rating: r.rating || 0,
-            comment: r.comment || "",
-            userName: r.user?.name || "Guest",
-            avatar: r.user?.avatar,
-            createdAt: r.createdAt,
-          }))
+          user: r.user?.name || "Guest",
+          rating: r.rating || 0,
+          comment: r.comment || "",
+          userName: r.user?.name || "Guest",
+          avatar: r.user?.avatar,
+          createdAt: r.createdAt,
+        }))
         : [],
       stats: data.stats || data._count || {},
       artists: data.artists || [],
@@ -858,312 +860,644 @@ const EventDetailNew = () => {
   }
 
   return (
-    <div
-      className="min-h-screen text-white relative overflow-hidden"
-      style={{
-        background:
-          "radial-gradient(circle at 18% 18%, rgba(37,99,235,0.12), transparent 26%), radial-gradient(circle at 80% 14%, rgba(225,29,72,0.12), transparent 30%), linear-gradient(145deg, #05060d 0%, #0a0f1f 38%, #0b1224 100%)",
-      }}
-    >
+    <div className="min-h-screen text-white bg-gray-950">
       <style>{pageCss}</style>
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-20 top-16 h-56 w-56 rounded-full bg-[#2563eb]/10 blur-3xl" />
-        <div className="absolute right-10 top-10 h-60 w-60 rounded-full bg-[#e11d48]/10 blur-[110px]" />
-        <div className="absolute right-16 bottom-0 h-72 w-72 rounded-full bg-[#5eead4]/10 blur-[130px]" />
-      </div>
 
-      {/* Hero Section - compact split image/details */}
-      <div className="relative overflow-hidden pt-5 md:pt-7 pb-3">
-        <div className="w-full relative px-3 md:px-6">
-          <div className="relative rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,25,0.9),rgba(8,11,22,0.92))] shadow-[0_30px_120px_rgba(0,0,0,0.55)] overflow-hidden backdrop-blur-xl">
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={handleShare}
-                className="bg-black/55 hover:bg-black/70 text-white border border-white/25 backdrop-blur-md rounded-full p-3"
-                title="Share event"
-              >
-                <Share2 className="h-5 w-5" />
-              </Button>
+      {/* Header */}
+      <PromoterDashboardHeader />
+
+      {/* Hero Section - matching reference design */}
+      <div className="pt-24 pb-2">
+        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+          <div className="grid lg:grid-cols-[1.3fr,0.6fr] gap-8 items-start px-8">
+            {/* Left: Hero Image with Overlays */}
+            <div className="relative">
+              <img
+                src={event.image}
+                alt={event.title}
+                className="w-full h-auto rounded-2xl object-cover shadow-2xl"
+              />
+
+              {/* Share Button - Top Right Corner */}
+              <div className="absolute top-4 right-4">
+                <Button
+                  variant="ghost"
+                  onClick={handleShare}
+                  className="bg-gray-900/90 hover:bg-gray-900 text-white border border-gray-700/50 backdrop-blur-md rounded-full p-3 shadow-lg"
+                  title="Share event"
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
+              </div>
+
+             
+                
+              
+
+              {/* Primary Sponsor - Bottom Right */}
+              {primarySponsor && (
+                <div className="absolute bottom-4 right-4">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg">
+                    <img
+                      src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
+                      alt={primarySponsor.name}
+                      className="h-10 w-10 object-contain rounded-full bg-white/10 p-1"
+                    />
+                    <span className="text-[11px] uppercase tracking-[0.15em] text-white/80">Powered by</span>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="grid lg:grid-cols-[0.65fr,0.35fr] gap-0 items-stretch">
-              {/* Left: Hero Image full bleed */}
-              <div className="relative overflow-hidden min-h-[460px] sm:min-h-[520px] h-full rounded-3xl lg:rounded-none lg:rounded-l-3xl bg-[#0a0c18] flex items-center justify-center">
-                <img
-                  src={event.image}
-                  alt={event.title}
-                  className="w-full h-full object-contain"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
 
-                <div className="absolute top-4 left-4 flex items-center gap-2">
+            {/* Right: Event Details Card */}
+            <div className="space-y-6">
+              <Card className="bg-gray-900/50 border-gray-800 backdrop-blur-sm">
+                <CardContent className="p-6 space-y-5">
+                  {/* Event Title and Category */}
+                  <div className="space-y-3">
+                    <h2 className="text-4xl font-bold text-white leading-tight">{event.title}</h2>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      {event.category && <span>{event.category}</span>}
+                      {event.category && event.subCategory && <span>•</span>}
+                      {event.subCategory && <span>{event.subCategory}</span>}
+                    </div>
+                  </div>
+
+                  {/* <div className="h-px bg-gray-800"></div> */}
+
+                  {/* Date & Time */}
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 flex items-center justify-center rounded-xl bg-gray-800/80 border border-gray-700">
+                      <Calendar className="h-6 w-6 text-gray-300" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Date & Time</p>
+                      <p className="text-white font-semibold text-sm">{formatDate(event.startDate)}</p>
+                      <p className="text-gray-400 text-xs mt-0.5">{formatTime(event.startDate)}</p>
+                    </div>
+                  </div>
+
+                  {/* <div className="h-px bg-gray-800"></div> */}
+
+                  {/* Location */}
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 flex items-center justify-center rounded-xl bg-gray-800/80 border border-gray-700">
+                      <MapPin className="h-6 w-6 text-gray-300" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Venue</p>
+                      <p className="text-white font-semibold text-sm">{event.venue}</p>
+                      <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">{event.address}</p>
+                    </div>
+                  </div>
+
+                  {/* Book Now Button */}
                   <Button
-                    variant="ghost"
-                    onClick={() => navigate(-1)}
-                    className="bg-black/50 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md rounded-full px-4"
+                    onClick={() => {
+                      const ticketSection = document.getElementById('ticket-section');
+                      if (ticketSection) {
+                        ticketSection.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-base py-2 rounded-lg transition-all mt-4"
+                    size="lg"
                   >
-                    <ChevronLeft className="h-5 w-5 mr-1" />
-                    Back
+                    {isSoldOut ? 'SOLD OUT' : isSalesClosed ? 'Sales Closed' : 'Book Now'}
                   </Button>
-                </div>
-                <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2">
-                  {event.subCategory && (
-                    <Badge className="bg-[#d60024]/90 text-white border border-[#ff8da8]/40 px-3 py-1 rounded-full shadow-[0_10px_30px_rgba(214,0,36,0.3)]">
-                      {event.subCategory}
-                    </Badge>
-                  )}
-                  {event.category && (
-                    <Badge className="bg-white/12 text-white border border-white/20 px-3 py-1 rounded-full backdrop-blur">
-                      {event.category}
-                    </Badge>
-                  )}
-                  {primarySponsor && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 shadow-lg ml-auto">
-                      <img
-                        src={primarySponsor.logo || SPONSOR_PLACEHOLDER}
-                        alt={primarySponsor.name}
-                        className="h-10 w-10 object-contain rounded-full bg-white/10 p-1"
-                      />
-                      <span className="text-[11px] uppercase tracking-[0.15em] text-white/80">Powered by</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: Compact Details */}
-              <div className="relative bg-[linear-gradient(140deg,rgba(10,14,25,0.92),rgba(6,9,18,0.94))] backdrop-blur-xl shadow-[0_26px_90px_rgba(0,0,0,0.6)] p-7 md:p-9 space-y-7 lg:border-l border-white/10 rounded-3xl lg:rounded-none lg:rounded-r-3xl flex flex-col justify-center">
-                <div className="space-y-4 text-center lg:text-left">
-                  <h1 className="text-4xl md:text-5xl font-extrabold leading-tight text-white drop-shadow-[0_8px_24px_rgba(0,0,0,0.45)]">{event.title}</h1>
-                  <div className="w-24 h-1 rounded-full bg-gradient-to-r from-[#2563eb] via-[#e11d48] to-[#5eead4] mx-auto lg:mx-0" />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="rounded-2xl border border-white/12 bg-white/5 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
-                    <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#2563eb]/90 via-[#3b82f6]/85 to-[#5eead4]/70 border border-white/20 shadow-[0_10px_35px_rgba(37,99,235,0.35)]">
-                      <Calendar className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/55">Date & Time</p>
-                      <p className="text-white font-semibold">{formatDate(event.startDate)}</p>
-                      <p className="text-white/75 text-sm">{formatTime(event.startDate)}</p>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/12 bg-white/5 p-4 flex items-start gap-3 shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
-                    <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#e11d48]/90 via-[#ff4d67]/80 to-[#f472b6]/70 border border-white/20 shadow-[0_10px_35px_rgba(225,29,72,0.35)]">
-                      <MapPin className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/55">Venue</p>
-                      <p className="text-white font-semibold">{event.venue}</p>
-                      <p className="text-white/75 text-sm line-clamp-2">{event.address}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
-
-          {showSponsorStrip && (
-            <div className="relative isolate overflow-hidden">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(15,20,35,0.98) 0%, rgba(20,25,40,0.99) 50%, rgba(15,20,35,0.98) 100%)",
-                }}
-              />
-              <div className="w-full px-0 py-6 relative">
-                <div className="flex items-center justify-center">
-                  <div className="relative flex-1 overflow-hidden">
-                    <div className="flex items-center gap-16 min-w-max animate-[sponsorMarquee_20s_linear_infinite]">
-                      {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
-                        <div
-                          key={`${s.id || s.name || "sponsor"}-${idx}`}
-                          className="flex items-center gap-4 opacity-90 hover:opacity-100 transition-all duration-300 hover:scale-105"
-                        >
-                          <div className="h-14 w-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden backdrop-blur-sm shadow-lg">
-                            <img
-                              src={s.logo || SPONSOR_PLACEHOLDER}
-                              alt={s.name || "Sponsor"}
-                              className="h-full w-full object-contain filter brightness-110"
-                            />
-                          </div>
-                          <span className="text-base font-semibold whitespace-nowrap text-white/90">
-                            {s.name || "Sponsor"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
+      {/* Sponsor Strip Section */}
+      {showSponsorStrip && (
+        <div className="relative isolate overflow-hidden bg-gradient-to-r from-gray-950 via-gray-900 to-gray-950 py-4">
+          {/* Background glow effects */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -left-1/4 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-red-600/5 blur-3xl" />
+            <div className="absolute -right-1/4 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-red-600/5 blur-3xl" />
+          </div>
+
+          {/* Section Header */}
+          
+
+          {/* Marquee Container */}
+          <div className="relative max-w-7xl mx-auto px-6 lg:px-12">
+            {/* Left fade gradient */}
+            <div className="absolute left-6 lg:left-12 top-0 bottom-0 w-16 lg:w-24 bg-gradient-to-r from-gray-950 to-transparent z-10 pointer-events-none" />
+            {/* Right fade gradient */}
+            <div className="absolute right-6 lg:right-12 top-0 bottom-0 w-16 lg:w-24 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
+
+            <div className="relative overflow-hidden rounded-2xl border border-gray-800/50 bg-gray-900/30 backdrop-blur-sm">
+              <div className="flex items-center gap-6 py-2 min-w-max animate-[sponsorMarquee_25s_linear_infinite] hover:[animation-play-state:paused]">
+                {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
+                  <a
+                    key={`${s.id || s.name || "sponsor"}-${idx}`}
+                    href={s.website || "#"}
+                    target={s.website ? "_blank" : undefined}
+                    rel={s.website ? "noopener noreferrer" : undefined}
+                    className="group flex items-center gap-4 px-4 py-2 rounded-xl transition-all duration-300 hover:bg-white/5"
+                  >
+                    {/* Logo Container */}
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-red-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm" />
+                      <div className="relative h-14 w-14 rounded-xl bg-gray-800/80 border border-gray-700/50 flex items-center justify-center overflow-hidden shadow-lg group-hover:border-gray-600/50 group-hover:shadow-xl group-hover:shadow-red-600/10 transition-all duration-300">
+                        <img
+                          src={s.logo || SPONSOR_PLACEHOLDER}
+                          alt={s.name || "Sponsor"}
+                          className="h-10 w-10 object-contain filter brightness-100 group-hover:brightness-110 transition-all duration-300 group-hover:scale-105"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sponsor Info */}
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold whitespace-nowrap text-gray-300 group-hover:text-white transition-colors duration-300">
+                        {s.name || "Sponsor"}
+                      </span>
+                      {s.isPrimary && (
+                        <span className="text-[10px] uppercase tracking-wider text-red-500/80 font-medium">
+                          Presenting Partner
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+      <div className="max-w-7xl mx-auto px-8 lg:px-16 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-white/10">
-              {visibleTabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => handleTabSelect(tab)}
-                  onMouseEnter={pauseAutoRotate}
-                  onFocus={pauseAutoRotate}
-                  onTouchStart={pauseAutoRotate}
-                  className={`px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap transition-all ${
-                    activeTab === tab
-                      ? "bg-gradient-to-r from-[#d60024] to-[#ff4d67] text-white shadow-[0_10px_26px_rgba(214,0,36,0.25)]"
-                      : "bg-white/8 text-white/80 hover:bg-white/12"
-                  }`}
+          <div className="lg:col-span-2 space-y-4">
+
+            {/* About Section */}
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-white">
+                  About This Event
+                </h2>
+                <div
+                  ref={aboutRef}
+                  className="text-gray-300 text-sm leading-relaxed whitespace-pre-line transition-all duration-300"
+                  style={
+                    aboutExpanded
+                      ? {}
+                      : {
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }
+                  }
                 >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+                  {event.about}
+                </div>
+                {aboutCanExpand && (
+                  <button
+                    type="button"
+                    onClick={() => setAboutExpanded((prev) => !prev)}
+                    className="text-sm font-medium text-red-600 hover:text-red-500 transition"
+                  >
+                    {aboutExpanded ? "Show less" : "Show more"}
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* About Tab */}
-            {activeTab === "about" && (
-              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(8,12,22,0.9))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
-                      <Info className="h-6 w-6 text-[#D60024]" />
-                      About This Event
-                    </h2>
+            <div className="h-px bg-gray-700 my-6"></div>
+
+            {/* Event Guide Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">Event Guide</h2>
+                {event.advisoryItems?.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setAdvisoryModalOpen(true)}
+                    className="text-red-600 hover:text-red-500 flex items-center gap-1"
+                  >
+                    See all <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {event.advisoryItems?.length ? (
+                <div className="flex flex-wrap gap-4">
+                  {event.advisoryItems.slice(0, 4).map((item, idx) => (
                     <div
-                      ref={aboutRef}
-                      className="text-white/85 text-sm md:text-base leading-6 md:leading-[1.7] whitespace-pre-line transition-all duration-300"
-                      style={
-                        aboutExpanded
-                          ? {}
-                          : {
-                              display: "-webkit-box",
-                              WebkitLineClamp: 4,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                            }
-                      }
+                      key={`advisory-preview-${idx}`}
+                      className="flex items-center gap-2"
                     >
-                      {event.about}
+                      <span className="text-lg">{item.includes('18+') ? '🔞' : item.includes('Parking') ? '🅿️' : item.includes('ID') ? '🆔' : 'ℹ️'}</span>
+                      <span className="text-sm text-gray-300">{item}</span>
                     </div>
-                    {aboutCanExpand && (
-                      <button
-                        type="button"
-                        onClick={() => setAboutExpanded((prev) => !prev)}
-                        className="text-sm font-semibold text-[#93c5fd] hover:text-white transition"
-                      >
-                        {aboutExpanded ? "See less" : "See more"}
-                      </button>
-                    )}
-                  </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No advisories provided.</p>
+              )}
+            </div>
 
-                  <div className="pt-2">
-                    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-white">Event Guide</h3>
-                        <p className="text-sm text-white/70">Key advisories and notes for attendees</p>
+            <div className="h-px bg-gray-700 my-6"></div>
+
+            {/* Artist Section */}
+            {event.artists?.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-white">Artists</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {event.artists.map((artist) => (
+                    <div
+                      key={artist.id || artist.name}
+                      className="flex gap-4 items-center"
+                    >
+                      <img
+                        src={getArtistImage(artist)}
+                        alt={artist.name}
+                        className="w-16 h-16 rounded-lg object-cover"
+                      />
+                      <div className="space-y-2">
+                        <p className="text-white font-medium text-base">{artist.name}</p>
+                        <div className="flex gap-3 text-xs font-medium">
+                          {artist.instagramLink && (
+                            <a
+                              href={artist.instagramLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-red-600 hover:text-red-500"
+                            >
+                              Instagram
+                            </a>
+                          )}
+                          {artist.spotifyLink && (
+                            <a
+                              href={artist.spotifyLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-red-600 hover:text-red-500"
+                            >
+                              Spotify
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      {event.advisoryItems?.length > 3 && (
-                        <button
-                          className="text-sm font-semibold text-[#93c5fd] hover:text-white transition"
-                          onClick={() => setAdvisoryModalOpen(true)}
-                        >
-                          See all 
-                        </button>
-                      )}
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    {event.advisoryItems?.length ? (
-                      <div className="flex flex-nowrap gap-3 overflow-x-auto pb-1">
-                        {event.advisoryItems.slice(0, 4).map((item, idx) => (
-                          <div
-                            key={`advisory-preview-${idx}`}
-                            className="group flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-white/5 via-white/5 to-white/0 border border-white/10 backdrop-blur-sm hover:border-[#60a5fa]/40 hover:bg-white/10 transition shadow-[0_10px_30px_rgba(0,0,0,0.25)] flex-shrink-0"
-                          >
-                            <div className="h-10 w-10 rounded-xl bg-[#0f172a] border border-white/10 flex items-center justify-center text-[#60a5fa]">
-                              <AlertTriangle className="h-5 w-5 drop-shadow" />
-                            </div>
-                            <div className="text-white font-semibold text-sm whitespace-nowrap">{item}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-white/60">No advisories provided.</p>
-                    )}
-                  </div>
+            <div className="h-px bg-gray-700 my-6"></div>
 
-                  {event.organizerNote?.trim?.() && (
-                    <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[#60a5fa]/30 bg-gradient-to-r from-[#0b172b]/85 via-[#0f223a]/85 to-[#0b172b]/70 p-4 shadow-[0_16px_50px_rgba(0,0,0,0.45)] backdrop-blur">
-                      <div className="h-12 w-12 rounded-xl bg-[#102541] border border-[#60a5fa]/40 flex items-center justify-center text-[#93c5fd]">
-                        <AlertTriangle className="h-6 w-6" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#c7d7ff]">Organizer Note</p>
-                        <p className="text-sm text-white/90 leading-relaxed whitespace-pre-line">
-                          {event.organizerNote}
-                        </p>
-                      </div>
+            {/* Gallery Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white">Event Gallery</h2>
+              </div>
+              <div 
+                className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+                style={{ 
+                  scrollbarWidth: 'none', 
+                  msOverflowStyle: 'none',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {/* First Column - 2 stacked images */}
+                <div className="flex flex-col gap-3 flex-shrink-0">
+                  {event.gallery[0] && (
+                    <div
+                      onClick={() => setSelectedImage(event.gallery[0])}
+                      className="relative w-40 h-28 md:w-52 md:h-36 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    >
+                      <img
+                        src={event.gallery[0]}
+                        alt="Gallery 1"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   )}
+                  {event.gallery[1] && (
+                    <div
+                      onClick={() => setSelectedImage(event.gallery[1])}
+                      className="relative w-40 h-28 md:w-52 md:h-36 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    >
+                      <img
+                        src={event.gallery[1]}
+                        alt="Gallery 2"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  )}
+                </div>
 
-                </CardContent>
-              </Card>
-            )}
-            {activeTab === "about" && artistsCount === 1 && event.artists?.length === 1 && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] shadow-[0_14px_50px_rgba(0,0,0,0.35)] p-5 md:p-6 space-y-4">
-                <h3 className="text-xl font-bold text-white">Artist</h3>
-                <div className="flex items-center gap-4">
-                  <img
-                    src={getArtistImage(event.artists[0])}
-                    alt={event.artists[0].name}
-                    className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border border-white/10 shadow-lg"
-                  />
-                  <div className="space-y-1">
-                    <p className="text-lg font-semibold text-white">{event.artists[0].name}</p>
-                    {(event.artists[0].role || event.artists[0].genre || event.artists[0].gender) && (
-                      <p className="text-sm text-white/70 capitalize">
-                        {event.artists[0].role || event.artists[0].genre || event.artists[0].gender?.toLowerCase()}
-                      </p>
+                {/* Second Column - 2 stacked images */}
+                <div className="flex flex-col gap-3 flex-shrink-0">
+                  {event.gallery[2] && (
+                    <div
+                      onClick={() => setSelectedImage(event.gallery[2])}
+                      className="relative w-40 h-28 md:w-52 md:h-36 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    >
+                      <img
+                        src={event.gallery[2]}
+                        alt="Gallery 3"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  )}
+                  {event.gallery[3] && (
+                    <div
+                      onClick={() => setSelectedImage(event.gallery[3])}
+                      className="relative w-40 h-28 md:w-52 md:h-36 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    >
+                      <img
+                        src={event.gallery[3]}
+                        alt="Gallery 4"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Third Column - 1 tall image */}
+                {event.gallery[4] && (
+                  <div
+                    onClick={() => setSelectedImage(event.gallery[4])}
+                    className="relative w-48 h-58 md:w-64 md:h-74 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    style={{ height: 'calc(2 * 9rem + 0.75rem)' }}
+                  >
+                    <img
+                      src={event.gallery[4]}
+                      alt="Gallery 5"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-white" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional images - horizontal scroll items */}
+                {event.gallery.slice(5).map((image, index) => (
+                  <div
+                    key={index + 5}
+                    onClick={() => setSelectedImage(image)}
+                    className="relative w-48 h-58 md:w-64 md:h-74 rounded-xl overflow-hidden cursor-pointer group flex-shrink-0"
+                    style={{ height: 'calc(2 * 9rem + 0.75rem)' }}
+                  >
+                    <img
+                      src={image}
+                      alt={`Gallery ${index + 6}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-white" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <style>{`
+                .scrollbar-hide::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
+            </div>
+
+            <div className="h-px bg-gray-700 my-6"></div>
+
+            {/* Location Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white">Venue</h2>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-xl bg-transparent border border-gray-700/50">
+                <div className="flex-1">
+                  <p className="text-white font-semibold text-lg">{event.venue}</p>
+                  <p className="text-gray-400 text-sm mt-0.5">{event.address}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-gray-700 text-white hover:bg-gray-800 hover:text-white flex items-center gap-2"
+                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`, '_blank')}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Get Directions
+                </Button>
+              </div>
+
+              {/* Map */}
+              {/* <div className="relative h-64 md:h-80 rounded-xl overflow-hidden bg-gray-800 mt-4">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  style={{ border: 0 }}
+                  src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(event.address)}`}
+                  allowFullScreen
+                  title="Event Location Map"
+                  className="grayscale"
+                ></iframe>
+              </div> */}
+            </div>
+
+            {/* <div className="h-px bg-gray-700 my-6"></div> */}
+
+            {/* Organizer Section */}
+            {/* <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-white">Organized By</h2>
+              </div>
+
+              <div className="flex items-start gap-4 mb-6">
+                <img
+                  src={event.organizer.logo}
+                  alt={event.organizer.name}
+                  className="w-20 h-20 rounded-lg object-cover border border-gray-700"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-xl font-semibold text-white">{event.organizer.name}</h3>
+                    {event.organizer.verified && (
+                      <Badge className="bg-green-600/20 text-green-400 border border-green-600/30 text-xs">
+                        <Check className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
                     )}
-                    <div className="flex gap-3 text-xs font-medium">
-                      {event.artists[0].instagramLink && (
-                        <a
-                          href={event.artists[0].instagramLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[#93c5fd] hover:text-white"
+                  </div>
+                  <p className="text-gray-400 text-sm mb-3">{event.organizer.bio}</p>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-gray-500">
+                      <strong className="text-white">{event.organizer.eventsOrganized}</strong> Events
+                    </span>
+                    <span className="text-gray-500">
+                      <strong className="text-white">{event.organizer.followers.toLocaleString()}</strong> Followers
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800 border border-gray-700">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                  <span className="text-white">{event.organizer.email}</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800 border border-gray-700">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                  <span className="text-white">{event.organizer.phone}</span>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800 border border-gray-700">
+                  <Globe className="h-5 w-5 text-gray-400" />
+                  <a href={event.organizer.website} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:text-red-500">
+                    {event.organizer.website}
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 border-gray-700 text-white hover:bg-gray-800">
+                  <Facebook className="h-4 w-4 mr-2" />
+                  Facebook
+                </Button>
+                <Button variant="outline" className="flex-1 border-gray-700 text-white hover:bg-gray-800">
+                  <Twitter className="h-4 w-4 mr-2" />
+                  Twitter
+                </Button>
+                <Button variant="outline" className="flex-1 border-gray-700 text-white hover:bg-gray-800">
+                  <Instagram className="h-4 w-4 mr-2" />
+                  Instagram
+                </Button>
+              </div>
+            </div> */}
+
+            <div className="h-px bg-gray-700 my-6"></div>
+
+            {/* Organizer Note Section */}
+            {event.organizerNote?.trim?.() && (
+              <div className="space-y-3">
+                <div className="rounded-xl bg-transparent border border-gray-700/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <h2 className="text-2xl font-bold text-white mb-2">Organizer Note</h2>
+                      <div
+                        className="text-sm text-gray-300 leading-relaxed whitespace-pre-line transition-all duration-300"
+                        style={
+                          organizerNoteExpanded
+                            ? {}
+                            : {
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }
+                        }
+                      >
+                        {event.organizerNote}
+                      </div>
+                      {organizerNoteCanExpand && (
+                        <button
+                          type="button"
+                          onClick={() => setOrganizerNoteExpanded((prev) => !prev)}
+                          className="text-sm font-medium text-red-600 hover:text-red-500 transition mt-2"
                         >
-                          Instagram
-                        </a>
-                      )}
-                      {event.artists[0].spotifyLink && (
-                        <a
-                          href={event.artists[0].spotifyLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[#22c55e] hover:text-white"
-                        >
-                          Spotify
-                        </a>
+                          {organizerNoteExpanded ? "Show less" : "Show more"}
+                        </button>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            {activeTab === "about" && renderFaqTcBlock()}
+
+            <div className="h-px bg-gray-700 my-6"></div>
+
+            {/* FAQ & Terms & Conditions Section */}
+            <div className="space-y-3">
+              {normalizedFaqs.length > 0 && (
+                <div className="rounded-xl border border-gray-700/50 overflow-hidden bg-transparent">
+                  <button
+                    className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 transition"
+                    onClick={() => setFaqOpen((prev) => !prev)}
+                  >
+                    <span className="text-white font-semibold text-lg">
+                      Frequently Asked Questions
+                    </span>
+                    <ChevronDown
+                      className={`h-5 w-5 text-gray-400 transition-transform ${faqOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {faqOpen && (
+                    <div className="border-t border-gray-800 divide-y divide-gray-800/20">
+                      {normalizedFaqs.map((qa, idx) => (
+                        <div key={`faq-${idx}`} className="px-5 py-2">
+                          <p className="text-white font-semibold text-base mb-1">{qa.question}</p>
+                          {qa.answer ? (
+                            <p className="text-gray-400 text-sm leading-relaxed">{qa.answer}</p>
+                          ) : (
+                            <p className="text-gray-500 text-xs">No answer provided.</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-gray-700/50 overflow-hidden bg-transparent">
+                <button
+                  className="w-full flex items-center justify-between gap-2 text-left px-5 py-4 transition"
+                  onClick={() => setTcOpen((prev) => !prev)}
+                >
+                  <span className="text-white font-semibold text-lg">
+                    Terms & Conditions
+                  </span>
+                  <ChevronDown
+                    className={`h-5 w-5 text-gray-400 transition-transform ${tcOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {tcOpen && (
+                  <div className="border-t border-gray-800 px-5 py-4 bg-transparent">
+                    {normalizedTerms.length > 0 ? (
+                      normalizedTerms.map((t, idx) => (
+                        <div key={`term-${idx}`} className="mb-2 last:mb-0">
+                          {t.content ? (
+                            <div
+                              className="text-gray-400 text-[11px] leading-4 space-y-1"
+                              dangerouslySetInnerHTML={{ __html: t.content }}
+                            />
+                          ) : (
+                            renderTermsContent()
+                          )}
+                          {t.lastUpdated && (
+                            <p className="text-xs text-gray-500 mt-2">Last updated: {new Date(t.lastUpdated).toLocaleDateString()}</p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      renderTermsContent()
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Advisory Modal */}
             <Dialog open={advisoryModalOpen} onOpenChange={setAdvisoryModalOpen}>
-              <DialogContent className="max-w-xl border-white/10 bg-[#0b1224]/95 text-white">
+              <DialogContent className="max-w-xl border-gray-800 bg-gray-900 text-white">
                 <DialogHeader>
                   <DialogTitle className="text-2xl">Event Guide</DialogTitle>
-                  <DialogDescription className="text-white/70">
+                  <DialogDescription className="text-gray-400">
                     All advisories and notes for this event.
                   </DialogDescription>
                 </DialogHeader>
@@ -1172,365 +1506,103 @@ const EventDetailNew = () => {
                     event.advisoryItems.map((item, idx) => (
                       <div
                         key={`advisory-modal-${idx}`}
-                        className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/5 border border-white/10"
+                        className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-800 border border-gray-700"
                       >
-                        <div className="h-10 w-10 rounded-lg bg-[#0f172a] border border-white/10 flex items-center justify-center text-[#60a5fa]">
+                        <div className="h-10 w-10 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-400">
                           <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div className="text-white font-medium text-sm">{item}</div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-white/60">No advisories provided.</p>
+                    <p className="text-sm text-gray-500">No advisories provided.</p>
                   )}
                 </div>
               </DialogContent>
             </Dialog>
-
-            {/* Gallery Tab */}
-            {activeTab === "gallery" && (
-              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                    <ImageIcon className="h-6 w-6 text-[#D60024]" />
-                    Event Gallery
-                  </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {event.gallery.map((image, index) => (
-                      <div
-                        key={index}
-                        onClick={() => setSelectedImage(image)}
-                        className="relative aspect-square rounded-xl overflow-hidden cursor-pointer group"
-                      >
-                        <img
-                          src={image}
-                          alt={`Gallery ${index + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <ImageIcon className="h-8 w-8 text-white" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {activeTab === "gallery" && renderFaqTcBlock()}
-
-            {/* Location Tab */}
-            {activeTab === "location" && (
-              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                    <Navigation className="h-6 w-6 text-[#D60024]" />
-                    Location & Venue
-                  </h2>
-                  
-                  <div className="space-y-4 mb-6">
-                    <div className="flex items-start gap-3">
-                      <Building className="h-5 w-5 text-[#60a5fa] mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="text-[rgba(255,255,255,0.65)] text-sm">Venue</p>
-                        <p className="text-white font-semibold text-lg">{event.venue}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <MapPin className="h-5 w-5 text-[#60a5fa] mt-1 flex-shrink-0" />
-                      <div>
-                        <p className="text-[rgba(255,255,255,0.65)] text-sm">Address</p>
-                        <p className="text-white font-semibold">{event.address}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Map Placeholder */}
-                  <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-white/5 border border-white/12">
-                    <iframe
-                      width="100%"
-                      height="100%"
-                      frameBorder="0"
-                      style={{ border: 0 }}
-                      src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(event.address)}`}
-                      allowFullScreen
-                      title="Event Location Map"
-                      className="grayscale"
-                    ></iframe>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
-                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/50 to-transparent" />
-                    <div className="absolute bottom-4 right-4">
-                      <Button
-                        className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white font-semibold shadow-lg"
-                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address)}`, '_blank')}
-                      >
-                        <Navigation className="h-4 w-4 mr-2" />
-                        Get Directions
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {activeTab === "location" && renderFaqTcBlock()}
-
-            {/* Organizer Tab */}
-            {activeTab === "organizer" && (
-              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 md:p-8" style={tabAnimationStyle}>
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                    <User className="h-6 w-6 text-[#D60024]" />
-                    Organized By
-                  </h2>
-                  
-                  <div className="flex items-start gap-4 mb-6">
-                    <img
-                      src={event.organizer.logo}
-                      alt={event.organizer.name}
-                      className="w-20 h-20 rounded-xl object-cover border-2 border-[rgba(100,200,255,0.3)]"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-xl font-bold text-white">{event.organizer.name}</h3>
-                        {event.organizer.verified && (
-                          <Badge className="bg-[#22c55e]/20 text-[#22c55e] border border-[#22c55e]/30 text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            Verified
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[rgba(255,255,255,0.75)] text-sm mb-3">{event.organizer.bio}</p>
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-[rgba(255,255,255,0.65)]">
-                          <strong className="text-white">{event.organizer.eventsOrganized}</strong> Events
-                        </span>
-                        <span className="text-[rgba(255,255,255,0.65)]">
-                          <strong className="text-white">{event.organizer.followers.toLocaleString()}</strong> Followers
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
-                      <Mail className="h-5 w-5 text-[#60a5fa]" />
-                      <span className="text-white">{event.organizer.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
-                      <Phone className="h-5 w-5 text-[#60a5fa]" />
-                      <span className="text-white">{event.organizer.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
-                      <Globe className="h-5 w-5 text-[#60a5fa]" />
-                      <a href={event.organizer.website} target="_blank" rel="noopener noreferrer" className="text-[#60a5fa] hover:underline">
-                        {event.organizer.website}
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button variant="outline" className="flex-1 border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)]">
-                      <Facebook className="h-4 w-4 mr-2" />
-                      Facebook
-                    </Button>
-                    <Button variant="outline" className="flex-1 border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)]">
-                      <Twitter className="h-4 w-4 mr-2" />
-                      Twitter
-                    </Button>
-                    <Button variant="outline" className="flex-1 border-[rgba(100,200,255,0.3)] text-white hover:bg-[rgba(59,130,246,0.15)]">
-                      <Instagram className="h-4 w-4 mr-2" />
-                      Instagram
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {activeTab === "organizer" && renderFaqTcBlock()}
-
-            {activeTab === "artists" && event.artists?.length > 0 && (
-              <Card className="border border-white/12 bg-[linear-gradient(145deg,rgba(10,14,25,0.92),rgba(9,13,24,0.88))] rounded-2xl shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 md:p-8 space-y-6" style={tabAnimationStyle}>
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-6 w-6 text-[#D60024]" />
-                    <h2 className="text-2xl font-bold text-white">Lineup & Artists</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {event.artists.map((artist) => (
-                      <div
-                        key={artist.id || artist.name}
-                        className="flex gap-4 items-center rounded-2xl border border-white/10 bg-white/[0.04] p-4 shadow-[0_16px_45px_rgba(0,0,0,0.35)] hover:border-white/20 transition"
-                      >
-                        <img
-                          src={getArtistImage(artist)}
-                          alt={artist.name}
-                          className="w-16 h-16 rounded-2xl object-cover border border-white/10"
-                        />
-                        <div className="space-y-1">
-                          <p className="text-white font-semibold text-base">{artist.name}</p>
-                          {(artist.role || artist.genre || artist.gender) && (
-                            <p className="text-xs text-white/60 capitalize">{artist.role || artist.genre || artist.gender?.toLowerCase()}</p>
-                          )}
-                          <div className="flex gap-3 text-xs font-medium">
-                            {artist.instagramLink && (
-                              <a
-                                href={artist.instagramLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[#93c5fd] hover:text-white"
-                              >
-                                Instagram
-                              </a>
-                            )}
-                            {artist.spotifyLink && (
-                              <a
-                                href={artist.spotifyLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[#22c55e] hover:text-white"
-                              >
-                                Spotify
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Reviews */}
-            {/* {event.reviewsList?.length > 0 && (
-              <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl">
-                <CardContent className="p-6 md:p-8 space-y-4">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <Star className="h-6 w-6 text-[#fbbf24]" />
-                    What attendees said
-                  </h2>
-                  <div className="space-y-3">
-                    {event.reviewsList.map((review) => (
-                      <div
-                        key={review.id}
-                        className="p-4 rounded-lg bg-white/5 border border-[rgba(100,200,255,0.15)]"
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <img
-                            src={review.avatar || FALLBACK_IMAGE}
-                            alt={review.userName}
-                            className="w-10 h-10 rounded-full object-cover border border-white/10"
-                          />
-                          <div>
-                            <p className="text-white font-semibold">{review.userName}</p>
-                            <p className="text-xs text-white/60">
-                              {new Date(review.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <span className="ml-auto text-sm text-amber-200 font-semibold">
-                            {review.rating} ★
-                          </span>
-                        </div>
-                        <p className="text-white/80 text-sm leading-relaxed">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )} */}
           </div>
 
           {/* Right Column - Booking Section */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6">
-              <Card className="border border-white/12 bg-[linear-gradient(150deg,rgba(10,14,25,0.92),rgba(8,12,22,0.9))] rounded-2xl shadow-[0_22px_70px_rgba(0,0,0,0.45)]">
-                <CardContent className="p-6 space-y-4">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                    <Ticket className="h-5 w-5 text-[#D60024]" />
-                    Select Tickets
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {event.tickets.map((ticket) => {
-                      const cap = getTicketCap(ticket);
-                      const qty = ticketQuantities[ticket.id] || 0;
-                      return (
+          <div className="lg:col-span-1" id="ticket-section">
+            <div className="space-y-3">
+              <div className="rounded-xl border border-gray-700/50 p-4 space-y-3 bg-transparent">
+                <h1 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-red-600" />
+                  Select Tickets
+                </h1>
+
+                <div className="space-y-3">
+                  {event.tickets.map((ticket) => {
+                    const cap = getTicketCap(ticket);
+                    const qty = ticketQuantities[ticket.id] || 0;
+                    return (
                       <div
                         key={ticket.id}
-                        className={`p-4 rounded-xl bg-white/6 border border-white/14 shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur ${
-                          ticket.available === 0 ? "opacity-60" : ""
-                        }`}
+                        className={`p-4 rounded-xl border border-gray-700/50 bg-transparent ${ticket.available === 0 ? "opacity-60" : ""}`}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h4 className="font-semibold text-white">{ticket.name}</h4>
-                            <p className="text-xs text-[rgba(255,255,255,0.65)]">{ticket.description}</p>
-                          </div>
-                          <span className="text-lg font-bold text-[#D60024]">{formatCurrency(ticket.price)}</span>
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-bold text-white text-xl">{ticket.name}</h4>
+                          <span className="text-xl font-bold text-red-600">{formatCurrency(ticket.price)}</span>
                         </div>
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="text-xs text-[rgba(255,255,255,0.65)] space-y-1">
+                        <p className="text-[11px] text-gray-500 mb-3">{ticket.description}</p>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="text-[10px] text-gray-500">
                             <p>{ticket.available} available</p>
                             {Number.isFinite(cap) && cap < Infinity && (
-                              <p className="text-[rgba(255,255,255,0.55)]">Max {cap} per user</p>
+                              <p className="text-gray-600 mt-0.5">Max {cap} per user</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
+                            <button
                               onClick={() => handleQuantityChange(ticket.id, -1)}
                               disabled={!qty || isSalesClosed || ticket.available === 0}
-                              className="h-8 w-8 p-0 border-[rgba(100,200,255,0.3)]"
+                              className="h-7 w-7 rounded-full border border-gray-600 flex items-center justify-center text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
                             >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="w-8 text-center font-semibold text-white">
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-6 text-center text-lg font-bold text-white">
                               {qty}
                             </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
+                            <button
                               onClick={() => handleQuantityChange(ticket.id, 1)}
                               disabled={isSalesClosed || ticket.available === 0 || qty >= cap}
-                              className="h-8 w-8 p-0 border-[rgba(100,200,255,0.3)]"
+                              className="h-7 w-7 rounded-full border border-gray-600 flex items-center justify-center text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
                             >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                              <Plus className="h-3 w-3" />
+                            </button>
                           </div>
                         </div>
+                        
                         {ticket.available === 0 && (
-                          <p className="text-[rgba(255,255,255,0.6)] text-xs mt-2">Sold out</p>
+                          <p className="text-gray-500 text-xs mt-2">Sold out</p>
                         )}
                         {ticket.available > 0 && Number.isFinite(cap) && cap < Infinity && qty >= cap && (
-                          <p className="text-[rgba(255,255,255,0.6)] text-xs mt-2">
-                            You’ve reached the max per-user limit.
-                          </p>
+                          <p className="text-gray-500 text-xs mt-2">Max per user limit reached</p>
                         )}
                       </div>
-                      );
-                    })}
-                  </div>
+                    );
+                  })}
+                </div>
 
-                  <div className="space-y-3 mb-4 p-4 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(100,200,255,0.15)]">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[rgba(255,255,255,0.75)]">Tickets selected</span>
-                      <span className="font-semibold text-white text-base">{totalTickets}</span>
-                    </div>
-                  </div>
+                <div className="pt-3 border-t border-gray-800 flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Tickets</span>
+                  <span className="font-semibold text-white text-base">{totalTickets}</span>
+                </div>
 
-                  <Button
-                    onClick={handleBookNow}
-                    disabled={totalTickets === 0 || isSalesClosed || isSoldOut}
-                    className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all text-base py-6"
-                  >
-                    <Ticket className="h-5 w-5 mr-2" />
-                    {bookingDisabledReason || "Book Now"}
-                  </Button>
+                <Button
+                  onClick={handleBookNow}
+                  disabled={totalTickets === 0 || isSalesClosed || isSoldOut}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold transition-all text-sm py-4 rounded-lg"
+                >
+                  <Ticket className="h-4 w-4 mr-2" />
+                  {bookingDisabledReason || "Book Now"}
+                </Button>
 
-                  <p className="text-xs text-center text-[rgba(255,255,255,0.5)] mt-4">
-                    {bookingDisabledReason ? "Booking is unavailable for this event." : "Secure payment • Instant confirmation"}
-                  </p>
-                </CardContent>
-              </Card>
+                <p className="text-[11px] text-center text-gray-500">
+                  {bookingDisabledReason ? "Booking unavailable" : "Secure payment • Instant confirmation"}
+                </p>
+              </div>
 
               {/* Event Stats */}
               {/* <Card className="border-2 border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.05)] rounded-xl mt-4">
@@ -1591,19 +1663,19 @@ const EventDetailNew = () => {
 
       {/* Auth Modal */}
       <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
-        <DialogContent className="border border-white/10 bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#111827] text-white max-w-2xl">
+        <DialogContent className="border-gray-800 bg-gray-900 text-white max-w-2xl">
           <DialogHeader className="space-y-2">
             <DialogTitle className="text-2xl flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#22c55e]" />
+              <ShieldCheck className="h-5 w-5 text-green-600" />
               Sign in to book instantly
             </DialogTitle>
-            <DialogDescription className="text-white/70">
-              Secure checkout with email or Google. We’ll auto-apply your details to the ticket.
+            <DialogDescription className="text-gray-400">
+              Secure checkout with email or Google. We'll auto-apply your details to the ticket.
             </DialogDescription>
           </DialogHeader>
 
           <Tabs value={authMode} onValueChange={setAuthMode} className="mt-2">
-            <TabsList className="grid grid-cols-2 bg-white/10">
+            <TabsList className="grid grid-cols-2 bg-gray-800">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
@@ -1630,7 +1702,7 @@ const EventDetailNew = () => {
                     onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                   />
                 </div>
-                <Button type="submit" className="w-full py-5 bg-gradient-to-r from-[#D60024] to-[#ff4d67]" disabled={authLoading}>
+                <Button type="submit" className="w-full py-5 bg-red-600 hover:bg-red-700" disabled={authLoading}>
                   {authLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1643,16 +1715,16 @@ const EventDetailNew = () => {
               </form>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/10" />
+                  <span className="w-full border-t border-gray-700" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-white/60">or continue with</span>
+                  <span className="bg-gray-900 px-2 text-gray-500">or continue with</span>
                 </div>
               </div>
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-white/20 text-white bg-white/5"
+                className="w-full border-gray-700 text-white bg-gray-800 hover:bg-gray-700"
                 onClick={handleGoogleLogin}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -1718,7 +1790,7 @@ const EventDetailNew = () => {
                     onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
                   />
                 </div>
-                <Button type="submit" className="w-full py-5 bg-gradient-to-r from-[#22c55e] to-[#16a34a]" disabled={authLoading}>
+                <Button type="submit" className="w-full py-5 bg-green-600 hover:bg-green-700" disabled={authLoading}>
                   {authLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1736,44 +1808,44 @@ const EventDetailNew = () => {
 
       {/* Success Modal */}
       <Dialog open={successModalOpen} onOpenChange={setSuccessModalOpen}>
-        <DialogContent className="border border-[#22c55e]/30 bg-gradient-to-br from-[#0b1220] via-[#0d1b2a] to-[#0f172a] text-white max-w-lg">
+        <DialogContent className="border-gray-800 bg-gray-900 text-white max-w-lg">
           <DialogHeader className="space-y-2 text-center">
-            <div className="mx-auto w-14 h-14 rounded-full bg-[#22c55e]/20 border border-[#22c55e]/40 flex items-center justify-center">
-              <Check className="h-7 w-7 text-[#22c55e]" />
+            <div className="mx-auto w-14 h-14 rounded-full bg-green-600/20 border border-green-600/40 flex items-center justify-center">
+              <Check className="h-7 w-7 text-green-600" />
             </div>
             <DialogTitle className="text-2xl">Ticket booked successfully</DialogTitle>
-            <DialogDescription className="text-white/70">
-              We’ve emailed your ticket to{" "}
-              <span className="text-white font-semibold">
+            <DialogDescription className="text-gray-400">
+              We've emailed your ticket to{" "}
+              <span className="text-white font-medium">
                 {sessionUser?.email || loginForm.email || signupForm.email || "your email"}
               </span>
               . See you at the event!
             </DialogDescription>
           </DialogHeader>
 
-          <div className="mt-4 space-y-3 bg-white/5 rounded-xl p-4 border border-white/10">
+          <div className="mt-4 space-y-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
             <div className="flex items-center justify-between">
-              <span className="text-white/70">Event</span>
-              <span className="font-semibold text-white">{event?.title}</span>
+              <span className="text-gray-400">Event</span>
+              <span className="font-medium text-white">{event?.title}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-white/70">Tickets</span>
-              <span className="font-semibold text-white">{totalTickets}</span>
+              <span className="text-gray-400">Tickets</span>
+              <span className="font-medium text-white">{totalTickets}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-white/70">Amount</span>
-              <span className="font-semibold text-[#22c55e]">₹{(totalAmount * 1.05).toLocaleString()}</span>
+              <span className="text-gray-400">Amount</span>
+              <span className="font-medium text-green-600">₹{(totalAmount * 1.05).toLocaleString()}</span>
             </div>
-            <div className="pt-3 border-t border-white/10 space-y-2">
+            <div className="pt-3 border-t border-gray-700 space-y-2">
               {event?.tickets
                 ?.filter((ticket) => (ticketQuantities[ticket.id] || 0) > 0)
                 .map((ticket) => (
-                  <div key={ticket.id} className="flex items-center justify-between text-sm text-white/80">
+                  <div key={ticket.id} className="flex items-center justify-between text-sm text-gray-300">
                     <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-[#D60024]" />
+                      <Sparkles className="h-4 w-4 text-red-600" />
                       {ticket.name}
                     </span>
-                    <span className="font-semibold">
+                    <span className="font-medium">
                       {ticketQuantities[ticket.id]} × ₹{ticket.price.toLocaleString()}
                     </span>
                   </div>
@@ -1782,7 +1854,7 @@ const EventDetailNew = () => {
           </div>
 
           <Button
-            className="w-full mt-4 bg-gradient-to-r from-[#D60024] to-[#ff4d67]"
+            className="w-full mt-4 bg-red-600 hover:bg-red-700"
             onClick={() => setSuccessModalOpen(false)}
           >
             Done

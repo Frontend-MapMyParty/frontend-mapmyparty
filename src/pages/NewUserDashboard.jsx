@@ -43,18 +43,19 @@ import {
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 import UserDashboardHeader from "@/components/UserDashboardHeader";
+import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
 import Footer from "@/components/Footer";
 import Dashboard from "@/components/dashboard/Dashboard";
 import { fetchSession } from "@/utils/auth";
 import logoSvg from '@/assets/MMP logo.svg';
 
 const INDIAN_STATES = [
-  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
-  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
-  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
-  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh",
-  "Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry",
-  "Chandigarh","Andaman and Nicobar Islands","Dadra and Nagar Haveli and Daman and Diu",
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat",
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh",
+  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh",
+  "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry",
+  "Chandigarh", "Andaman and Nicobar Islands", "Dadra and Nagar Haveli and Daman and Diu",
   "Lakshadweep"
 ];
 
@@ -266,7 +267,7 @@ const NewUserDashboard = () => {
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
+
       if (currentScrollY < 10) {
         setIsHeaderVisible(true);
       } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
@@ -276,7 +277,7 @@ const NewUserDashboard = () => {
         // Scrolling up
         setIsHeaderVisible(true);
       }
-      
+
       setLastScrollY(currentScrollY);
     };
 
@@ -345,9 +346,9 @@ const NewUserDashboard = () => {
             <span>MapMyParty</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="relative hover:bg-[rgba(59,130,246,0.15)] border border-[rgba(100,200,255,0.25)] rounded-full transition-all hover:scale-110"
             >
               <Bell className="h-5 w-5 text-white" />
@@ -355,8 +356,8 @@ const NewUserDashboard = () => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   className="relative h-9 w-9 rounded-full hover:bg-red-800 border border-red-700 transition-all hover:scale-110"
                 >
@@ -392,8 +393,8 @@ const NewUserDashboard = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-red-700" />
-                <DropdownMenuItem 
-                  onClick={() => navigate("/dashboard/profile")} 
+                <DropdownMenuItem
+                  onClick={() => navigate("/dashboard/profile")}
                   className="cursor-pointer hover:bg-red-800 transition-all"
                 >
                   <UserIcon className="mr-2 h-4 w-4 text-red-600" />
@@ -429,11 +430,10 @@ const NewUserDashboard = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
-                  location.pathname === item.path
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${location.pathname === item.path
                     ? 'bg-red-800 text-white shadow-[0_8px_20px_-8px_rgba(100,0,0,0.4)]'
                     : 'text-red-300 hover:text-white hover:bg-red-900 border border-red-700 hover:border-red-600'
-                }`}
+                  }`}
               >
                 <span className="flex-shrink-0">{item.icon}</span>
                 <span className="text-sm">{item.name}</span>
@@ -523,11 +523,10 @@ const NewUserDashboard = () => {
                               setPendingState(city.name);
                               setStateInput(city.name);
                             }}
-                            className={`flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all text-sm ${
-                              active
+                            className={`flex flex-col items-center gap-1 rounded-xl px-3 py-3 transition-all text-sm ${active
                                 ? "border border-[#D60024] bg-[rgba(214,0,36,0.14)] text-white shadow-[0_10px_28px_-12px_rgba(214,0,36,0.45)]"
                                 : "border border-[rgba(100,200,255,0.15)] bg-[rgba(255,255,255,0.04)] text-[rgba(255,255,255,0.9)] hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
-                            }`}
+                              }`}
                           >
                             <span className="text-xl leading-none">{city.icon}</span>
                             <span className="text-sm font-semibold">{city.name}</span>
@@ -550,11 +549,10 @@ const NewUserDashboard = () => {
                               setPendingState(state);
                               setStateInput(state);
                             }}
-                            className={`flex items-center gap-2 rounded-full px-3.5 py-2.5 border transition-all text-xs ${
-                              active
+                            className={`flex items-center gap-2 rounded-full px-3.5 py-2.5 border transition-all text-xs ${active
                                 ? "border-[#D60024] bg-[rgba(214,0,36,0.14)] text-white"
                                 : "border-[rgba(100,200,255,0.12)] bg-[rgba(255,255,255,0.03)] text-[rgba(255,255,255,0.9)] hover:border-[#60a5fa] hover:bg-[rgba(96,165,250,0.08)]"
-                            }`}
+                              }`}
                           >
                             <MapPin className="h-3.5 w-3.5 text-[#60a5fa]" />
                             <span className="truncate">{state}</span>
@@ -603,11 +601,10 @@ const NewUserDashboard = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-300 ${
-                      location.pathname === item.path
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-300 ${location.pathname === item.path
                         ? 'bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white shadow-[0_10px_25px_-8px_rgba(214,0,36,0.5)]'
                         : 'text-[rgba(255,255,255,0.75)] hover:text-white hover:bg-[rgba(59,130,246,0.15)] border border-[rgba(100,200,255,0.15)] hover:border-[#60a5fa]/50 hover:shadow-[0_8px_20px_-10px_rgba(100,180,255,0.2)]'
-                    }`}
+                      }`}
                   >
                     <span className="flex-shrink-0">{item.icon}</span>
                     <span className="text-sm">{item.name}</span>
@@ -629,9 +626,9 @@ const NewUserDashboard = () => {
               </div>
 
               {/* Notifications */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="relative text-white hover:bg-[rgba(59,130,246,0.15)] border border-[rgba(100,200,255,0.2)] rounded-full transition-all duration-300 hover:scale-110 hover:border-[#60a5fa]/60 hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]"
               >
                 <Bell className="h-5 w-5" />
@@ -641,8 +638,8 @@ const NewUserDashboard = () => {
               {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="relative h-10 px-2 rounded-full border border-[rgba(100,200,255,0.2)] bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(59,130,246,0.12)] hover:border-[#60a5fa]/60 shadow-sm text-white transition-all duration-300 hover:scale-105 hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]"
                   >
                     <Avatar className="h-8 w-8 bg-[#000000] ring-2 ring-[rgba(100,200,255,0.3)]">
@@ -681,8 +678,8 @@ const NewUserDashboard = () => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-[rgba(100,200,255,0.15)]" />
-                  <DropdownMenuItem 
-                    onClick={() => navigate("/dashboard/profile")} 
+                  <DropdownMenuItem
+                    onClick={() => navigate("/dashboard/profile")}
                     className="cursor-pointer hover:bg-[rgba(59,130,246,0.15)] transition-all duration-300"
                   >
                     <UserIcon className="mr-2 h-4 w-4 text-[#60a5fa]" />
@@ -719,7 +716,7 @@ const NewUserDashboard = () => {
         </div>
       </div>
 
-       
+
     </div>
   );
 };
