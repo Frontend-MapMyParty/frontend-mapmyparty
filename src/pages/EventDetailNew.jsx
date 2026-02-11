@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from "@/utils/auth";
 import BillingDetailsModal from "@/components/BillingDetailsModal";
-import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
+// import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
 
 const FALLBACK_IMAGE = "https://via.placeholder.com/1200x600?text=Event";
 const SPONSOR_PLACEHOLDER = "https://via.placeholder.com/200x200?text=Sponsor";
@@ -864,10 +864,10 @@ const EventDetailNew = () => {
       <style>{pageCss}</style>
 
       {/* Header */}
-      <PromoterDashboardHeader />
+      {/* <PromoterDashboardHeader /> */}
 
       {/* Hero Section - matching reference design */}
-      <div className="pt-24 pb-2">
+      <div className="pt-14 pb-2">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="grid lg:grid-cols-[1.3fr,0.6fr] gap-8 items-start px-8">
             {/* Left: Hero Image with Overlays */}
