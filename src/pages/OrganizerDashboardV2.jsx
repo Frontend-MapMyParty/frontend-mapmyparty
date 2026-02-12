@@ -1546,7 +1546,7 @@ const OrganizerDashboardV2 = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#0b1220] via-[#0b0f1a] to-[#0a0b10] text-white">
+    <div className="dashboard-theme flex h-screen bg-background text-foreground">
       {/* Sidebar */}
       <aside
         className={`${sidebarOpen ? "w-64" : "w-24"} bg-[#0f1628] border-r border-white/10 flex flex-col transition-all duration-300`}

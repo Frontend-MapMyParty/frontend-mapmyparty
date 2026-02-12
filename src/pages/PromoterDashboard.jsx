@@ -1,8 +1,11 @@
-import { useMemo } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buildUrl } from "@/config/api";
+import { clearSessionData, resetSessionCache } from "@/utils/auth";
+import Logo from "@/assets/MMP logo.svg";
 import {
   LayoutDashboard,
   Users,
@@ -13,9 +16,15 @@ import {
   BarChart3,
   Building2,
   ShieldCheck,
-  Sparkles,
   Bell,
   Search,
+  ChevronLeft,
+  Menu,
+  User,
+  LogOut,
+  ChevronDown,
+  FileText,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -25,11 +34,19 @@ const navItems = [
   { label: "Users", to: "/promoter/users", icon: Users },
   { label: "Bookings", to: "/promoter/bookings", icon: Ticket },
   { label: "Payouts", to: "/promoter/payouts", icon: Wallet2 },
-  { label: "Live", to: "/promoter/live", icon: Activity },
+  // { label: "Live", to: "/promoter/live", icon: Activity },
   { label: "Analytics", to: "/promoter/analytics", icon: BarChart3 },
+  { label: "Reports", to: "/promoter/reports", icon: FileText },
+  { label: "Billing", to: "/promoter/billing", icon: CreditCard },
 ];
 
 const PromoterDashboard = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [footerMenuOpen, setFooterMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [user, setUser] = useState({ name: "Promoter", email: "" });
+  const footerMenuRef = useRef(null);
+  const navigate = useNavigate();
   // Dummy data inspired by schema entities (organizers, events, bookings, payouts, users)
   const data = useMemo(() => ({
     stats: [
@@ -42,13 +59,31 @@ const PromoterDashboard = () => {
     ],
     organizers: [
       {
+        id: "org-abc",
+        slug: "abc-events",
         name: "ABC Events",
+        description: "Large-format festival promoter curating multi-genre events across Mumbai and Pune.",
         state: "MH",
+        address: "Unit 12B, Bandra Kurla Complex, Mumbai",
+        email: "hello@abcevents.in",
+        contact: "+91 98200 12345",
+        isVerified: true,
+        createdAt: "2023-04-12",
+        updatedAt: "2024-02-14",
         owner: { name: "Amit Kulkarni", email: "amit@abc.events", phone: "+91 98200 12345" },
+        managers: [
+          { name: "Neha Shah", email: "neha@abc.events", phone: "+91 98222 11000" },
+          { name: "Rahul Menon", email: "rahul@abc.events", phone: "+91 98111 33000" },
+        ],
+        socials: {
+          instagram: "https://instagram.com/abcevents",
+          linkedin: "https://linkedin.com/company/abcevents",
+          facebook: "https://facebook.com/abcevents",
+        },
         bank: { bankName: "ICICI Bank", accountNumber: "2021", ifsc: "ICIC0002021", status: "VERIFIED", gstNumber: "27ABCDE1234F1Z5" },
         events: [
-          { title: "Summer Music Festival 2024", status: "LIVE", gross: 1250000, tickets: 4850 },
-          { title: "Arena EDM Night", status: "DRAFT", gross: 360000, tickets: 1200 },
+          { title: "Summer Music Festival 2024", status: "LIVE", gross: 1250000, tickets: 4850, city: "Mumbai", type: "EXCLUSIVE" },
+          { title: "Arena EDM Night", status: "DRAFT", gross: 360000, tickets: 1200, city: "Pune", type: "EXCLUSIVE" },
         ],
         bookings: 8450,
         gross: 3200000,
@@ -57,12 +92,28 @@ const PromoterDashboard = () => {
         lastPayout: "Mar 2",
       },
       {
+        id: "org-techcorp",
+        slug: "techcorp",
         name: "TechCorp",
+        description: "Conference organizer focused on innovation summits and executive networking.",
         state: "KA",
+        address: "2nd Floor, Indiranagar 100ft Rd, Bengaluru",
+        email: "events@techcorp.in",
+        contact: "+91 98450 11223",
+        isVerified: false,
+        createdAt: "2023-07-03",
+        updatedAt: "2024-01-28",
         owner: { name: "Shreya Rao", email: "shreya@techcorp.in", phone: "+91 98450 11223" },
+        managers: [
+          { name: "Anirudh Iyer", email: "anirudh@techcorp.in", phone: "+91 98861 55220" },
+        ],
+        socials: {
+          linkedin: "https://linkedin.com/company/techcorp",
+          x: "https://x.com/techcorp",
+        },
         bank: { bankName: "HDFC Bank", accountNumber: "9981", ifsc: "HDFC0009981", status: "PENDING", gstNumber: "29ABCDE9981F1Z6" },
         events: [
-          { title: "Tech Innovation Summit", status: "UPCOMING", gross: 940000, tickets: 3120 },
+          { title: "Tech Innovation Summit", status: "UPCOMING", gross: 940000, tickets: 3120, city: "Bengaluru", type: "CONFERENCE" },
         ],
         bookings: 4120,
         gross: 2140000,
@@ -71,12 +122,29 @@ const PromoterDashboard = () => {
         lastPayout: "Mar 1",
       },
       {
+        id: "org-culinary",
+        slug: "culinary-dreams",
         name: "Culinary Dreams",
+        description: "Gourmet experiences, food festivals, and chef-led pop-ups in Delhi NCR.",
         state: "DL",
+        address: "C-7, Khan Market, New Delhi",
+        email: "contact@culinarydreams.in",
+        contact: "+91 98111 44220",
+        isVerified: true,
+        createdAt: "2022-11-19",
+        updatedAt: "2024-02-02",
         owner: { name: "Ritika Sharma", email: "ritika@culinarydreams.in", phone: "+91 98111 44220" },
+        managers: [
+          { name: "Kabir Sood", email: "kabir@culinarydreams.in", phone: "+91 98190 77654" },
+          { name: "Isha Arora", email: "isha@culinarydreams.in", phone: "+91 98190 55432" },
+        ],
+        socials: {
+          instagram: "https://instagram.com/culinarydreams",
+          facebook: "https://facebook.com/culinarydreams",
+        },
         bank: { bankName: "SBI", accountNumber: "4410", ifsc: "SBIN0004410", status: "ON-HOLD", gstNumber: "07ABCDE4410F1Z7" },
         events: [
-          { title: "Food & Wine Festival", status: "LIVE", gross: 820000, tickets: 2875 },
+          { title: "Food & Wine Festival", status: "LIVE", gross: 820000, tickets: 2875, city: "Delhi", type: "EXPERIENCE" },
         ],
         bookings: 2890,
         gross: 1560000,
@@ -85,12 +153,28 @@ const PromoterDashboard = () => {
         lastPayout: "Feb 27",
       },
       {
+        id: "org-elite",
+        slug: "elite-nights",
         name: "Elite Nights",
+        description: "Late-night club experiences and VIP ticketing across Hyderabad.",
         state: "TG",
+        address: "Road 12, Jubilee Hills, Hyderabad",
+        email: "vip@elitenights.com",
+        contact: "+91 98850 99881",
+        isVerified: true,
+        createdAt: "2023-02-08",
+        updatedAt: "2024-01-18",
         owner: { name: "Karthik Reddy", email: "karthik@elitenights.com", phone: "+91 98850 99881" },
+        managers: [
+          { name: "Sneha Kapoor", email: "sneha@elitenights.com", phone: "+91 98850 12321" },
+        ],
+        socials: {
+          instagram: "https://instagram.com/elitenights",
+          snapchat: "https://snapchat.com/add/elitenights",
+        },
         bank: { bankName: "Kotak", accountNumber: "8331", ifsc: "KKBK0008331", status: "VERIFIED", gstNumber: "36ABCDE8331F1Z4" },
         events: [
-          { title: "Arena EDM Night", status: "DRAFT", gross: 360000, tickets: 1200 },
+          { title: "Arena EDM Night", status: "DRAFT", gross: 360000, tickets: 1200, city: "Hyderabad", type: "EXCLUSIVE" },
         ],
         bookings: 2330,
         gross: 980000,
@@ -100,10 +184,98 @@ const PromoterDashboard = () => {
       },
     ],
     events: [
-      { title: "Summer Music Festival 2024", organizer: "ABC Events", city: "Mumbai", status: "LIVE", ticketsSold: 4850, gross: 1250000, platformFee: 112500, payout: 320000, type: "EXCLUSIVE" },
-      { title: "Tech Innovation Summit", organizer: "TechCorp", city: "Bengaluru", status: "UPCOMING", ticketsSold: 3120, gross: 940000, platformFee: 75200, payout: 180000, type: "CONFERENCE" },
-      { title: "Food & Wine Festival", organizer: "Culinary Dreams", city: "Delhi", status: "LIVE", ticketsSold: 2875, gross: 820000, platformFee: 65600, payout: 150000, type: "EXPERIENCE" },
-      { title: "Arena EDM Night", organizer: "Elite Nights", city: "Hyderabad", status: "DRAFT", ticketsSold: 1200, gross: 360000, platformFee: 28800, payout: 0, type: "EXCLUSIVE" },
+      {
+        id: "evt-summer-music",
+        title: "Summer Music Festival 2024",
+        organizer: "ABC Events",
+        description: "A multi-stage celebration of indie, electronic, and pop artists with immersive art zones.",
+        type: "EXCLUSIVE",
+        category: "Music",
+        subCategory: "Festival",
+        status: "LIVE",
+        publishStatus: "PUBLISHED",
+        city: "Mumbai",
+        venue: "MMRDA Grounds",
+        location: "Bandra Kurla Complex, Mumbai",
+        startDate: "2024-07-15",
+        endDate: "2024-07-15",
+        ticketsSold: 4850,
+        totalTickets: 5200,
+        gross: 1250000,
+        platformFee: 112500,
+        payout: 320000,
+        bookings: 4850,
+        capacity: 5200,
+      },
+      {
+        id: "evt-tech-summit",
+        title: "Tech Innovation Summit",
+        organizer: "TechCorp",
+        description: "Flagship summit featuring product launches, startup showcases, and investor networking.",
+        type: "CONFERENCE",
+        category: "Conference",
+        subCategory: "Technology",
+        status: "UPCOMING",
+        publishStatus: "PUBLISHED",
+        city: "Bengaluru",
+        venue: "BIEC",
+        location: "Tumkur Road, Bengaluru",
+        startDate: "2024-08-22",
+        endDate: "2024-08-23",
+        ticketsSold: 3120,
+        totalTickets: 4500,
+        gross: 940000,
+        platformFee: 75200,
+        payout: 180000,
+        bookings: 3120,
+        capacity: 4500,
+      },
+      {
+        id: "evt-food-wine",
+        title: "Food & Wine Festival",
+        organizer: "Culinary Dreams",
+        description: "Chef-led pop-ups, curated tasting menus, and signature cocktail experiences.",
+        type: "EXPERIENCE",
+        category: "Food",
+        subCategory: "Festival",
+        status: "LIVE",
+        publishStatus: "PUBLISHED",
+        city: "Delhi",
+        venue: "NSIC Grounds",
+        location: "Okhla, New Delhi",
+        startDate: "2024-09-10",
+        endDate: "2024-09-10",
+        ticketsSold: 2875,
+        totalTickets: 3500,
+        gross: 820000,
+        platformFee: 65600,
+        payout: 150000,
+        bookings: 2875,
+        capacity: 3500,
+      },
+      {
+        id: "evt-arena-edm",
+        title: "Arena EDM Night",
+        organizer: "Elite Nights",
+        description: "Late-night EDM showcase with VIP lounges and immersive visual production.",
+        type: "EXCLUSIVE",
+        category: "Music",
+        subCategory: "Nightlife",
+        status: "COMPLETED",
+        publishStatus: "PUBLISHED",
+        city: "Hyderabad",
+        venue: "Hitex Hall",
+        location: "Madhapur, Hyderabad",
+        startDate: "2024-03-14",
+        endDate: "2024-03-14",
+        ticketsSold: 1200,
+        totalTickets: 1200,
+        gross: 360000,
+        platformFee: 28800,
+        payout: 0,
+        bookings: 1200,
+        capacity: 1200,
+      },
     ],
     bookings: {
       today: { count: 182, value: 420000, platformFee: 33600 },
@@ -115,12 +287,154 @@ const PromoterDashboard = () => {
         { id: "BK-9820", event: "Tech Innovation Summit", organizer: "TechCorp", amount: 8200, status: "PAID", createdAt: "10:10 AM" },
         { id: "BK-9819", event: "Food & Wine Festival", organizer: "Culinary Dreams", amount: 5600, status: "REFUND_PENDING", createdAt: "9:55 AM" },
       ],
+      list: [
+        {
+          id: "BK-9821",
+          eventId: "evt-summer-music",
+          eventTitle: "Summer Music Festival 2024",
+          eventOrganizer: "ABC Events",
+          eventCity: "Mumbai",
+          createdAt: "Feb 04, 2024 • 10:22 AM",
+          status: "PAID",
+          paymentStatus: "CAPTURED",
+          tickets: 2,
+          amount: 12500,
+          platformFee: 950,
+          gstAmount: 310,
+          userId: "USR-101",
+          userName: "Arjun Mehta",
+          userEmail: "arjun@gmail.com",
+          userPhone: "+91 98765 43210",
+          userCity: "Mumbai",
+          ticketName: "VIP Lounge",
+          bookingItems: [
+            { name: "VIP Lounge", quantity: 2, price: 6250, subtotal: 12500 },
+          ],
+        },
+        {
+          id: "BK-9820",
+          eventId: "evt-tech-summit",
+          eventTitle: "Tech Innovation Summit",
+          eventOrganizer: "TechCorp",
+          eventCity: "Bengaluru",
+          createdAt: "Feb 04, 2024 • 10:10 AM",
+          status: "PAID",
+          paymentStatus: "CAPTURED",
+          tickets: 1,
+          amount: 8200,
+          platformFee: 650,
+          gstAmount: 210,
+          userId: "USR-102",
+          userName: "Sara Khan",
+          userEmail: "sara.khan@gmail.com",
+          userPhone: "+91 98765 43211",
+          userCity: "Bengaluru",
+          ticketName: "All Access Pass",
+          bookingItems: [
+            { name: "All Access Pass", quantity: 1, price: 8200, subtotal: 8200 },
+          ],
+        },
+        {
+          id: "BK-9819",
+          eventId: "evt-food-wine",
+          eventTitle: "Food & Wine Festival",
+          eventOrganizer: "Culinary Dreams",
+          eventCity: "Delhi",
+          createdAt: "Feb 04, 2024 • 9:55 AM",
+          status: "REFUND_PENDING",
+          paymentStatus: "REFUND_REQUESTED",
+          tickets: 3,
+          amount: 5600,
+          platformFee: 420,
+          gstAmount: 140,
+          userId: "USR-103",
+          userName: "Rohit Patil",
+          userEmail: "rohit@abc.events",
+          userPhone: "+91 98765 43212",
+          userCity: "Delhi",
+          ticketName: "Tasting Pass",
+          bookingItems: [
+            { name: "Tasting Pass", quantity: 3, price: 1866, subtotal: 5600 },
+          ],
+        },
+        {
+          id: "BK-9818",
+          eventId: "evt-arena-edm",
+          eventTitle: "Arena EDM Night",
+          eventOrganizer: "Elite Nights",
+          eventCity: "Hyderabad",
+          createdAt: "Feb 03, 2024 • 8:15 PM",
+          status: "PAID",
+          paymentStatus: "CAPTURED",
+          tickets: 4,
+          amount: 10400,
+          platformFee: 780,
+          gstAmount: 260,
+          userId: "USR-104",
+          userName: "Ananya Rao",
+          userEmail: "ananya@techcorp.in",
+          userPhone: "+91 98765 43213",
+          userCity: "Hyderabad",
+          ticketName: "Early Bird",
+          bookingItems: [
+            { name: "Early Bird", quantity: 4, price: 2600, subtotal: 10400 },
+          ],
+        },
+      ],
     },
     payouts: [
-      { organizer: "ABC Events", amount: 82000, status: "PENDING", eta: "Mar 4", bank: "ICICI • 2021" },
-      { organizer: "TechCorp", amount: 45000, status: "PROCESSING", eta: "Mar 2", bank: "HDFC • 9981" },
-      { organizer: "Culinary Dreams", amount: 38000, status: "ON-HOLD", eta: "KYC", bank: "SBI • 4410" },
-      { organizer: "Elite Nights", amount: 21000, status: "PENDING", eta: "Mar 6", bank: "Kotak • 8331" },
+      {
+        organizer: "ABC Events",
+        amount: 82000,
+        status: "PENDING",
+        eta: "Mar 4",
+        bank: "ICICI • 2021",
+        accountHolder: "ABC Events Pvt Ltd",
+        ifsc: "ICIC0002021",
+        gstNumber: "27AAACA1234F1Z5",
+        kycStatus: "VERIFIED",
+        lastPayout: "Feb 18",
+        payoutMethod: "IMPS",
+      },
+      {
+        organizer: "TechCorp",
+        amount: 45000,
+        status: "PROCESSING",
+        eta: "Mar 2",
+        bank: "HDFC • 9981",
+        accountHolder: "TechCorp India",
+        ifsc: "HDFC0009981",
+        gstNumber: "29AAACT9876K1Z2",
+        kycStatus: "VERIFIED",
+        lastPayout: "Feb 22",
+        payoutMethod: "NEFT",
+      },
+      {
+        organizer: "Culinary Dreams",
+        amount: 38000,
+        status: "ON-HOLD",
+        eta: "KYC",
+        bank: "SBI • 4410",
+        accountHolder: "Culinary Dreams LLP",
+        ifsc: "SBIN0004410",
+        gstNumber: "07AAACC4567M1Z9",
+        kycStatus: "PENDING",
+        lastPayout: "Feb 15",
+        payoutMethod: "NEFT",
+      },
+      {
+        organizer: "Elite Nights",
+        amount: 21000,
+        status: "PENDING",
+        eta: "Mar 6",
+        bank: "Kotak • 8331",
+        accountHolder: "Elite Nights",
+        ifsc: "KKBK0008331",
+        gstNumber: "36AAACE2234P1Z3",
+        kycStatus: "VERIFIED",
+        lastPayout: "Feb 10",
+        payoutMethod: "IMPS",
+      },
     ],
     liveEvents: [
       { title: "Summer Music Festival 2024", checkIns: 3120, capacity: 5200, city: "Mumbai", status: "LIVE" },
@@ -159,62 +473,174 @@ const PromoterDashboard = () => {
 
   const currency = (v) => `₹${Number(v || 0).toLocaleString("en-IN")}`;
 
+  useEffect(() => {
+    const loadUser = () => {
+      try {
+        const profileRaw = sessionStorage.getItem("userProfile");
+        const profile = profileRaw ? JSON.parse(profileRaw) : {};
+        const name = sessionStorage.getItem("userName") || profile.name || "Promoter";
+        const email = sessionStorage.getItem("userEmail") || profile.email || "";
+        setUser({ name, email });
+      } catch {
+        setUser({ name: "Promoter", email: "" });
+      }
+    };
+    loadUser();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (footerMenuRef.current && !footerMenuRef.current.contains(event.target)) {
+        setFooterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await fetch(buildUrl("auth/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      console.warn("Logout API call failed:", err);
+    }
+
+    clearSessionData();
+    resetSessionCache();
+    navigate("/");
+    setIsLoggingOut(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#060810] text-white flex">
+    <div className="promoter-theme dashboard-theme min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
-      <aside className="hidden lg:flex w-72 flex-col gap-4 bg-black/40 border-r border-white/5 px-4 py-6 sticky top-0 h-screen">
-        <div className="rounded-2xl border border-white/5 bg-gradient-to-b from-white/5 to-white/0 p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-rose-500 to-orange-400 flex items-center justify-center font-black text-lg">
-              M
-            </div>
-            <div>
-              <p className="text-sm text-white/60">MapMyParty</p>
-              <p className="font-semibold">Promoter HQ</p>
-            </div>
+      <aside
+        className={`hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"} flex-col gap-4 bg-sidebar border-r border-sidebar-border/60 px-3 py-5 sticky top-0 h-screen transition-all duration-300`}
+      >
+        <div className="rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-3 shadow-[var(--shadow-card)]">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => navigate("/promoter/overview")}
+              className="flex items-center gap-3 text-left"
+            >
+              <img src={Logo} alt="MapMyParty" className="h-10 w-10" />
+              {sidebarOpen && (
+                <div>
+                  <p className="text-xs text-foreground/60">MapMyParty</p>
+                  <p className="font-semibold tracking-[0.08em]">MAPMYPARTY</p>
+                </div>
+              )}
+            </button>
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className="p-2 rounded-lg hover:bg-sidebar-accent text-foreground/80"
+            >
+              {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
-          <Button variant="outline" size="sm" className="mt-4 w-full border-white/10">
-            <Sparkles className="w-4 h-4 mr-2" /> Command Center
-          </Button>
         </div>
 
-        <nav className="rounded-2xl border border-white/5 bg-white/5 p-3 space-y-1 shadow-lg">
+        <nav className="rounded-2xl border border-sidebar-border/60 bg-sidebar/70 p-2 space-y-1 shadow-[var(--shadow-card)]">
           {navItems.map(({ label, to, icon: Icon }) => (
             <NavLink
               key={label}
               to={to}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-xl transition ${
-                  isActive ? "bg-white/15 text-white" : "hover:bg-white/10 text-white/80"
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
                 }`
               }
             >
               <Icon className="w-4 h-4" />
-              <span className="text-sm font-medium">{label}</span>
+              {sidebarOpen && <span className="text-sm font-medium">{label}</span>}
             </NavLink>
           ))}
         </nav>
 
-       
+        <div className="mt-auto">
+          <div
+            ref={footerMenuRef}
+            className="relative rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-2 shadow-[var(--shadow-card)]"
+          >
+            <button
+              onClick={() => setFooterMenuOpen((v) => !v)}
+              className="flex items-center gap-3 w-full text-left hover:bg-sidebar-accent/60 transition rounded-lg px-2 py-2"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary-foreground font-semibold border border-primary/30">
+                {(user.name || "P").charAt(0).toUpperCase()}
+              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{user.name || "Promoter"}</p>
+                  <p className="text-xs text-foreground/60 truncate">{user.email || "promoter@mapmyparty"}</p>
+                </div>
+              )}
+              {sidebarOpen && (
+                <ChevronDown
+                  className={`w-4 h-4 text-foreground/70 transition-transform ${
+                    footerMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              )}
+            </button>
+
+            {footerMenuOpen && (
+              <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 z-20">
+                <div className="rounded-xl border border-sidebar-border/60 bg-sidebar/95 backdrop-blur-md shadow-[var(--shadow-card)] p-2 space-y-2">
+                  <button
+                    onClick={() => {
+                      setFooterMenuOpen(false);
+                      navigate("/promoter/profile");
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-sidebar-accent/40 border border-sidebar-border/60 text-foreground hover:bg-sidebar-accent transition"
+                  >
+                    <User className="w-4 h-4" />
+                    {sidebarOpen && <span>My Profile</span>}
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25 transition disabled:opacity-60"
+                  >
+                    {isLoggingOut ? (
+                      <span className="h-4 w-4 border-2 border-destructive/60 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <LogOut className="w-4 h-4" />
+                    )}
+                    {sidebarOpen && <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
       <div className="flex-1 min-h-screen">
-        <div className="border-b border-white/5 bg-black/40 backdrop-blur sticky top-0 z-20">
+        <div className="border-b border-border/60 bg-card/70 backdrop-blur sticky top-0 z-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/60">Promoter Super Admin</p>
-              <h1 className="text-2xl font-bold">Control Center</h1>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Promoter Super Admin</p>
+              <h1 className="text-2xl font-semibold">Control Center</h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="border-white/10">
+              <Button variant="outline" size="icon" className="border-border/60 text-foreground/80 hover:bg-muted">
                 <Search className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="icon" className="border-white/10 relative">
+              <Button variant="outline" size="icon" className="border-border/60 relative text-foreground/80 hover:bg-muted">
                 <Bell className="w-4 h-4" />
-                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500" />
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent" />
               </Button>
-              <Button className="bg-gradient-to-r from-rose-500 to-orange-400 border-none shadow-lg">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-[var(--shadow-card)]">
                 New Broadcast
               </Button>
             </div>

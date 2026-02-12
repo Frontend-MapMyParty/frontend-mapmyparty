@@ -1,262 +1,211 @@
- import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Eye, Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { useMemo } from "react";
+import { Link, useOutletContext, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Calendar,
+  MapPin,
+  Users,
+  DollarSign,
+  Ticket,
+  Wallet2,
+  ShieldCheck,
+  Building2,
+  Clock,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import eventMusic from "@/assets/event-music.jpg";
-import eventConference from "@/assets/event-conference.jpg";
-import eventFood from "@/assets/event-food.jpg";
-import { useEvents } from "@/hooks/useEvents";
 
 const PromoterEventDetail = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { events, loading } = useEvents();
+  const { data, currency, statusBadge } = useOutletContext();
 
-  const allEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    organizer: e.organizer?.name || "Event Organizer",
-    date: e.date || e.startDate,
-    time: e.time || "TBD",
-    location: e.location || e.venue || "TBA",
-    status: e.status || "published",
-    category: e.category || "Event",
-    ticketsSold: e.ticketsSold || 0,
-    totalTickets: e.totalTickets || 0,
-    revenue: e.revenue || 0,
-    image: e.image || e.coverImage || eventMusic,
-    description: e.description || "No description available.",
-    views: e.views || 0,
-    shares: e.shares || 0,
-  }));
-
-  const event = allEvents.find((e) => e.id === id);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading event...</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  const event = useMemo(() => data.events.find((item) => item.id === id), [data.events, id]);
+  const organizer = event
+    ? data.organizers.find((org) => org.name === event.organizer)
+    : null;
 
   if (!event) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container mx-auto px-4 py-8">
-          <div className="text-center py-12">
-            <h1 className="text-2xl font-bold mb-4">Event Not Found</h1>
-            <p className="text-muted-foreground mb-4">The event you're looking for doesn't exist or has been removed.</p>
-            <Button onClick={() => navigate("/promoter/dashboard")}>
-              Back to Dashboard
-            </Button>
-          </div>
-        </main>
-        <Footer />
+      <div className="space-y-6">
+        <Link to="/promoter/events" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back to events
+        </Link>
+        <Card className="bg-card/70 border-border/60">
+          <CardContent className="py-16 text-center">
+            <p className="text-lg font-semibold">Event not found</p>
+            <p className="text-sm text-muted-foreground mt-2">Select another event from the list.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  const enrolledPercentage =
-    event.totalTickets > 0
-      ? Math.round((event.ticketsSold / event.totalTickets) * 100)
-      : 0;
+  const enrolledPercentage = event.totalTickets
+    ? Math.round((event.ticketsSold / event.totalTickets) * 100)
+    : 0;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/promoter/dashboard")}
-          className="mb-6"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Dashboard
-        </Button>
+    <div className="space-y-6">
+      <Link to="/promoter/events" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <ArrowLeft className="w-4 h-4" /> Back to events
+      </Link>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardContent className="p-0">
-                <div className="relative h-64 md:h-96 overflow-hidden rounded-t-lg">
-                  <img
-                    src={event.image}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="bg-card/70 border-border/60">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-2xl">{event.title}</CardTitle>
+                  <CardDescription className="text-muted-foreground flex flex-wrap items-center gap-2">
+                    <Badge variant={statusBadge(event.status)}>{event.status}</Badge>
+                    <Badge variant="outline">{event.category}</Badge>
+                    <span className="text-muted-foreground/60">•</span>
+                    {event.subCategory}
+                  </CardDescription>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-card/80 px-4 py-2">
+                  <p className="text-xs text-muted-foreground">Publish status</p>
+                  <p className="text-sm font-semibold">{event.publishStatus}</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{event.description}</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
+                  {event.startDate} {event.endDate ? `• ${event.endDate}` : ""}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="w-4 h-4" /> {event.eventStatus || event.status}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MapPin className="w-4 h-4" /> {event.venue}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Building2 className="w-4 h-4" /> {event.location}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <Card className="bg-card/70 border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Ticket className="w-4 h-4" /> Tickets Sold
+                </p>
+                <p className="text-2xl font-semibold">{event.ticketsSold.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">of {event.totalTickets.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/70 border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Users className="w-4 h-4" /> Bookings
+                </p>
+                <p className="text-2xl font-semibold">{event.bookings.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Capacity {event.capacity}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/70 border-border/60">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Wallet2 className="w-4 h-4" /> Gross Revenue
+                </p>
+                <p className="text-2xl font-semibold text-accent">{currency(event.gross)}</p>
+                <p className="text-xs text-muted-foreground">Platform fee {currency(event.platformFee)}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-card/70 border-border/60">
+            <CardHeader>
+              <CardTitle>Organizer</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">{organizer?.name || event.organizer}</p>
+                  <p className="text-muted-foreground">{organizer?.address || event.location}</p>
+                </div>
+                {organizer?.isVerified && (
+                  <Badge variant="success">
+                    <ShieldCheck className="w-4 h-4 mr-1" /> Verified
+                  </Badge>
+                )}
+              </div>
+              {organizer && (
+                <div className="grid sm:grid-cols-2 gap-3 text-muted-foreground">
+                  <div>Owner: {organizer.owner.name}</div>
+                  <div>Contact: {organizer.contact}</div>
+                  <div>Email: {organizer.email}</div>
+                  <div>Managers: {organizer.managers?.length || 0}</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="bg-card/70 border-border/60">
+            <CardHeader>
+              <CardTitle>Performance</CardTitle>
+              <CardDescription className="text-muted-foreground">Live ticketing and revenue health.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2 text-sm">
+                  <span className="text-muted-foreground">Capacity used</span>
+                  <span className="font-semibold">{enrolledPercentage}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${enrolledPercentage}%` }}
                   />
                 </div>
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h1 className="text-3xl font-bold mb-3">{event.title}</h1>
-                      <div className="flex gap-2 flex-wrap">
-                        <Badge
-                          variant={
-                            event.status === "published" ? "default" : "secondary"
-                          }
-                        >
-                          {event.status}
-                        </Badge>
-                        <Badge variant="outline">{event.category}</Badge>
-                      </div>
-                    </div>
-                  </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total payout</span>
+                <span className="font-semibold">{currency(event.payout)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Platform fee</span>
+                <span className="font-semibold">{currency(event.platformFee)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Gross revenue</span>
+                <span className="font-semibold text-accent">{currency(event.gross)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Event type</span>
+                <span className="font-semibold">{event.type}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-                  <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-5 h-5" />
-                      <div>
-                        <p className="font-medium text-foreground">{event.date}</p>
-                        <p className="text-sm">{event.time}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <MapPin className="w-5 h-5" />
-                      <p className="font-medium text-foreground">{event.location}</p>
-                    </div>
-                  </div>
-
-                  <Separator className="my-6" />
-
-                  <div>
-                    <h2 className="text-xl font-bold mb-3">Description</h2>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {event.description}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Organizer Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Users className="w-8 h-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">{event.organizer}</h3>
-                    <p className="text-sm text-muted-foreground">Event Organizer</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Event Analytics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-muted-foreground">Tickets Sold</span>
-                    <span className="font-bold">
-                      {event.ticketsSold} / {event.totalTickets}
-                    </span>
-                  </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all"
-                      style={{ width: `${enrolledPercentage}%` }}
-                    />
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm">Enrolled</span>
-                  </div>
-                  <span className="font-bold text-lg">{enrolledPercentage}%</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <DollarSign className="w-4 h-4" />
-                    <span className="text-sm">Total Revenue</span>
-                  </div>
-                  <span className="font-bold text-lg text-primary">
-                    ₹{event.revenue.toLocaleString()}
-                  </span>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Eye className="w-4 h-4" />
-                    <span className="text-sm">Page Views</span>
-                  </div>
-                  <span className="font-bold">{event.views.toLocaleString()}</span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Share2 className="w-4 h-4" />
-                    <span className="text-sm">Shares</span>
-                  </div>
-                  <span className="font-bold">{event.shares.toLocaleString()}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Conversion Rate</span>
-                  <span className="font-medium">
-                    {event.views > 0
-                      ? ((event.ticketsSold / event.views) * 100).toFixed(2)
-                      : 0}
-                    %
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Avg. Ticket Price</span>
-                  <span className="font-medium">
-                    ₹
-                    {event.ticketsSold > 0
-                      ? Math.round(event.revenue / event.ticketsSold)
-                      : 0}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Remaining Capacity</span>
-                  <span className="font-medium">
-                    {event.totalTickets - event.ticketsSold}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="bg-card/70 border-border/60">
+            <CardHeader>
+              <CardTitle>Compliance</CardTitle>
+              <CardDescription className="text-muted-foreground">Status and publishing controls.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                <p className="text-xs text-muted-foreground">Publish status</p>
+                <p className="font-semibold">{event.publishStatus}</p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-card/80 p-3">
+                <p className="text-xs text-muted-foreground">Event status</p>
+                <p className="font-semibold">{event.status}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-      <Footer />
+      </div>
     </div>
   );
 };

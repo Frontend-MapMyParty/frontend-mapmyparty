@@ -1,180 +1,137 @@
- import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { useMemo, useState } from "react";
+import { Link, useOutletContext } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Mail, Phone, Calendar, MapPin } from "lucide-react";
+import { Search, Mail, Phone, Calendar, MapPin, ChevronRight, Users, Wallet2 } from "lucide-react";
 
 const PromoterUsers = () => {
+  const { data, currency, statusBadge } = useOutletContext();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const users = [
-    {
-      id: "1",
-      name: "Rajesh Kumar",
-      email: "rajesh.kumar@email.com",
-      phone: "+91 98765 43210",
-      totalTickets: 12,
-      totalSpent: 8400,
-      joinedDate: "Jan 2024",
-      city: "Mumbai",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Priya Sharma",
-      email: "priya.sharma@email.com",
-      phone: "+91 98765 43211",
-      totalTickets: 8,
-      totalSpent: 5600,
-      joinedDate: "Feb 2024",
-      city: "Delhi",
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Amit Patel",
-      email: "amit.patel@email.com",
-      phone: "+91 98765 43212",
-      totalTickets: 15,
-      totalSpent: 12800,
-      joinedDate: "Dec 2023",
-      city: "Bangalore",
-      status: "active",
-    },
-    {
-      id: "4",
-      name: "Sneha Reddy",
-      email: "sneha.reddy@email.com",
-      phone: "+91 98765 43213",
-      totalTickets: 6,
-      totalSpent: 4200,
-      joinedDate: "Mar 2024",
-      city: "Hyderabad",
-      status: "active",
-    },
-    {
-      id: "5",
-      name: "Vikram Singh",
-      email: "vikram.singh@email.com",
-      phone: "+91 98765 43214",
-      totalTickets: 10,
-      totalSpent: 7500,
-      joinedDate: "Jan 2024",
-      city: "Pune",
-      status: "active",
-    },
-  ];
+  const users = useMemo(() => {
+    // Use dummy users from promoter dashboard data; map bookings when available
+    const dummyUsers = data.users || [];
+    const bookings = Array.isArray(data.bookings) ? data.bookings : [];
+    const userMap = {};
+    dummyUsers.forEach((u) => {
+      userMap[u.email] = {
+        id: u.email,
+        name: u.name,
+        email: u.email,
+        phone: "+91 XXXXX XXXXX",
+        joinedDate: "Jan 2024",
+        city: u.state || "Unknown",
+        status: "active",
+        totalTickets: u.bookings || 0,
+        totalSpent: u.bookings * 850 || 0,
+        bookings: [],
+      };
+    });
+    bookings.forEach((booking) => {
+      const uid = booking.userId || booking.userEmail;
+      if (!userMap[uid]) {
+        userMap[uid] = {
+          id: uid,
+          name: booking.userName || "Unknown",
+          email: booking.userEmail,
+          phone: booking.userPhone,
+          joinedDate: booking.createdAt,
+          city: booking.userCity || "Unknown",
+          status: booking.userStatus || "active",
+          totalTickets: 0,
+          totalSpent: 0,
+          bookings: [],
+        };
+      }
+      userMap[uid].totalTickets += booking.tickets || 1;
+      userMap[uid].totalSpent += booking.amount || booking.totalAmount || 0;
+      userMap[uid].bookings.push(booking);
+    });
+    return Object.values(userMap);
+  }, [data.users, data.bookings]);
 
-  const filteredUsers = users.filter((user) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      user.name.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      user.city.toLowerCase().includes(searchLower)
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return users.filter(
+      (u) =>
+        u.name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.city?.toLowerCase().includes(q)
     );
-  });
-
-  const getInitials = (name) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
+  }, [users, searchQuery]);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <CardTitle>All Users</CardTitle>
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users by name, email, or city..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">Users</h2>
+          <p className="text-muted-foreground">All registered users with booking activity and spend.</p>
         </div>
-      </CardHeader>
+        <Badge variant="outline" className="text-sm py-1 px-3 border-border/70">
+          {filteredUsers.length} Users
+        </Badge>
+      </div>
 
-      <CardContent>
-        <div className="space-y-4">
-          {filteredUsers.map((user) => (
-            <Card key={user.id} className="hover:shadow-elegant transition-all">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by name, email, or city..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      <div className="space-y-2">
+        {filteredUsers.map((user) => (
+          <Card key={user.id} className="bg-card/70 border-border/60">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>{user.name?.slice(0, 2).toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
-
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">{user.name}</h3>
-                        <Badge variant="outline" className="mt-1">
-                          {user.status}
-                        </Badge>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Total Spent</p>
-                        <p className="text-xl font-bold text-primary">
-                          ₹{user.totalSpent.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="w-4 h-4" />
-                        <span className="truncate">{user.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="w-4 h-4" />
-                        <span>{user.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        <span>{user.city}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>Joined {user.joinedDate}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pt-2 border-t">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Tickets Purchased</p>
-                        <p className="text-lg font-semibold">{user.totalTickets}</p>
-                      </div>
-                      <div className="h-8 w-px bg-border" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Average per Ticket</p>
-                        <p className="text-lg font-semibold">
-                          ₹{Math.round(user.totalSpent / user.totalTickets)}
-                        </p>
-                      </div>
-                    </div>
+                  <div>
+                    <p className="font-semibold">{user.name}</p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Mail className="w-3 h-3" />
+                      {user.email}
+                      <span className="text-muted-foreground/60">•</span>
+                      <Phone className="w-3 h-3" />
+                      {user.phone}
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-12">
-              <Search className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No users found</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+                <div className="flex items-center gap-4">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Tickets</p>
+                      <p className="font-semibold">{user.totalTickets}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Spent</p>
+                      <p className="font-semibold text-accent">{currency(user.totalSpent)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">City</p>
+                      <p className="font-semibold">{user.city}</p>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/promoter/users/${user.id}`}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-accent hover:text-accent/80 transition"
+                  >
+                    View details <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 };
 
