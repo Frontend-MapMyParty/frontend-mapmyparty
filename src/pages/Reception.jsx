@@ -61,7 +61,7 @@ const ReceptionLanding = () => {
     setError(null);
 
     try {
-      const response = await apiFetch("promoter/live-events?status=ONGOING");
+      const response = await apiFetch("event/my-events/live?status=ongoing");
       if (!isMountedRef.current) return;
       const data = response.data || response;
       const events = data.events || [];
