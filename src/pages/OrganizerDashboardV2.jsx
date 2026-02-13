@@ -43,6 +43,9 @@ import LiveEvents from "./LiveEvents";
 import LiveEventPage from "./LiveEventPage";
 import Reception from "./Reception";
 import FoodBeverages from "./FoodBeverages";
+import OrganizerPayouts from "./OrganizerPayouts";
+import EventAttendees from "./EventAttendees";
+import EventRefunds from "./EventRefunds";
 import Logo from "@/assets/MMP logo.svg";
 
 // Profile Content Component
@@ -1273,6 +1276,7 @@ const OrganizerDashboardV2 = () => {
     { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
     { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
     { id: "food-beverages", name: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" /> },
+    { id: "payouts", name: "Payouts", icon: <CreditCard className="w-6 h-6 mr-3" /> },
     // { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
 
@@ -1284,6 +1288,9 @@ const OrganizerDashboardV2 = () => {
     else if (path.startsWith("/organizer/live")) setActiveTab("live");
     else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
     else if (path.startsWith("/organizer/food-beverages")) setActiveTab("food-beverages");
+    else if (path.startsWith("/organizer/payouts")) setActiveTab("payouts");
+    else if (path.startsWith("/organizer/events") && path.includes("/attendees")) setActiveTab("attendees");
+    else if (path.startsWith("/organizer/events") && path.includes("/refunds")) setActiveTab("refunds");
     else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
     else if (path.startsWith("/organizer/profile")) setActiveTab("profile");
     else setActiveTab("dashboard");
@@ -1421,6 +1428,9 @@ const OrganizerDashboardV2 = () => {
             {activeTab === "live" && liveEventId && <LiveEventPage embedded />}
             {activeTab === "reception" && <Reception />}
             {activeTab === "food-beverages" && <FoodBeverages />}
+            {activeTab === "payouts" && <OrganizerPayouts />}
+            {activeTab === "attendees" && <EventAttendees />}
+            {activeTab === "refunds" && <EventRefunds />}
             {activeTab === "financial" && <FinancialReporting />}
             {activeTab === "profile" && <OrganizerProfileContent user={user} />}
           </div>

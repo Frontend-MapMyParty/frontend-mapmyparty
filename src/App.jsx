@@ -136,6 +136,26 @@ const App = () => {
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
+            <Route path="/organizer/payouts" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/payouts/:id" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/events/:eventId/attendees" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/events/:eventId/refunds" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
             {/* <Route path="/organizer/financial" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />

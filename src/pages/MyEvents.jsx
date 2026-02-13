@@ -12,12 +12,12 @@ import {
   Loader,
   Clock,
   Tag,
-  Ticket,
-  IndianRupee,
-  Users,
+  Plus,
   X,
   AlertTriangle,
-  Sparkles,
+  Ban,
+  Users,
+  RotateCcw,
 } from "lucide-react";
 import { useOrganizerEvents } from "@/hooks/useOrganizerEvents";
 import { apiFetch } from "@/config/api";
@@ -26,61 +26,51 @@ import { toast } from "sonner";
 const MyEvents = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4; // 2 cards per row, 2 rows per page
+  const itemsPerPage = 6;
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Use the shared hook instead of direct API call
   const {
     events: rawEvents,
     loading,
     error,
-    updateFilters,
     invalidateCache,
     refresh,
   } = useOrganizerEvents();
 
-  // Log component mount and state
   useEffect(() => {
-    console.log("📄 MyEvents component mounted");
-    console.log("📊 Hook state - Loading:", loading, "Error:", error, "Events count:", rawEvents?.length || 0);
+    console.log("MyEvents mounted — Loading:", loading, "Error:", error, "Count:", rawEvents?.length || 0);
   }, [loading, error, rawEvents]);
 
-  // Use raw events directly with all the API fields
   const events = useMemo(() => {
-    if (!Array.isArray(rawEvents)) {
-      return [];
-    }
+    if (!Array.isArray(rawEvents)) return [];
     return rawEvents.map((event) => {
       const startDate = event.startDate ? new Date(event.startDate) : null;
       const endDate = event.endDate ? new Date(event.endDate) : null;
-      const createdOn = event.createdAt ? new Date(event.createdAt) : null;
-      
       return {
         id: event.id,
         title: event.title,
         slug: event.slug,
-        flyerImage: event.flyerImage || 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800',
+        flyerImage: event.flyerImage || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800",
         category: event.category,
         subCategory: event.subCategory,
         description: event.description,
         eventStatus: event.eventStatus || event.status1,
         publishStatus: event.publishStatus || event.status2 || event.status,
-        startDate: startDate,
-        endDate: endDate,
-        createdAt: createdOn,
+        startDate,
+        endDate,
+        createdAt: event.createdAt ? new Date(event.createdAt) : null,
         venues: event.venues || [],
+        organizer: event.organizer,
         stats: event.stats || {},
         _count: event._count || {},
-        // Formatted display values
-        formattedDate: startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'TBD',
-        formattedTime: startDate ? startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
-        formattedEndTime: endDate ? endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null,
-        location: event.venues && event.venues.length > 0 
-          ? `${event.venues[0].city || ''}${event.venues[0].city && event.venues[0].state ? ', ' : ''}${event.venues[0].state || ''}`.trim()
-          : 'Location TBD',
-        isPublished: (event.publishStatus || event.status2) === 'ACTIVE' || (event.publishStatus || event.status2) === 'PUBLISHED',
+        location:
+          event.venues && event.venues.length > 0
+            ? `${event.venues[0].city || ""}${event.venues[0].city && event.venues[0].state ? ", " : ""}${event.venues[0].state || ""}`.trim()
+            : "Location TBD",
         attendees: event._count?.bookings || 0,
         revenue: event.stats?.totalRevenue || 0,
         ticketsSold: event.stats?.totalTicketsSold || 0,
@@ -88,328 +78,327 @@ const MyEvents = () => {
     });
   }, [rawEvents]);
 
-  const formatNumber = (n) => new Intl.NumberFormat("en-IN").format(n || 0);
-  const formatCurrency = (n) => `₹${new Intl.NumberFormat("en-IN").format(n || 0)}`;
-  const formatDateRange = (start, end) => {
+  const formatDateShort = (start, end) => {
     if (!start) return "Date TBD";
-    const startStr = start.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-    if (!end) return startStr;
-    const sameDay = start.toDateString() === end.toDateString();
-    const endStr = end.toLocaleDateString("en-US", { day: "numeric", month: "short", year: start.getFullYear() === end.getFullYear() ? undefined : "numeric" });
-    return sameDay ? startStr : `${startStr} → ${endStr}`;
+    const s = start.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    if (!end || start.toDateString() === end.toDateString()) return s;
+    const e = end.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+    return `${s} - ${e}`;
   };
-  const formatTimeRange = (start, end) => {
+
+  const formatTime = (start, end) => {
     if (!start) return "Time TBD";
-    const startStr = start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    if (!end) return startStr;
-    const endStr = end.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    return `${startStr} - ${endStr}`;
-  };
-  const formatCreated = (date) => {
-    if (!date) return "Created date TBD";
-    return date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    const s = start.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    if (!end) return s;
+    return `${s} - ${end.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
   };
 
   const getPublishBadge = (publishStatus) => {
-    const normalized = (publishStatus || "").toUpperCase();
-    if (normalized === "PUBLISHED" || normalized === "ACTIVE") {
-      return { text: "Published", className: "bg-emerald-400/15 text-emerald-100 border border-emerald-400/30" };
-    }
-    if (normalized === "DRAFT") {
-      return { text: "Draft", className: "bg-amber-400/15 text-amber-100 border border-amber-400/30" };
-    }
-    if (normalized === "PENDING" || normalized === "REVIEW") {
-      return { text: "Review", className: "bg-blue-400/15 text-blue-100 border border-blue-400/30" };
-    }
-    if (normalized === "ARCHIVED" || normalized === "CANCELLED") {
-      return { text: normalized, className: "bg-red-500/15 text-red-100 border border-red-400/30" };
-    }
-    return { text: publishStatus || "Unknown", className: "bg-white/10 text-white border border-white/20" };
+    const n = (publishStatus || "").toUpperCase();
+    if (n === "PUBLISHED" || n === "ACTIVE") return { text: "Published", cls: "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20" };
+    if (n === "DRAFT") return { text: "Draft", cls: "bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20" };
+    if (n === "PENDING" || n === "REVIEW") return { text: "Review", cls: "bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20" };
+    if (n === "ARCHIVED" || n === "CANCELLED") return { text: n.charAt(0) + n.slice(1).toLowerCase(), cls: "bg-red-500/10 text-red-400 ring-1 ring-red-500/20" };
+    return { text: publishStatus || "Unknown", cls: "bg-white/5 text-white/60 ring-1 ring-white/10" };
   };
 
-  const getEventStateBadge = (eventStatus) => {
-    const normalized = (eventStatus || "").toUpperCase();
-    if (normalized === "UPCOMING") {
-      return { text: "Upcoming", className: "bg-indigo-400/15 text-indigo-100 border border-indigo-400/30" };
-    }
-    if (normalized === "ONGOING" || normalized === "LIVE") {
-      return { text: "Live", className: "bg-emerald-400/15 text-emerald-100 border border-emerald-400/30" };
-    }
-    if (normalized === "COMPLETED" || normalized === "ENDED" || normalized === "PAST") {
-      return { text: "Completed", className: "bg-white/10 text-white border border-white/25" };
-    }
-    if (normalized === "CANCELLED") {
-      return { text: "Cancelled", className: "bg-red-500/15 text-red-100 border border-red-400/30" };
-    }
-    return { text: eventStatus || "Status TBD", className: "bg-white/10 text-white border border-white/20" };
+  const getStateBadge = (eventStatus) => {
+    const n = (eventStatus || "").toUpperCase();
+    if (n === "UPCOMING") return { text: "Upcoming", cls: "bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20" };
+    if (n === "ONGOING" || n === "LIVE") return { text: "Live", cls: "bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20", dot: true };
+    if (n === "COMPLETED" || n === "ENDED" || n === "PAST") return { text: "Completed", cls: "bg-white/5 text-white/50 ring-1 ring-white/10" };
+    if (n === "CANCELLED") return { text: "Cancelled", cls: "bg-red-500/10 text-red-400 ring-1 ring-red-500/20" };
+    return { text: eventStatus || "TBD", cls: "bg-white/5 text-white/50 ring-1 ring-white/10" };
   };
 
-  // Filter events based on search term (client-side for this component's UI)
   const filteredEvents = useMemo(() => {
-    if (!Array.isArray(events)) {
-      return [];
-    }
-    if (!searchTerm.trim()) {
-      return events;
-    }
-    const searchLower = searchTerm.toLowerCase();
-    return events.filter((event) =>
-      event.title?.toLowerCase().includes(searchLower) ||
-      event.location?.toLowerCase().includes(searchLower) ||
-      event.category?.toLowerCase().includes(searchLower) ||
-      event.subCategory?.toLowerCase().includes(searchLower)
+    if (!Array.isArray(events)) return [];
+    if (!searchTerm.trim()) return events;
+    const q = searchTerm.toLowerCase();
+    return events.filter(
+      (e) =>
+        e.title?.toLowerCase().includes(q) ||
+        e.location?.toLowerCase().includes(q) ||
+        e.category?.toLowerCase().includes(q) ||
+        e.subCategory?.toLowerCase().includes(q)
     );
   }, [events, searchTerm]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
+  const paginatedEvents = filteredEvents.slice(startIndex, startIndex + itemsPerPage);
 
   const summary = useMemo(() => {
     const published = events.filter((e) => getPublishBadge(e.publishStatus).text === "Published").length;
     const drafts = events.filter((e) => getPublishBadge(e.publishStatus).text === "Draft").length;
-    const upcoming = events.filter((e) => getEventStateBadge(e.eventStatus).text === "Upcoming").length;
-    return {
-      total: events.length,
-      published,
-      drafts,
-      upcoming,
-    };
+    const upcoming = events.filter((e) => getStateBadge(e.eventStatus).text === "Upcoming").length;
+    return { total: events.length, published, drafts, upcoming };
   }, [events]);
 
-  const handleDelete = useCallback(
-    async () => {
-      if (!confirmDelete?.id) return;
-      setDeleteLoading(true);
-      try {
-        const response = await apiFetch(`api/event/delete-event/${confirmDelete.id}`, {
-          method: "DELETE",
-          credentials: "include",
-        });
-
-        if (!response || response.error || response.success === false) {
-          throw new Error(response?.message || "Failed to delete event");
-        }
-
-        invalidateCache();
-        refresh();
-        toast.success("Event deleted successfully");
-
-        if (startIndex >= filteredEvents.length - 1 && currentPage > 1) {
-          setCurrentPage(currentPage - 1);
-        }
-      } catch (err) {
-        console.error("Error deleting event:", err);
-        toast.error(err.message || "Failed to delete event. Please try again.");
-      } finally {
-        setDeleteLoading(false);
-        setConfirmDelete(null);
+  const handleDelete = useCallback(async () => {
+    if (!confirmDelete?.id) return;
+    setDeleteLoading(true);
+    try {
+      const response = await apiFetch(`api/event/delete-event/${confirmDelete.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!response || response.error || response.success === false) {
+        throw new Error(response?.message || "Failed to delete event");
       }
-    },
-    [confirmDelete, invalidateCache, refresh, startIndex, filteredEvents.length, currentPage]
-  );
+      invalidateCache();
+      refresh();
+      toast.success("Event deleted successfully");
+      if (startIndex >= filteredEvents.length - 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      toast.error(err.message || "Failed to delete event. Please try again.");
+    } finally {
+      setDeleteLoading(false);
+      setConfirmDelete(null);
+    }
+  }, [confirmDelete, invalidateCache, refresh, startIndex, filteredEvents.length, currentPage]);
+
+  const handleCancel = useCallback(async () => {
+    if (!confirmCancel?.id) return;
+    setCancelLoading(true);
+    try {
+      const response = await apiFetch(`api/event/cancel-event/${confirmCancel.id}`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!response || response.error || response.success === false) {
+        throw new Error(response?.message || "Failed to cancel event");
+      }
+      invalidateCache();
+      refresh();
+      const refunded = response.data?.refundedBookings || 0;
+      const cancelled = response.data?.cancelledBookings || 0;
+      const parts = [];
+      if (refunded > 0) parts.push(`${refunded} booking${refunded > 1 ? "s" : ""} refunded`);
+      if (cancelled > 0) parts.push(`${cancelled} booking${cancelled > 1 ? "s" : ""} cancelled`);
+      toast.success(
+        `Event cancelled successfully.${parts.length > 0 ? " " + parts.join(", ") + "." : ""} Attendees have been notified.`
+      );
+    } catch (err) {
+      console.error("Error cancelling event:", err);
+      toast.error(err.message || "Failed to cancel event. Please try again.");
+    } finally {
+      setCancelLoading(false);
+      setConfirmCancel(null);
+    }
+  }, [confirmCancel, invalidateCache, refresh]);
+
+  const isCancellable = (event) => {
+    const status = (event.eventStatus || "").toUpperCase();
+    return status !== "CANCELLED" && status !== "COMPLETED";
+  };
 
   const handleSearch = useCallback((e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page on search
-    
-    // Update hook filters for server-side search (optional, can keep client-side only)
-    // updateFilters({ search: value || null });
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
   }, []);
 
-  const handlePreviousPage = useCallback(() => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  }, [currentPage]);
-
-  const handleNextPage = useCallback(() => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  }, [currentPage, totalPages]);
-
   return (
-    <div className="space-y-8 text-white w-full max-w-7xl mx-auto relative">
-      <div className="pointer-events-none absolute inset-0 opacity-40 blur-3xl bg-[radial-gradient(circle_at_20%_20%,rgba(148,163,255,0.15),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(248,113,113,0.18),transparent_30%),radial-gradient(circle_at_50%_80%,rgba(16,185,129,0.12),transparent_30%)]" />
-      <div className="relative space-y-8">
+    <div className="w-full max-w-6xl mx-auto text-white">
+      <style>{`
+        @keyframes card-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-card-in {
+          animation: card-in 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.18em] text-white/50">Organizer Portal</p>
-          <div className="flex items-center gap-2">
-            <h2 className="text-3xl font-extrabold">My Events</h2>
-            <Sparkles className="w-5 h-5 text-amber-300" />
-          </div>
-          <p className="text-sm text-white/60">Manage, edit, and track all your events</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-white/40 mb-0.5">Organizer</p>
+          <h1 className="text-xl font-semibold tracking-tight">My Events</h1>
         </div>
         <button
-          className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
           onClick={() => navigate("/organizer/select-event-type")}
+          className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg bg-white text-zinc-900 hover:bg-white/90 transition-colors"
         >
-          + Create New Event
+          <Plus className="w-3.5 h-3.5" />
+          New Event
         </button>
       </div>
 
-      {/* Loading State */}
+      {/* Stats */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {[
+          { label: "Total", value: summary.total, cls: "text-white/70" },
+          { label: "Published", value: summary.published, cls: "text-emerald-400" },
+          { label: "Drafts", value: summary.drafts, cls: "text-amber-400" },
+          { label: "Upcoming", value: summary.upcoming, cls: "text-indigo-400" },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06] text-xs"
+          >
+            <span className="text-white/40">{s.label}</span>
+            <span className={`font-semibold ${s.cls}`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+        <input
+          type="text"
+          placeholder="Search by title, location, category..."
+          value={searchTerm}
+          onChange={handleSearch}
+          className="w-full pl-9 pr-4 py-2 text-sm bg-white/[0.04] ring-1 ring-white/[0.08] rounded-lg placeholder:text-white/30 text-white focus:outline-none focus:ring-white/20 transition-all"
+        />
+        {searchTerm && (
+          <button
+            onClick={() => { setSearchTerm(""); setCurrentPage(1); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Loading */}
       {loading && (
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center backdrop-blur shadow-lg shadow-black/20">
-          <Loader className="w-8 h-8 text-red-400 animate-spin mx-auto mb-4" />
-          <p className="text-white/70">Loading your events...</p>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader className="w-5 h-5 text-white/40 animate-spin mb-3" />
+          <p className="text-sm text-white/40">Loading events...</p>
         </div>
       )}
 
-      {/* Error State */}
+      {/* Error */}
       {error && !loading && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-red-100">
-          <p className="font-semibold">Error loading events</p>
-          <p className="text-sm mt-1">{error}</p>
+        <div className="rounded-lg bg-red-500/10 ring-1 ring-red-500/20 p-4 mb-5">
+          <p className="text-sm font-medium text-red-400">Error loading events</p>
+          <p className="text-xs text-red-400/70 mt-0.5">{error}</p>
         </div>
       )}
 
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeInUp { animation: fadeInUp 0.6s ease-out; }
-      `}</style>
-      
       {!loading && (
         <>
-          {/* Quick stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            {[
-              { label: "Total Events", value: summary.total, tone: "from-white/10 to-white/5", border: "border-white/10" },
-              { label: "Published", value: summary.published, tone: "from-emerald-500/20 to-emerald-500/5", border: "border-emerald-400/25" },
-              { label: "Drafts", value: summary.drafts, tone: "from-amber-500/20 to-amber-500/5", border: "border-amber-400/25" },
-              { label: "Upcoming", value: summary.upcoming, tone: "from-indigo-500/20 to-indigo-500/5", border: "border-indigo-400/25" },
-            ].map((card) => (
-              <div
-                key={card.label}
-                className={`rounded-2xl px-4 py-3 bg-gradient-to-br ${card.tone} border ${card.border} shadow-lg shadow-black/10 backdrop-blur`}
-              >
-                <p className="text-xs uppercase tracking-[0.12em] text-white/60">{card.label}</p>
-                <p className="text-2xl font-bold mt-1">{card.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative bg-white/5 border border-white/10 rounded-2xl px-4 py-3 backdrop-blur shadow-lg shadow-black/10">
-            <Search className="absolute left-6 top-3.5 w-5 h-5 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search events by title or location..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="w-full pl-12 pr-4 py-3 bg-transparent text-white placeholder:text-white/40 focus:outline-none focus:ring-0"
-            />
-          </div>
-
-          {/* Events Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
-            {paginatedEvents.map((event, index) => {
-              const publishBadge = getPublishBadge(event.publishStatus);
-              const eventStateBadge = getEventStateBadge(event.eventStatus);
-              
+          {/* Event Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {paginatedEvents.map((event, i) => {
+              const pub = getPublishBadge(event.publishStatus);
+              const state = getStateBadge(event.eventStatus);
               return (
                 <div
                   key={event.id}
-                  className="bg-gradient-to-br from-white/10 via-white/5 to-white/0 rounded-3xl overflow-hidden border border-white/10 shadow-xl shadow-black/25 backdrop-blur opacity-0 animate-fadeInUp transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl"
-                  style={{ 
-                    animationDelay: `${index * 100}ms`,
-                    animationFillMode: 'forwards'
-                  }}
+                  className="group animate-card-in rounded-xl bg-white/[0.03] ring-1 ring-white/[0.07] overflow-hidden hover:ring-white/15 hover:bg-white/[0.05] transition-all duration-200"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
-                  {/* Event Image */}
-                  <div className="relative h-48 bg-black/30 overflow-hidden">
+                  {/* Image */}
+                  <div className="relative h-36 overflow-hidden">
                     <img
                       src={event.flyerImage}
                       alt={event.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                    <div className="absolute top-3 left-3 flex gap-2">
-                      <span className={`px-3 py-1 rounded-full text-[11px] font-semibold backdrop-blur border ${publishBadge.className}`}>
-                        {publishBadge.text}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-[11px] font-semibold backdrop-blur border ${eventStateBadge.className}`}>
-                        {eventStateBadge.text}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-                      <div className="text-sm text-white font-semibold truncate">{event.title || "Untitled Event"}</div>
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/40 text-white border border-white/10 backdrop-blur">
-                        {event.category || "Category"}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    {/* Badges */}
+                    <div className="absolute top-2.5 left-2.5 flex gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${pub.cls}`}>{pub.text}</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium flex items-center gap-1 ${state.cls}`}>
+                        {state.dot && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                        {state.text}
                       </span>
                     </div>
+                    {/* Category pill on image */}
+                    {event.category && (
+                      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[10px] font-medium bg-black/50 text-white/80 ring-1 ring-white/10 backdrop-blur-sm">
+                        {event.category}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Event Details */}
-                  <div className="p-6 space-y-6">
-                    <div className="flex flex-wrap gap-2">
-                      {event.subCategory && (
-                        <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-white/5 text-white/70 border border-white/10">
+                  {/* Body */}
+                  <div className="p-3.5 space-y-2.5">
+                    {/* Title */}
+                    <h3 className="text-[13px] font-semibold leading-snug truncate" title={event.title}>
+                      {event.title || "Untitled Event"}
+                    </h3>
+
+                    {/* Meta rows */}
+                    <div className="space-y-1.5 text-[11px] text-white/50">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3 flex-shrink-0 text-white/30" />
+                        <span>{formatDateShort(event.startDate, event.endDate)}</span>
+                        <span className="text-white/20 mx-0.5">|</span>
+                        <Clock className="w-3 h-3 flex-shrink-0 text-white/30" />
+                        <span>{formatTime(event.startDate, event.endDate)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 flex-shrink-0 text-white/30" />
+                        <span className="truncate">{event.location}</span>
+                      </div>
+                    </div>
+
+                    {/* Sub-category tag */}
+                    {event.subCategory && (
+                      <div>
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-white/40 bg-white/[0.04] ring-1 ring-white/[0.06]">
+                          <Tag className="w-2.5 h-2.5" />
                           {event.subCategory}
                         </span>
-                      )}
-                      <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-400/10 text-emerald-200 border border-emerald-300/20">
-                        {event.location || "Location TBD"}
-                      </span>
-                    </div>
-
-                    {/* Date & Time */}
-                    <div className="flex items-center gap-2 text-sm text-white/70 flex-wrap">
-                      <Calendar className="w-4 h-4 text-white/50 flex-shrink-0" />
-                      <span className="font-semibold text-white">{formatDateRange(event.startDate, event.endDate)}</span>
-                      <span className="text-white/30">•</span>
-                      <Clock className="w-4 h-4 text-white/50 flex-shrink-0" />
-                      <span>{formatTimeRange(event.startDate, event.endDate)}</span>
-                    </div>
-
-                    {/* Location & Category */}
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-white/70">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-white/50" />
-                        <span>{event.location || "Location TBD"}</span>
                       </div>
-                      <span className="h-1 w-1 rounded-full bg-white/20" />
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-white/50" />
-                        <span>{event.category || "Event"}</span>
-                      </div>
-                    </div>
+                    )}
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-4 border-t border-white/10">
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-white/[0.06]">
                       <button
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white text-gray-900 rounded-lg hover:bg-white/90 transition-colors text-sm font-semibold"
                         onClick={() => event.organizer?.slug && event.slug && navigate(`/events/${event.organizer.slug}/${event.slug}`)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white text-zinc-900 hover:bg-white/90 transition-colors"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3 h-3" />
                         View
                       </button>
                       <button
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white/5 text-white rounded-lg hover:bg-white/10 border border-white/10 transition-colors text-sm font-semibold"
-                        onClick={() =>
-                          navigate(`/organizer/create-event?edit=${event.id}`, {
-                            state: { event },
-                          })
-                        }
+                        onClick={() => navigate(`/organizer/create-event?edit=${event.id}`, { state: { event } })}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white/[0.06] text-white/80 ring-1 ring-white/[0.08] hover:bg-white/10 transition-colors"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-3 h-3" />
                         Edit
                       </button>
                       <button
-                        onClick={() => setConfirmDelete(event)}
-                        className="px-3 py-2 bg-red-500/15 text-red-200 rounded-lg hover:bg-red-500/25 border border-red-500/20 transition-colors text-sm font-semibold"
+                        onClick={() => navigate(`/organizer/events/${event.id}/attendees`)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white/[0.06] text-white/80 ring-1 ring-white/[0.08] hover:bg-white/10 transition-colors"
+                        title="View attendees"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Users className="w-3 h-3" />
+                        Attendees
+                      </button>
+                      <button
+                        onClick={() => navigate(`/organizer/events/${event.id}/refunds`)}
+                        className="p-1.5 rounded-md text-white/30 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                        title="View refunds"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex-1" />
+                      {isCancellable(event) && (
+                        <button
+                          onClick={() => setConfirmCancel(event)}
+                          className="p-1.5 rounded-md text-white/30 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                          title="Cancel event"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setConfirmDelete(event)}
+                        className="p-1.5 rounded-md text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Delete event"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -418,60 +407,67 @@ const MyEvents = () => {
             })}
           </div>
 
-          {/* No Results State */}
+          {/* No search results */}
           {filteredEvents.length === 0 && searchTerm && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center backdrop-blur shadow-lg shadow-black/20">
-              <div className="mx-auto w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/10">
-                <Search className="w-8 h-8 text-white/50" />
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] ring-1 ring-white/[0.08] flex items-center justify-center mb-3">
+                <Search className="w-4 h-4 text-white/30" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">No Events Found</h3>
-              <p className="text-white/60 mb-6">Try adjusting your search terms</p>
+              <p className="text-sm font-medium text-white/60">No events found</p>
+              <p className="text-xs text-white/30 mt-0.5">Try a different search term</p>
             </div>
           )}
 
-          {/* Empty State */}
+          {/* Empty state */}
           {events.length === 0 && !searchTerm && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center backdrop-blur shadow-lg shadow-black/20">
-              <div className="mx-auto w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/10">
-                <Calendar className="w-8 h-8 text-white/60" />
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] ring-1 ring-white/[0.08] flex items-center justify-center mb-3">
+                <Calendar className="w-4 h-4 text-white/30" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">No Events Yet</h3>
-              <p className="text-white/60 mb-6">Create your first event to get started</p>
-              <button className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg shadow-red-500/20 hover:shadow-red-500/30">
-                + Create Event
+              <p className="text-sm font-medium text-white/60">No events yet</p>
+              <p className="text-xs text-white/30 mt-0.5 mb-4">Create your first event to get started</p>
+              <button
+                onClick={() => navigate("/organizer/select-event-type")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-white text-zinc-900 hover:bg-white/90 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Create Event
               </button>
             </div>
           )}
 
-          {/* Pagination Controls */}
-          {filteredEvents.length > 0 && (
-            <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur shadow-lg shadow-black/20">
-              <div className="text-sm text-white/70">
-                Showing <span className="font-semibold text-white">{startIndex + 1}</span> to{" "}
-                <span className="font-semibold text-white">{Math.min(endIndex, filteredEvents.length)}</span> of{" "}
-                <span className="font-semibold text-white">{filteredEvents.length}</span> events
-              </div>
-
-              <div className="flex items-center gap-2">
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-5 px-1">
+              <p className="text-xs text-white/35">
+                {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredEvents.length)} of {filteredEvents.length}
+              </p>
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={handlePreviousPage}
+                  onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="flex items-center gap-2 px-3 py-2 border border-white/15 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white text-sm"
+                  className="p-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  Previous
                 </button>
-                <div className="text-sm text-white/70">
-                  Page <span className="font-semibold text-white">{currentPage}</span> of{" "}
-                  <span className="font-semibold text-white">{totalPages || 1}</span>
-                </div>
-
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-7 h-7 rounded-md text-xs font-medium transition-colors ${
+                      page === currentPage
+                        ? "bg-white text-zinc-900"
+                        : "text-white/40 hover:text-white hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
                 <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  className="flex items-center gap-2 px-3 py-2 border border-white/15 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white text-sm"
+                  onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
-                  Next
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -479,46 +475,91 @@ const MyEvents = () => {
           )}
         </>
       )}
-      </div>
 
       {/* Delete Confirmation Modal */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => !deleteLoading && setConfirmDelete(null)} />
-          <div className="relative w-full max-w-md bg-[#0f172a] border border-white/10 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-amber-300" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-card-in"
+            onClick={() => !deleteLoading && setConfirmDelete(null)}
+          />
+          <div className="relative w-full max-w-sm bg-zinc-900 ring-1 ring-white/10 rounded-xl p-5 shadow-2xl animate-card-in space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 p-1.5 rounded-lg bg-amber-500/10 ring-1 ring-amber-500/20">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+              </div>
               <div>
-                <h3 className="text-lg font-semibold">Delete this event?</h3>
-                <p className="text-sm text-white/60">“{confirmDelete.title || "Untitled Event"}” will be removed permanently.</p>
+                <h3 className="text-sm font-semibold">Delete event?</h3>
+                <p className="text-xs text-white/50 mt-0.5 leading-relaxed">
+                  <span className="text-white/70 font-medium">"{confirmDelete.title || "Untitled"}"</span> will be permanently removed.
+                </p>
               </div>
             </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 pt-1">
               <button
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/15 hover:bg-white/15 transition"
                 onClick={() => setConfirmDelete(null)}
                 disabled={deleteLoading}
+                className="flex-1 px-3 py-2 text-xs font-medium rounded-lg bg-white/[0.06] ring-1 ring-white/[0.08] text-white/70 hover:bg-white/10 transition-colors"
               >
-                <X className="w-4 h-4" />
                 Cancel
               </button>
               <button
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 transition disabled:opacity-70"
                 onClick={handleDelete}
                 disabled={deleteLoading}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-60"
               >
-                {deleteLoading ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                Yes, delete
+                {deleteLoading ? <Loader className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Delete
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Cancel Confirmation Modal */}
+      {confirmCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-card-in"
+            onClick={() => !cancelLoading && setConfirmCancel(null)}
+          />
+          <div className="relative w-full max-w-sm bg-zinc-900 ring-1 ring-white/10 rounded-xl p-5 shadow-2xl animate-card-in space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 p-1.5 rounded-lg bg-amber-500/10 ring-1 ring-amber-500/20">
+                <Ban className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">Cancel event?</h3>
+                <p className="text-xs text-white/50 mt-0.5 leading-relaxed">
+                  <span className="text-white/70 font-medium">"{confirmCancel.title || "Untitled"}"</span> will be cancelled and all attendees will be notified.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg bg-amber-500/5 ring-1 ring-amber-500/15 px-3 py-2">
+              <p className="text-[11px] text-amber-200/70 leading-relaxed">
+                All confirmed bookings with payments will be automatically refunded. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setConfirmCancel(null)}
+                disabled={cancelLoading}
+                className="flex-1 px-3 py-2 text-xs font-medium rounded-lg bg-white/[0.06] ring-1 ring-white/[0.08] text-white/70 hover:bg-white/10 transition-colors"
+              >
+                Keep Event
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelLoading}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-60"
+              >
+                {cancelLoading ? <Loader className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                Cancel Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
