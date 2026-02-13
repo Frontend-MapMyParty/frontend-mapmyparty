@@ -31,7 +31,7 @@ import {
   Heart,
   Star
 } from "lucide-react";
-import { isAuthenticated } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 

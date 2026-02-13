@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { clearSessionData, resetSessionCache } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { buildUrl, apiFetch } from "@/config/api";
 import {
   Calendar,
@@ -129,18 +130,14 @@ const OrganizerProfileContent = ({ user }) => {
   const fetchProfileData = useCallback(async () => {
     setLoadingProfile(true);
     try {
-      // Fetch authenticated user (owner) plus organizer snapshot
-      const authRes = await apiFetch("auth/me", { method: "GET" });
-      const authData = authRes?.data || authRes || {};
-      const ownerData = authData.user || {};
+      // Use user prop from context as owner data
+      const ownerData = user || {};
       setOwner(ownerData);
       setOwnerDraft(ownerData);
 
-      let organizerPayload = authData.organizer;
-      if (!organizerPayload) {
-        const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
-        organizerPayload = orgRes?.data || orgRes || {};
-      }
+      // Fetch organizer-specific profile data (lazy-loaded)
+      const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
+      const organizerPayload = orgRes?.data || orgRes || {};
 
       const normalized = buildInitialData(organizerPayload, ownerData);
       setProfileData(normalized);
@@ -151,7 +148,7 @@ const OrganizerProfileContent = ({ user }) => {
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchProfileData();
@@ -1208,61 +1205,17 @@ const OrganizerDashboardV2 = () => {
   // Note: Authentication is handled by ProtectedRoute wrapper
   // No need for redundant auth check here
 
-  // Organizer profile from session - will be populated after ProtectedRoute validates
-  const [user, setUser] = useState({ name: "Organizer", email: "" });
-  useEffect(() => {
-    // Fetch user data from validated session (ProtectedRoute ensures we're authenticated)
-    const loadUserData = async () => {
-      try {
-        const { fetchSession } = await import("@/utils/auth");
-        const session = await fetchSession();
-        if (session?.user) {
-          setUser({
-            name: session.user.name || sessionStorage.getItem("userName") || "Organizer",
-            email: session.user.email || sessionStorage.getItem("userEmail") || "",
-          });
-        } else {
-          // Fallback to sessionStorage if session.user not available yet
-          const profileRaw = sessionStorage.getItem("userProfile");
-          const profile = profileRaw ? JSON.parse(profileRaw) : {};
-          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
-          const email = sessionStorage.getItem("userEmail") || profile.email || "";
-          setUser({ name, email });
-        }
-      } catch (err) {
-        console.warn("Failed to load user data:", err);
-        // Fallback to sessionStorage
-        try {
-          const profileRaw = sessionStorage.getItem("userProfile");
-          const profile = profileRaw ? JSON.parse(profileRaw) : {};
-          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
-          const email = sessionStorage.getItem("userEmail") || profile.email || "";
-          setUser({ name, email });
-        } catch {}
-      }
-    };
-    loadUserData();
-  }, []);
+  // User data from auth context (populated by AuthProvider on app load)
+  const { user: authUser, logout: contextLogout } = useAuth();
+  const user = {
+    name: authUser?.name || "Organizer",
+    email: authUser?.email || "",
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    // Call logout API to clear cookies on backend (if available)
-    try {
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      // Continue even if logout API fails
-      console.warn("Logout API call failed:", err);
-    }
-    
-    // Clear all session data using centralized function
-    clearSessionData();
-    resetSessionCache();
-    
-    // Redirect to home
+    await contextLogout();
     navigate("/");
     setIsLoggingOut(false);
   };

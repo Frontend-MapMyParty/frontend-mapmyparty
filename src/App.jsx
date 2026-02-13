@@ -1,4 +1,4 @@
- import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -45,8 +45,17 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Policies from "./pages/Policies";
 import Footer from "./components/Footer";
+import { AuthProvider } from "./contexts/AuthContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
+  },
+});
 
 const PublicShell = () => (
   <div className="min-h-screen flex flex-col bg-[#040712] text-white">
@@ -64,6 +73,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthProvider>
           <Routes>
             <Route element={<PublicShell />}>
               <Route path="/" element={<Index />} />
@@ -232,6 +242,7 @@ const App = () => {
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

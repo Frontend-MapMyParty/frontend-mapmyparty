@@ -1,55 +1,19 @@
-import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { fetchSession } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const location = useLocation();
-  const [state, setState] = useState({
-    loading: true,
-    isAuthenticated: false,
-    user: null,
-  });
+  const { isAuthenticated, user, loading } = useAuth();
 
-  useEffect(() => {
-    let mounted = true;
-    const guestRole = sessionStorage.getItem("role");
-    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
+  // Promoter guest bypass — check before loading gate
+  const guestRole = sessionStorage.getItem("role");
+  const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
 
-    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
-      setState({ loading: false, isAuthenticated: false, user: null });
-      return () => {
-        mounted = false;
-      };
-    }
+  if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
+    return children;
+  }
 
-    const validateSession = async () => {
-      try {
-        // Always fetch fresh session from backend
-        const session = await fetchSession(true);
-
-        if (!mounted) return;
-
-        setState({
-          loading: false,
-          isAuthenticated: session?.isAuthenticated || false,
-          user: session?.user || null,
-        });
-      } catch (err) {
-        console.error("Failed to validate session:", err);
-        if (mounted) {
-          setState({ loading: false, isAuthenticated: false, user: null });
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, [location.pathname]);
-
-  if (state.loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0b1220] via-[#0c1426] to-[#0a0f1a] flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-3">
@@ -60,14 +24,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     );
   }
 
-  if (!state.isAuthenticated) {
-    const guestRole = sessionStorage.getItem("role");
-    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
-
-    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
-      return children;
-    }
-
+  if (!isAuthenticated) {
     return (
       <Navigate
         to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}
@@ -77,7 +34,7 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   if (requiredRole) {
-    const userRole = (state.user?.role || "").toString().toUpperCase();
+    const userRole = (user?.role || "").toString().toUpperCase();
     const normalizedRequiredRole = requiredRole.toUpperCase();
 
     if (userRole !== normalizedRequiredRole) {

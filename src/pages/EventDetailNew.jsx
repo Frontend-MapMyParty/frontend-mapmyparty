@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronDown, ChevronRight, Calendar, MapPin, Clock, Users, Share2, Heart,
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram,
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
-  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles,
+  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck,
   AlertTriangle, Megaphone
 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ const TAB_PAUSE_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 const EventDetailNew = () => {
   const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -37,7 +38,6 @@ const EventDetailNew = () => {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [billingModalOpen, setBillingModalOpen] = useState(false);
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [authMode, setAuthMode] = useState("login");
@@ -560,6 +560,35 @@ const EventDetailNew = () => {
     }
   }, [organizerSlug, eventSlug]);
 
+  // Resume booking after Google OAuth redirect
+  useEffect(() => {
+    if (searchParams.get('resumeBooking') !== 'true') return;
+
+    const pendingRaw = sessionStorage.getItem('pendingBooking');
+    sessionStorage.removeItem('pendingBooking');
+
+    // Clean URL
+    searchParams.delete('resumeBooking');
+    setSearchParams(searchParams, { replace: true });
+
+    if (!pendingRaw) return;
+    try {
+      const pending = JSON.parse(pendingRaw);
+      if (pending.ticketQuantities) {
+        setTicketQuantities(pending.ticketQuantities);
+      }
+    } catch { return; }
+
+    // Wait for session, then open billing modal
+    const resumeAfterLoad = async () => {
+      const ok = await ensureSession();
+      if (ok) {
+        setBillingModalOpen(true);
+      }
+    };
+    resumeAfterLoad();
+  }, [searchParams]);
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -664,20 +693,6 @@ const EventDetailNew = () => {
     return false;
   };
 
-  const bookTickets = async () => {
-    setBookingLoading(true);
-    try {
-      // Placeholder booking flow; replace with actual booking API when ready
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setSuccessModalOpen(true);
-      toast.success("Your tickets are booked! Confirmation sent to your email.");
-    } catch (err) {
-      toast.error(err?.message || "Booking failed, please try again");
-    } finally {
-      setBookingLoading(false);
-    }
-  };
-
   const handleBookNow = async () => {
     if (totalTickets === 0) {
       toast.error("Please select at least one ticket");
@@ -771,7 +786,7 @@ const EventDetailNew = () => {
       setIsSessionAuthed(true);
       setSessionUser(session.user);
       setAuthModalOpen(false);
-      await bookTickets();
+      setBillingModalOpen(true);
     } catch (err) {
       toast.error(err?.message || "Login failed");
     } finally {
@@ -808,7 +823,7 @@ const EventDetailNew = () => {
       setIsSessionAuthed(true);
       setSessionUser(session.user);
       setAuthModalOpen(false);
-      await bookTickets();
+      setBillingModalOpen(true);
     } catch (err) {
       toast.error(err?.message || "Signup failed");
     } finally {
@@ -817,6 +832,12 @@ const EventDetailNew = () => {
   };
 
   const handleGoogleLogin = () => {
+    // Save pending booking state before navigating away
+    sessionStorage.setItem('pendingBooking', JSON.stringify({
+      returnUrl: window.location.pathname,
+      ticketQuantities,
+      timestamp: Date.now(),
+    }));
     const redirect = encodeURIComponent(window.location.href);
     const googleAuthUrl = buildUrl(`auth/google?redirect=${redirect}`);
     window.location.href = googleAuthUrl;
@@ -1803,62 +1824,6 @@ const EventDetailNew = () => {
               </form>
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      {/* Success Modal */}
-      <Dialog open={successModalOpen} onOpenChange={setSuccessModalOpen}>
-        <DialogContent className="border-gray-800 bg-gray-900 text-white max-w-lg">
-          <DialogHeader className="space-y-2 text-center">
-            <div className="mx-auto w-14 h-14 rounded-full bg-green-600/20 border border-green-600/40 flex items-center justify-center">
-              <Check className="h-7 w-7 text-green-600" />
-            </div>
-            <DialogTitle className="text-2xl">Ticket booked successfully</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              We've emailed your ticket to{" "}
-              <span className="text-white font-medium">
-                {sessionUser?.email || loginForm.email || signupForm.email || "your email"}
-              </span>
-              . See you at the event!
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-4 space-y-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Event</span>
-              <span className="font-medium text-white">{event?.title}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Tickets</span>
-              <span className="font-medium text-white">{totalTickets}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Amount</span>
-              <span className="font-medium text-green-600">₹{(totalAmount * 1.05).toLocaleString()}</span>
-            </div>
-            <div className="pt-3 border-t border-gray-700 space-y-2">
-              {event?.tickets
-                ?.filter((ticket) => (ticketQuantities[ticket.id] || 0) > 0)
-                .map((ticket) => (
-                  <div key={ticket.id} className="flex items-center justify-between text-sm text-gray-300">
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-red-600" />
-                      {ticket.name}
-                    </span>
-                    <span className="font-medium">
-                      {ticketQuantities[ticket.id]} × ₹{ticket.price.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <Button
-            className="w-full mt-4 bg-red-600 hover:bg-red-700"
-            onClick={() => setSuccessModalOpen(false)}
-          >
-            Done
-          </Button>
         </DialogContent>
       </Dialog>
 

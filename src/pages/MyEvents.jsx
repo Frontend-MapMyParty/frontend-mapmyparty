@@ -196,6 +196,12 @@ const MyEvents = () => {
     return status !== "CANCELLED" && status !== "COMPLETED";
   };
 
+  const isDeletable = (event) => {
+    const pubStatus = (event.publishStatus || "").toUpperCase();
+    const evtStatus = (event.eventStatus || "").toUpperCase();
+    return pubStatus === "DRAFT" || evtStatus === "CANCELLED";
+  };
+
   const handleSearch = useCallback((e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
@@ -393,13 +399,15 @@ const MyEvents = () => {
                           <Ban className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <button
-                        onClick={() => setConfirmDelete(event)}
-                        className="p-1.5 rounded-md text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                        title="Delete event"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isDeletable(event) && (
+                        <button
+                          onClick={() => setConfirmDelete(event)}
+                          className="p-1.5 rounded-md text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete event"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

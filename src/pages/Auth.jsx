@@ -9,11 +9,13 @@ import { Calendar, User, Building2, UserCog, Loader2, Eye, EyeOff, ArrowLeft, Sp
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { resetSessionCache, fetchSession } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import OTPVerificationModal from "@/components/OTPVerificationModal";
 import Logo from "../assets/android-chrome-192x192.png";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { login: contextLogin } = useAuth();
   const [userType, setUserType] = useState(null);
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +63,9 @@ const Auth = () => {
         if (!session?.isAuthenticated) {
           throw new Error("Login succeeded but session validation failed");
         }
+
+        // Populate auth context before navigating
+        contextLogin(session);
 
         toast.success("Logged in successfully!");
 
@@ -174,6 +179,9 @@ const Auth = () => {
       toast.error("Signup succeeded but session validation failed. Please try logging in.");
       return;
     }
+
+    // Populate auth context before navigating
+    contextLogin(session);
 
     toast.success("Account created successfully!");
 

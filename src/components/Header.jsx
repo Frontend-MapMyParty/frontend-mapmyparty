@@ -8,8 +8,7 @@ import {
 import { Calendar, Menu, X, ChevronDown, User, Ticket, Settings, LogOut } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { isAuthenticated as checkAuth } from "@/utils/auth";
-import { apiFetch } from "@/config/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Header = ({ 
   isAuthenticated: isAuthenticatedProp = undefined, 
@@ -20,55 +19,32 @@ const Header = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated: contextIsAuthenticated, role: contextRole, logout: contextLogout } = useAuth();
 
   const resolvedIsAuthenticated = useMemo(() => {
     if (typeof isAuthenticatedProp === "boolean") {
       return isAuthenticatedProp;
     }
-    return checkAuth();
-  }, [isAuthenticatedProp]);
+    return contextIsAuthenticated;
+  }, [isAuthenticatedProp, contextIsAuthenticated]);
 
   const resolvedUserRole = useMemo(() => {
     if (userRoleProp) {
       return userRoleProp;
     }
-    const storedRole = sessionStorage.getItem("role") || sessionStorage.getItem("userType");
-    return storedRole || null;
-  }, [userRoleProp]);
+    return contextRole || null;
+  }, [userRoleProp, contextRole]);
 
   const normalizedRole = typeof resolvedUserRole === "string" ? resolvedUserRole.toLowerCase() : null;
   const isOrganizer = normalizedRole === "organizer";
   const isPromoter = normalizedRole === "promoter";
   const isAttendee = !isOrganizer && !isPromoter;
 
-  const fetchAndCacheProfile = async () => {
-    try {
-      const response = await apiFetch("/api/user/profile", { method: "GET" });
-      const data = response?.data;
-
-      if (response?.success && data) {
-        sessionStorage.setItem("userName", data.name || "");
-        sessionStorage.setItem("userEmail", data.email || "");
-        sessionStorage.setItem("userPhone", data.phone || "");
-        if (data.user_roles && data.user_roles.length > 0) {
-          const roleName = data.user_roles[0]?.roles?.name || "USER";
-          sessionStorage.setItem("role", roleName);
-          sessionStorage.setItem("userType", roleName);
-        }
-        sessionStorage.setItem("userProfile", JSON.stringify(data));
-      }
-    } catch (err) {
-      console.warn("⚠️ Failed to prefetch profile", err);
-    }
-  };
-
-  const handleProfileNav = async () => {
-    await fetchAndCacheProfile();
+  const handleProfileNav = () => {
     navigate("/dashboard/profile");
   };
 
-  const handleBookingsNav = async () => {
-    await fetchAndCacheProfile();
+  const handleBookingsNav = () => {
     navigate("/dashboard/bookings");
   };
 
@@ -81,27 +57,8 @@ const Header = ({
   };
 
   const handleLogout = async () => {
-    // Call logout API to clear cookies on backend (if available)
-    try {
-      const { buildUrl } = await import("@/config/api");
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      // Continue even if logout API fails
-      console.warn("Logout API call failed:", err);
-    }
-    
-    // Clear all session data using centralized function
-    const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
-    clearSessionData();
-    resetSessionCache();
-
-    // Call parent onLogout if provided
+    await contextLogout();
     if (onLogout) onLogout();
-
-    // Redirect to home
     navigate("/");
   };
 
