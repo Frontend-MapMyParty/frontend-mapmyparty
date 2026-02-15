@@ -5,14 +5,6 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   const location = useLocation();
   const { isAuthenticated, user, loading } = useAuth();
 
-  // Promoter guest bypass — check before loading gate
-  const guestRole = sessionStorage.getItem("role");
-  const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
-
-  if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
-    return children;
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0b1220] via-[#0c1426] to-[#0a0f1a] flex items-center justify-center text-white">
@@ -25,6 +17,15 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   if (!isAuthenticated) {
+    // Redirect promoter/admin routes to the dedicated promoter login page
+    if (requiredRole?.toUpperCase() === "PROMOTER") {
+      return (
+        <Navigate
+          to={`/promoter/login?redirect=${encodeURIComponent(location.pathname)}`}
+          replace
+        />
+      );
+    }
     return (
       <Navigate
         to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}
@@ -35,7 +36,12 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   if (requiredRole) {
     const userRole = (user?.role || "").toString().toUpperCase();
-    const normalizedRequiredRole = requiredRole.toUpperCase();
+    let normalizedRequiredRole = requiredRole.toUpperCase();
+
+    // Promoter and Admin are the same role
+    if (normalizedRequiredRole === "PROMOTER") {
+      normalizedRequiredRole = "ADMIN";
+    }
 
     if (userRole !== normalizedRequiredRole) {
       console.warn(

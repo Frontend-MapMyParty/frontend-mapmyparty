@@ -37,6 +37,7 @@ import EventTypeSelection from "./pages/EventTypeSelection";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import PromoterProfile from "./pages/PromoterProfile";
+import PromoterLogin from "./pages/PromoterLogin";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
@@ -93,6 +94,7 @@ const App = () => {
               <Route path="/policies" element={<Policies />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/google/callback" element={<GoogleCallback />} />
+              <Route path="/promoter/login" element={<PromoterLogin />} />
             </Route>
             
             {/* Protected User Dashboard Routes */}
