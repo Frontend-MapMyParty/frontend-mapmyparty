@@ -1,11 +1,11 @@
- import { Calendar, Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
+ import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 import { Link } from "react-router-dom";
+import logo from "../assets/MMP logo.svg";
 
 const navLinks = [
   { label: "Browse Events", to: "/browse-events" },
   { label: "About", to: "/about" },
   { label: "Contact", to: "/contact" },
-  { label: "Policies", to: "/policies" },
 ];
 
 const socials = [
@@ -21,9 +21,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D60024] to-[#ff4d67] flex items-center justify-center shadow-[0_10px_35px_rgba(214,0,36,0.35)]">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
+            <img src={logo} alt="MapMyParty" className="h-12 w-auto" />
             <div className="space-y-1">
               <p className="text-lg font-semibold">Map MyParty</p>
               <p className="text-sm text-white/70 max-w-xs leading-relaxed">
@@ -54,8 +52,14 @@ const Footer = () => {
                 <Link to="/contact" className="block hover:text-white transition-colors">
                   Help & Support
                 </Link>
-                <Link to="/policies" className="block hover:text-white transition-colors">
-                  Terms & Privacy
+                <Link to="/privacy-policy" className="block hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
+                <Link to="/terms-conditions" className="block hover:text-white transition-colors">
+                  Terms & Conditions
+                </Link>
+                <Link to="/cookie-policy" className="block hover:text-white transition-colors">
+                  Cookie Policy
                 </Link>
               </div>
             </div>

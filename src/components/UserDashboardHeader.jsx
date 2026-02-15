@@ -5,10 +5,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, Menu, X, ChevronDown, User, Ticket, LogOut, Search, Bell } from "lucide-react";
+import { Menu, X, ChevronDown, User, Ticket, LogOut, Search, Bell } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import logo from "@/assets/MMP logo.svg";
 
 const getInitials = (name, email) => {
   if (name) {
@@ -74,9 +75,7 @@ const UserDashboardHeader = () => {
       <div className="container flex h-16 items-center justify-between">
         {/* Brand */}
         <Link to="/dashboard" className="flex items-center gap-2 font-bold text-xl text-white">
-          <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] flex items-center justify-center shadow-[0_15px_40px_-15px_rgba(0,0,0,0.7)]">
-            <Calendar className="w-5 h-5 text-white" />
-          </div>
+          <img src={logo} alt="MapMyParty" className="h-8 w-auto" />
           <span className="text-white">Map MyParty</span>
         </Link>
 

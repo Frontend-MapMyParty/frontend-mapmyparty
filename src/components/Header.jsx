@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, Menu, X, ChevronDown, User, Ticket, Settings, LogOut } from "lucide-react";
+import { Menu, X, ChevronDown, User, Ticket, Settings, LogOut } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { isAuthenticated as checkAuth } from "@/utils/auth";
@@ -120,9 +120,7 @@ const Header = ({
         {/* Brand */}
         {/* Always show Map MyParty logo that links to home */}
         <Link to="/" className="flex items-center gap-3 font-bold text-xl group text-white">
-          <div className="w-10 h-10 rounded-2xl bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.18)] flex items-center justify-center shadow-[0_15px_40px_-15px_rgba(0,0,0,0.7)] transition-all duration-300 group-hover:scale-105">
-            <Calendar className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="MapMyParty" className="h-10 w-10 object-contain" />
           <span className="text-white">Map MyParty</span>
         </Link>
 

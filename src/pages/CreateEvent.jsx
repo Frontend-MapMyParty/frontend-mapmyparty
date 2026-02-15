@@ -111,6 +111,8 @@ const CreateEvent = () => {
   const artistsLoadedRef = useRef(false);
   const originalAdditionalRef = useRef(null);
   const currentAdditionalRef = useRef(null);
+  const eventFetchInProgressRef = useRef(false);
+  const coverImageInputRef = useRef(null);
 
   const normalizeAdditionalFromState = () => ({
     tc: (termsAndConditions || "").trim(),
@@ -162,14 +164,14 @@ const CreateEvent = () => {
     };
 
     const itemBase =
-      "w-full text-left px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white transition";
-    const itemActive = "bg-gradient-to-r from-[#2563eb]/70 to-[#e11d48]/70 text-white border-white/30 shadow";
+      "w-full text-left px-3 py-2 rounded-xl border border-gray-700 bg-[#0a0a0a] text-gray-400 hover:border-[#D60024]/50 hover:text-white transition";
+    const itemActive = "border-[#D60024] bg-[#D60024]/10 text-white";
 
     return (
-      <div className="grid grid-cols-3 gap-3 p-3 bg-[#0b1224]/90 rounded-2xl border border-white/10 shadow-[0_15px_50px_rgba(0,0,0,0.55)] w-[320px]">
+      <div className="grid grid-cols-3 gap-2 p-2 bg-[#0a0a0a] rounded-xl border border-gray-700 w-[280px]">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.08em] text-white/60">Hour</p>
-          <div className="max-h-48 overflow-y-auto pr-1 space-y-2">
+          <div className="max-h-40 overflow-y-auto pr-1 space-y-1">
             {hourOptions.map((h) => (
               <button
                 key={h}
@@ -294,23 +296,20 @@ const CreateEvent = () => {
     }
   }, [currentStep]);
 
-  // Neon event theme colors (toned-down)
+  // Theme matching EventDetailNew - black/dark with red accent
   const pageTheme = {
-    background:
-      "radial-gradient(circle at 15% 18%, rgba(37,99,235,0.18), transparent 30%), radial-gradient(circle at 82% 12%, rgba(225,29,72,0.2), transparent 28%), radial-gradient(circle at 20% 75%, rgba(94,234,212,0.18), transparent 34%), linear-gradient(135deg, #0a0f1f 0%, #0b1227 35%, #0a0f1c 70%)",
-    card: "rgba(255,255,255,0.04)",
-    border: "rgba(255,255,255,0.08)",
-    red: "#e11d48",
-    blue: "#2563eb",
-    glow: "0 24px 80px rgba(0,0,0,0.5)",
+    background: "bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510]",
+    card: "bg-[#0a0a0a]/80",
+    border: "border-gray-800",
+    accent: "#D60024",
+    text: "text-white",
+    muted: "text-gray-400",
   };
 
   const fieldClass =
-    "bg-white/5 border-white/10 text-white placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:ring-offset-0 focus-visible:border-[#2563eb]/60 transition-all duration-200";
-  const cardBase =
-    "border-white/10 bg-[#0f172a]/85 backdrop-blur-sm shadow-2xl rounded-3xl";
-  const selectMenuClass =
-    "bg-[#0f1624] text-white border border-white/10 shadow-xl rounded-lg";
+    "bg-[#0a0a0a] border-gray-700 text-white placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-[#D60024]/50 focus-visible:border-[#D60024] transition-all duration-200";
+  const cardBase = "border border-gray-800 bg-[#0a0a0a]/80 rounded-2xl";
+  const selectMenuClass = "bg-[#0a0a0a] text-white border border-gray-700 rounded-lg";
 
   const ensureBackendEventId = async () => {
     if (backendEventId) return backendEventId;
@@ -698,10 +697,17 @@ const CreateEvent = () => {
     // If images or description/venue were not present in the cached event, fetch full event details (by slug if available)
     if (((!eventToEdit.images || eventToEdit.images.length === 0) || !eventToEdit.description || !eventToEdit.venues?.length) && (eventToEdit.slug || eventToEdit.id || eventToEdit._id)) {
       (async () => {
+        if (eventFetchInProgressRef.current) return;
+        eventFetchInProgressRef.current = true;
         try {
-          const fetchUrl = eventToEdit.slug
-            ? `api/event/slug/${eventToEdit.slug}`
-            : `api/event/${eventToEdit.id || eventToEdit._id}`;
+          const organizerSlug = eventToEdit.organizer?.slug;
+          const eventSlug = eventToEdit.slug;
+          const fetchUrl = organizerSlug && eventSlug
+            ? `api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
+            : eventToEdit.id || eventToEdit._id
+              ? `api/event/${eventToEdit.id || eventToEdit._id}`
+              : null;
+          if (!fetchUrl) return;
           const response = await apiFetch(fetchUrl, { method: "GET" });
           const eventData = response.data?.event || response.data || response.event || response;
           eventCacheRef.current = eventData;
@@ -740,6 +746,8 @@ const CreateEvent = () => {
           setAdditionalFromEvent(eventData);
         } catch (err) {
           console.error("Failed to fetch full event details for gallery hydration:", err);
+        } finally {
+          eventFetchInProgressRef.current = false;
         }
       })();
     }
@@ -770,7 +778,16 @@ const CreateEvent = () => {
           return;
         }
 
-        const response = await apiFetch(`api/event/${backendEventId}`, { method: "GET" });
+        // Check if fetch is already in progress
+        if (eventFetchInProgressRef.current) return;
+        eventFetchInProgressRef.current = true;
+
+        const organizerSlug = eventCacheRef.current?.organizer?.slug;
+        const eventSlug = eventCacheRef.current?.slug;
+        const fetchUrl = organizerSlug && eventSlug
+          ? `api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
+          : `api/event/${backendEventId}`;
+        const response = await apiFetch(fetchUrl, { method: "GET" });
         const eventData = response.data?.event || response.data || response.event || response;
         eventCacheRef.current = eventData;
         const sponsorData = Array.isArray(eventData?.sponsors) ? eventData.sponsors : [];
@@ -783,6 +800,8 @@ const CreateEvent = () => {
         sponsorsLoadedRef.current = true;
       } catch (err) {
         console.error("Failed to fetch sponsors for edit mode:", err);
+      } finally {
+        eventFetchInProgressRef.current = false;
       }
     };
 
@@ -817,7 +836,16 @@ const CreateEvent = () => {
           return;
         }
 
-        const response = await apiFetch(`api/event/${backendEventId}`, { method: "GET" });
+        // Check if fetch is already in progress
+        if (eventFetchInProgressRef.current) return;
+        eventFetchInProgressRef.current = true;
+
+        const organizerSlug = eventCacheRef.current?.organizer?.slug;
+        const eventSlug = eventCacheRef.current?.slug;
+        const fetchUrl = organizerSlug && eventSlug
+          ? `api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
+          : `api/event/${backendEventId}`;
+        const response = await apiFetch(fetchUrl, { method: "GET" });
         const eventData = response.data?.event || response.data || response.event || response;
         eventCacheRef.current = eventData;
         const artistData = Array.isArray(eventData?.artists) ? eventData.artists : [];
@@ -841,6 +869,8 @@ const CreateEvent = () => {
         artistsLoadedRef.current = true;
       } catch (err) {
         console.error("Failed to fetch artists for edit mode:", err);
+      } finally {
+        eventFetchInProgressRef.current = false;
       }
     };
 
@@ -877,7 +907,16 @@ const CreateEvent = () => {
           setExistingGalleryUrls([]);
           
           // Fetch event details to get images (with timestamp to prevent caching)
-          const response = await apiFetch(`api/event/${backendEventId}?t=${Date.now()}`, {
+          // Check if fetch is already in progress
+          if (eventFetchInProgressRef.current) return;
+          eventFetchInProgressRef.current = true;
+
+          const organizerSlug = eventCacheRef.current?.organizer?.slug;
+          const eventSlug = eventCacheRef.current?.slug;
+          const fetchUrl = organizerSlug && eventSlug
+            ? `api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}?t=${Date.now()}`
+            : `api/event/${backendEventId}?t=${Date.now()}`;
+          const response = await apiFetch(fetchUrl, {
             method: "GET",
           });
           
@@ -949,6 +988,8 @@ const CreateEvent = () => {
           setGalleryImages([]);
           setGalleryImageIds({});
           setExistingGalleryUrls([]);
+        } finally {
+          eventFetchInProgressRef.current = false;
         }
       }
     };
@@ -2013,6 +2054,11 @@ const CreateEvent = () => {
         setCoverPublicId(null);
         setImagesChanged(true);
         
+        // Reset the file input value to clear the filename
+        if (coverImageInputRef.current) {
+          coverImageInputRef.current.value = '';
+        }
+        
         toast.success("Cover image deleted successfully!");
         console.log("✅ Cover image removed from UI and backend");
         
@@ -2035,6 +2081,11 @@ const CreateEvent = () => {
       setCoverPublicId(null);
       setRemoveFlyerImage(true);
       setImagesChanged(true);
+      
+      // Reset the file input value to clear the filename
+      if (coverImageInputRef.current) {
+        coverImageInputRef.current.value = '';
+      }
       
       console.log("✅ Local cover image removed from UI");
     }
@@ -2618,27 +2669,18 @@ const CreateEvent = () => {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col relative text-white"
-      style={{ background: pageTheme.background }}
-    >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-20 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
-        <div className="absolute -left-32 top-1/4 h-64 w-64 rounded-full bg-[#2563eb]/10 blur-3xl" />
-        <div className="absolute -right-24 bottom-10 h-72 w-72 rounded-full bg-[#e11d48]/10 blur-3xl" />
-      </div>
-
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] text-white">
       <LoadingOverlay show={showLoading} message={loadingMessage} />
       <Header isAuthenticated userRole="organizer" />
 
-      <main className="flex-1 py-3 md:py-6 relative">
-        <div className="px-4 md:px-8 lg:px-10 w-full max-w-5xl mx-auto relative space-y-2">
+      <main className="flex-1 py-4 md:py-5">
+        <div className="px-4 md:px-6 w-full max-w-5xl mx-auto space-y-3">
           {/* Back Button and Clear Draft */}
           <div className="flex items-center justify-between mb-0">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                className="text-white hover:bg-white/10 px-3"
+                className="text-white hover:bg-[#0a0a0a] px-3"
                 onClick={() => navigate(-1)}
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -2647,11 +2689,11 @@ const CreateEvent = () => {
               {/* <span className="text-sm text-gray-300">Back</span> */}
             </div>
             
-            {backendEventId && !isEditMode && currentStep === 1 && (
+            {backendEventId && !isEditMode && (
               <Button
                 variant="outline"
                 size="sm"
-                className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                className="border-[#D60024]/30 bg-[#D60024]/10 text-white hover:bg-[#D60024]/20"
                 onClick={() => {
                   if (confirm("Are you sure you want to start a new event? This will discard the current draft.")) {
                     sessionStorage.removeItem('draftEventId');
@@ -2678,25 +2720,25 @@ const CreateEvent = () => {
             className={`mb-6 border ${cardBase}`}
             style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
           >
-            <CardContent className="p-5 md:p-6 space-y-5 rounded-2xl">
+            <CardContent className="p-4 space-y-4 rounded-2xl">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-blue-200/80">
+                  <p className="text-xs uppercase tracking-wider text-gray-500">
                     Event Builder
                   </p>
                   <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-3xl font-bold text-white drop-shadow-sm">
+                    <h1 className="text-2xl font-bold text-white drop-shadow-sm">
                       {isEditMode ? "Update Event" : "Create New Event"}
                     </h1>
                     {selectedEventTypeCategory && (
-                      <Badge className="bg-white/8 text-white border-white/15">
+                      <Badge className="bg-[#0a0a0a] text-gray-300 border-gray-700">
                         {selectedEventTypeCategory}
                       </Badge>
                     )}
                     
                     {backendEventId && !isEditMode && (
-                      <Badge className="bg-[#e11d48]/15 text-white border-[#e11d48]/30">
-                        📝 Draft
+                      <Badge className="bg-[#D60024]/15 text-white border-[#D60024]/30">
+                        Draft
                       </Badge>
                     )}
                   </div>
@@ -2706,9 +2748,9 @@ const CreateEvent = () => {
                     
                   <div className="flex items-center gap-3">
                    
-                    <div className="relative flex rounded-full overflow-hidden border border-white/20 bg-white/[0.08] shadow-xl backdrop-blur-md p-1">
+                    <div className="relative flex rounded-full overflow-hidden border border-gray-700 bg-[#0a0a0a] p-1">
                       <div
-                        className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#60a5fa] rounded-full transition-all duration-300 ease-out shadow-[0_0_30px_rgba(37,99,235,0.7)]"
+                        className="absolute top-1 left-1 h-[calc(100%-8px)] w-[calc(50%-4px)] bg-[#D60024] rounded-full transition-all duration-300 ease-out"
                         style={{
                           transform: publishState === "PUBLISHED" ? "translateX(100%)" : "translateX(0)",
                         }}
@@ -2719,10 +2761,10 @@ const CreateEvent = () => {
                           <button
                             key={state}
                             type="button"
-                            className={`relative z-10 text-sm font-semibold px-5 py-2 transition-all duration-300 ${
+                            className={`relative z-10 text-sm font-medium px-5 py-2 transition-all duration-300 ${
                               isActive
-                                ? "text-white drop-shadow-[0_0_8px_rgba(37,99,235,0.5)]"
-                                : "text-white/60 hover:text-white/80"
+                                ? "text-white"
+                                : "text-gray-400 hover:text-gray-300"
                             }`}
                             onClick={() => setPublishState(state)}
                             disabled={isSubmitting}
@@ -2734,9 +2776,9 @@ const CreateEvent = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10">
-                    <div className="w-2 h-2 rounded-full bg-[#e11d48] animate-pulse" />
-                    <span className="text-xs text-gray-200 whitespace-nowrap">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-[#0a0a0a] border border-gray-700">
+                    <div className="w-2 h-2 rounded-full bg-[#D60024] animate-pulse" />
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
                       Step {currentStep} of {steps.length} • {steps[currentStep - 1].title}
                     </span>
                   </div>
@@ -2751,26 +2793,26 @@ const CreateEvent = () => {
                     const isDone = step.number < currentStep;
                     const barActive =
                       idx < currentStep - 1
-                        ? "bg-gradient-to-r from-[#2563eb] to-[#e11d48]"
+                        ? "bg-[#D60024]"
                         : idx === currentStep - 1
-                        ? "bg-[#2563eb]/60"
-                        : "bg-white/12";
+                        ? "bg-gray-700"
+                        : "bg-gray-800";
 
                     return (
-                      <div key={step.number} className="flex-1 min-w-[110px] flex items-center gap-2">
-                        <div className="flex flex-col items-center gap-2 w-full">
+                      <div key={step.number} className="flex-1 min-w-[90px] flex items-center gap-1">
+                        <div className="flex flex-col items-center gap-1 w-full">
                           <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                            className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-sm transition-all ${
                               isDone
-                                ? "bg-[#16a34a] border-[#16a34a] text-white shadow-lg shadow-[#16a34a]/30"
+                                ? "bg-[#D60024] border-[#D60024] text-white"
                                 : isCurrent
-                                ? "border-[#2563eb] bg-[#2563eb]/15 text-white"
-                                : "border-white/15 bg-white/5 text-gray-300"
+                                ? "border-[#D60024] bg-[#0a0a0a] text-white"
+                                : "border-gray-800 bg-[#0a0a0a] text-gray-500"
                             }`}
                           >
                             {isDone ? <Check className="w-4 h-4" /> : step.number}
                           </div>
-                          <p className="text-xs font-semibold text-white/85 text-center leading-tight">
+                          <p className="text-xs font-medium text-gray-400 text-center leading-tight">
                             {step.title}
                           </p>
                         </div>
@@ -2786,25 +2828,19 @@ const CreateEvent = () => {
           </Card>
 
           {/* Step Content */}
-          <Card
-            className={`border ${cardBase}`}
-            style={{ borderColor: pageTheme.border, boxShadow: pageTheme.glow }}
-          >
-            <CardHeader
-              className="border-b border-white/10 bg-transparent pb-5"
-              style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
-            >
+          <Card className={cardBase}>
+            <CardHeader className="border-b border-gray-800 bg-transparent pb-5">
               <CardTitle className="text-xl text-white flex items-center gap-2">
-                <span className="inline-flex w-8 h-8 items-center justify-center rounded-full bg-white/10 text-sm font-semibold">
+                <span className="inline-flex w-8 h-8 items-center justify-center rounded-full bg-gray-800 text-sm font-semibold">
                   {currentStep}
                 </span>
                 {steps[currentStep - 1].title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6 text-gray-100 pt-7">
+            <CardContent className="space-y-4 text-gray-200 pt-5">
               {/* Step 1: Event Details + Images */}
               {currentStep === 1 && (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="eventTitle">Event Title *</Label>
@@ -2827,7 +2863,7 @@ const CreateEvent = () => {
                         setSelectedCategories([]);
                         if (backendEventId) setTextFieldsChanged(true);
                       }}>
-                        <SelectTrigger className={`${fieldClass} h-12`}>
+                        <SelectTrigger className={`${fieldClass} h-10`}>
                           <SelectValue placeholder="Select main category" />
                         </SelectTrigger>
                         <SelectContent className={selectMenuClass}>
@@ -2844,7 +2880,7 @@ const CreateEvent = () => {
                           setSelectedCategories([value]);
                           if (backendEventId) setTextFieldsChanged(true);
                         }}>
-                          <SelectTrigger className={`${fieldClass} h-12`}>
+                          <SelectTrigger className={`${fieldClass} h-10`}>
                             <SelectValue placeholder="Select subcategory" />
                           </SelectTrigger>
                           <SelectContent className={selectMenuClass}>
@@ -2881,13 +2917,14 @@ const CreateEvent = () => {
                     <div className="space-y-2">
                       <Label htmlFor="cover-image">Cover Image *</Label>
                       <div className="space-y-3">
-                        <Input 
+                        <input
                           id="cover-image" 
                           type="file" 
                           accept="image/*" 
                           onChange={handleCoverImageChange}
                           className={`${fieldClass} cursor-pointer`}
                           disabled={uploadingCover || !basicDetailsFilled}
+                          ref={coverImageInputRef}
                         />
                         <p className="text-xs text-muted-foreground">
                           Recommended size: 1920x1080px.
@@ -2907,7 +2944,7 @@ const CreateEvent = () => {
                         )}
                         
                         {coverImage && !uploadingCover && (
-                          <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border">
+                          <div className="relative w-full h-40 rounded-lg overflow-hidden border border-border">
                             <img 
                               src={coverImage} 
                               alt="Cover preview" 
@@ -2990,7 +3027,7 @@ const CreateEvent = () => {
               {/* Step 5: Sponsor */}
               {currentStep === 5 && (
                 <div className="space-y-5">
-                  <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex flex-col gap-3 rounded-lg border border-gray-800 bg-[#0a0a0a]/80 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-white">Is this event sponsored?</p>
@@ -3026,7 +3063,7 @@ const CreateEvent = () => {
                         variant="outline"
                         size="sm"
                         onClick={addSponsorRow}
-                        className="border-white/20 bg-white/5 text-white hover:bg-white/10"
+                        className="border-gray-700 bg-[#0a0a0a] text-white hover:border-[#D60024]/50"
                       >
                         <Plus className="w-4 h-4 mr-2" />
                         Add Sponsor
@@ -3038,11 +3075,11 @@ const CreateEvent = () => {
                     <div className="space-y-4">
                       {sponsors.map((sponsor, index) => (
                         <Card key={index} className={`border ${cardBase}`} style={{ borderColor: pageTheme.border }}>
-                          <CardContent className="p-5 space-y-4">
+                          <CardContent className="p-4 space-y-3">
                             <div className="flex items-start justify-between">
                               <div>
                                 <p className="text-sm text-muted-foreground">Sponsor {index + 1}</p>
-                                <h3 className="font-semibold text-white">Brand details</h3>
+                                <h5 className="font-semibold text-white">Brand details</h5>
                               </div>
                               {sponsors.length > 1 && (
                                 <Button
@@ -3095,7 +3132,7 @@ const CreateEvent = () => {
                                     </div>
                                   )}
                                   {sponsor.logoUrl && (
-                                    <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-border bg-white/5 flex items-center justify-center">
+                                    <div className="relative w-28 h-28 rounded-lg overflow-hidden border border-gray-700 bg-[#0a0a0a] flex items-center justify-center">
                                       <img
                                         src={sponsor.logoUrl}
                                         alt={`${sponsor.name || "Sponsor"} logo`}
@@ -3128,7 +3165,7 @@ const CreateEvent = () => {
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="text-xs text-white/70 bg-white/10 px-3 py-2 rounded-lg border border-white/10">
+                                  <div className="text-xs text-gray-400 bg-[#0a0a0a] px-3 py-2 rounded-lg border border-gray-700">
                                     Single sponsor is primary by default.
                                   </div>
                                 )}
@@ -3141,7 +3178,7 @@ const CreateEvent = () => {
                   )}
 
                   {isSponsored && sponsors.length === 0 && (
-                    <div className="border border-dashed border-white/15 rounded-xl p-6 text-sm text-muted-foreground text-center">
+                    <div className="border border-dashed border-gray-700 rounded-xl p-4 text-sm text-gray-400 text-center">
                       No sponsors added yet. Click “Add Sponsor” to include partners.
                     </div>
                   )}
@@ -3158,15 +3195,15 @@ const CreateEvent = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                            className={`w-full justify-between ${fieldClass} h-10 hover:border-[#D60024]/50`}
                           >
                             <span className="flex items-center gap-2 text-white">
-                              <CalendarIcon className="w-4 h-4 text-white/70" />
+                              <CalendarIcon className="w-4 h-4 text-gray-400" />
                               {startDate ? formatDateValue(startDate) : "Pick a start date"}
                             </span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" className="w-auto p-0 border-white/15 bg-transparent">
+                        <PopoverContent align="start" className="w-auto p-0 border-gray-700 bg-[#0a0a0a]">
                           <Calendar
                             mode="single"
                             selected={startDate ? new Date(`${startDate}T00:00:00`) : undefined}
@@ -3191,10 +3228,10 @@ const CreateEvent = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                            className={`w-full justify-between ${fieldClass} h-10 hover:border-[#D60024]/50`}
                           >
                             <span className="flex items-center gap-2 text-white">
-                              <Clock className="w-4 h-4 text-white/70" />
+                              <Clock className="w-4 h-4 text-gray-400" />
                               {formatTimeDisplay(startTime)}
                             </span>
                           </Button>
@@ -3202,7 +3239,7 @@ const CreateEvent = () => {
                         <PopoverContent
                           align="start"
                           sideOffset={8}
-                          className="w-auto p-0 border-white/15 bg-transparent"
+                          className="w-auto p-0 border-gray-700 bg-[#0a0a0a]"
                         >
                           <TimePicker
                             value={startTime}
@@ -3223,15 +3260,15 @@ const CreateEvent = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                            className={`w-full justify-between ${fieldClass} h-10 hover:border-[#D60024]/50`}
                           >
                             <span className="flex items-center gap-2 text-white">
-                              <CalendarIcon className="w-4 h-4 text-white/70" />
+                              <CalendarIcon className="w-4 h-4 text-gray-400" />
                               {endDate ? formatDateValue(endDate) : "Pick an end date"}
                             </span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent align="start" className="w-auto p-0 border-white/15 bg-transparent">
+                        <PopoverContent align="start" className="w-auto p-0 border-gray-700 bg-[#0a0a0a]">
                           <Calendar
                             mode="single"
                             selected={endDate ? new Date(`${endDate}T00:00:00`) : undefined}
@@ -3255,10 +3292,10 @@ const CreateEvent = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className={`w-full justify-between ${fieldClass} h-12 hover:border-white/30 hover:bg-white/5`}
+                            className={`w-full justify-between ${fieldClass} h-10 hover:border-[#D60024]/50`}
                           >
                             <span className="flex items-center gap-2 text-white">
-                              <Clock className="w-4 h-4 text-white/70" />
+                              <Clock className="w-4 h-4 text-gray-400" />
                               {formatTimeDisplay(endTime)}
                             </span>
                           </Button>
@@ -3266,7 +3303,7 @@ const CreateEvent = () => {
                         <PopoverContent
                           align="start"
                           sideOffset={8}
-                          className="w-auto p-0 border-white/15 bg-transparent"
+                          className="w-auto p-0 border-gray-700 bg-[#0a0a0a]"
                         >
                           <TimePicker
                             value={endTime}
@@ -3285,29 +3322,28 @@ const CreateEvent = () => {
               {/* Step 3: Tickets */}
               {currentStep === 3 && (
                 <div className="space-y-6">
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-gray-400">
                     Select ticket types to add for your event
                   </div>
 
-                  <div className="p-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 text-xs md:text-sm text-muted-foreground">
-                    Need a custom ticket? Pick <span className="font-semibold text-white/90">Add Standard Ticket</span>, name it (e.g., <span className="font-semibold text-white/90">Silver</span>) and set any price (₹150, ₹499, etc.). You can add multiple categories.
+                  <div className="p-3 rounded-xl border border-dashed border-gray-700 bg-[#0a0a0a]/80 text-xs md:text-sm text-gray-400">
+                    Need a custom ticket? Pick <span className="font-medium text-white">Add Standard Ticket</span>, name it (e.g., <span className="font-medium text-white">Silver</span>) and set any price. You can add multiple categories.
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     {/* VIP Guest List Card */}
                     <Card 
-                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
-                      style={{ borderColor: pageTheme.border }}
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#D60024]/50`}
                       onClick={() => openTicketModal("vip-guest")}
                     >
-                      <CardContent className="p-6 space-y-4">
+                      <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
-                            <Users className="w-6 h-6 text-white" />
+                          <div className="p-2 rounded-lg bg-[#0a0a0a] border border-gray-700">
+                            <Users className="w-5 h-5 text-gray-400" />
                           </div>
-                          <h3 className="text-lg font-semibold">Add VIP Guest List</h3>
+                          <h3 className="text-base font-semibold text-white">Add VIP Guest List</h3>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-400">
                           Free entry for VIP guests with no pricing
                         </p>
                       </CardContent>
@@ -3315,18 +3351,17 @@ const CreateEvent = () => {
 
                     {/* Standard Ticket Card */}
                     <Card 
-                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
-                      style={{ borderColor: pageTheme.border }}
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#D60024]/50`}
                       onClick={() => openTicketModal("standard")}
                     >
-                      <CardContent className="p-6 space-y-4">
+                      <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
-                            <Ticket className="w-6 h-6 text-white" />
+                          <div className="p-2 rounded-lg bg-[#0a0a0a] border border-gray-700">
+                            <Ticket className="w-5 h-5 text-gray-400" />
                           </div>
-                          <h3 className="text-lg font-semibold">Add Standard Ticket</h3>
+                          <h3 className="text-base font-semibold text-white">Add Standard Ticket</h3>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-400">
                           Regular paid tickets with GST options
                         </p>
                       </CardContent>
@@ -3334,18 +3369,17 @@ const CreateEvent = () => {
 
                     {/* Table Ticket Card */}
                     <Card 
-                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
-                      style={{ borderColor: pageTheme.border }}
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#D60024]/50`}
                       onClick={() => openTicketModal("table")}
                     >
-                      <CardContent className="p-6 space-y-4">
+                      <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
-                            <Table2 className="w-6 h-6 text-white" />
+                          <div className="p-2 rounded-lg bg-[#0a0a0a] border border-gray-700">
+                            <Table2 className="w-5 h-5 text-gray-400" />
                           </div>
-                          <h3 className="text-lg font-semibold">Add Table Ticket</h3>
+                          <h3 className="text-base font-semibold text-white">Add Table Ticket</h3>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-400">
                           Reserved table booking for groups
                         </p>
                       </CardContent>
@@ -3353,18 +3387,17 @@ const CreateEvent = () => {
 
                     {/* Group Pass Card */}
                     <Card 
-                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#2563eb] hover:shadow-xl`}
-                      style={{ borderColor: pageTheme.border }}
+                      className={`group transition-all cursor-pointer border ${cardBase} hover:border-[#D60024]/50`}
                       onClick={() => openTicketModal("group-pass")}
                     >
-                      <CardContent className="p-6 space-y-4">
+                      <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-3 rounded-lg bg-gradient-to-br from-[#2563eb]/15 via-white/5 to-[#e11d48]/10">
-                            <UsersRound className="w-6 h-6 text-white" />
+                          <div className="p-2 rounded-lg bg-[#0a0a0a] border border-gray-700">
+                            <UsersRound className="w-5 h-5 text-gray-400" />
                           </div>
-                          <h3 className="text-lg font-semibold">Add Group Pass</h3>
+                          <h3 className="text-base font-semibold text-white">Add Group Pass</h3>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-400">
                           Discounted pass for group bookings
                         </p>
                       </CardContent>
@@ -3374,24 +3407,24 @@ const CreateEvent = () => {
                   {/* Display saved tickets */}
                   {savedTickets.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="font-semibold">Added Tickets ({savedTickets.length})</h3>
+                      <h5 className="font-semibold">Added Tickets ({savedTickets.length})</h5>
                       <div className="grid gap-3">
                         {savedTickets.map((ticket, index) => (
-                          <Card key={index}>
+                          <Card key={index} className="border border-gray-800 bg-[#0a0a0a]/80">
                             <CardContent className="p-4">
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <h4 className="font-semibold">{ticket.ticketName}</h4>
-                                  <p className="text-sm text-muted-foreground">
+                                  <h6 className="font-semibold text-white">{ticket.ticketName}</h6>
+                                  <p className="text-sm text-gray-400">
                                     {ticket.ticketCategory} • {ticket.ticketEntryType}
                                   </p>
                                   {ticket.ticketAddress && (
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-gray-400 mt-1">
                                       {ticket.ticketAddress}
                                     </p>
                                   )}
                                   {ticket.price !== "0" && (
-                                    <p className="text-sm font-semibold mt-1">₹{ticket.price}</p>
+                                    <p className="text-sm font-semibold mt-1 text-[#D60024]">₹{ticket.price}</p>
                                   )}
                                 </div>
                                 
@@ -3403,6 +3436,7 @@ const CreateEvent = () => {
                                     handleDeleteTicket(ticket, index);
                                   }}
                                   disabled={showLoading}
+                                  className="text-gray-400 hover:text-white"
                                 >
                                   {showLoading ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -3423,15 +3457,15 @@ const CreateEvent = () => {
               {/* Step 4: Venue & Location */}
               {currentStep === 4 && (
                 <div className="space-y-6">
-                  <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                  <div className="rounded-xl border border-gray-800 bg-[#0a0a0a]/80 p-4">
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-white/60">Venue</p>
-                        <h3 className="text-lg font-semibold text-white">Location Details</h3>
+                        <h3 className="text-base font-semibold text-white">Location Details</h3>
                       </div>
                       <div className="flex gap-2 text-[11px]">
-                        <span className="px-3 py-1 rounded-full bg-[#2563eb]/15 text-[#8ab4ff] border border-[#2563eb]/30">Manual entry</span>
-                        <span className="px-3 py-1 rounded-full bg-[#e11d48]/15 text-[#ff9cb7] border border-[#e11d48]/30">Required fields *</span>
+                        <span className="px-3 py-1 rounded-full bg-[#0a0a0a] text-gray-400 border border-gray-700">Manual entry</span>
+                        <span className="px-3 py-1 rounded-full bg-[#0a0a0a] text-gray-400 border border-gray-700">Required fields *</span>
                       </div>
                     </div>
 
@@ -3551,11 +3585,11 @@ const CreateEvent = () => {
                   </div>
 
                   {artists.map((artist, index) => (
-                    <Card key={index} className="p-4 border border-border/60 shadow-sm">
+                    <Card key={index} className="p-3 border border-gray-800">
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <p className="text-sm text-muted-foreground">Artist {index + 1}</p>
-                          <h3 className="font-semibold leading-tight">Add details</h3>
+                          <h5 className="font-semibold leading-tight">Add details</h5>
                         </div>
                         {artists.length > 1 && (
                           <Button
@@ -3702,7 +3736,7 @@ const CreateEvent = () => {
 
                 return (
                   <div className="space-y-5">
-                    <Card className="border border-white/10 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0b1224] shadow-[0_20px_80px_rgba(0,0,0,0.55)]">
+                    <Card className="border border-gray-800 bg-[#0a0a0a]/80">
                       <CardHeader className="pb-2">
                         <p className="text-xs uppercase tracking-[0.2em] text-white/50">Step 7</p>
                         <CardTitle className="text-xl text-white">Additional Info</CardTitle>
@@ -3716,7 +3750,7 @@ const CreateEvent = () => {
                               <p className="text-xs text-white/60">Describe entry rules, refunds, or other policies.</p>
                             </div>
                           </div>
-                          <div className="rounded-2xl border border-white/15 bg-gradient-to-br from-[#0c1324] via-[#0f172a] to-[#0b1224] shadow-[0_20px_70px_rgba(0,0,0,0.5)] p-3">
+                          <div className="rounded-2xl border border-gray-700 bg-[#0a0a0a] p-3">
                             <ReactQuill
                               theme="snow"
                               value={termsAndConditions}
@@ -3752,7 +3786,7 @@ const CreateEvent = () => {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="border-white/30 text-white bg-white/5 hover:bg-white/10"
+                                className="border-gray-700 bg-[#0a0a0a] text-white hover:border-[#D60024]/50"
                                 onClick={() => setAdvisoryDialogOpen(true)}
                               >
                                 {hasSelections ? `${selectedBuiltIns.length + customAdvisories.length} selected` : "Open advisory picker"}
@@ -3761,8 +3795,8 @@ const CreateEvent = () => {
                           </div>
 
                           <Dialog open={advisoryDialogOpen} onOpenChange={setAdvisoryDialogOpen}>
-                            <DialogContent className="max-w-4xl border-white/15 bg-[#0b1224]/95 text-white shadow-[0_30px_120px_rgba(0,0,0,0.65)] max-h-[90vh] overflow-hidden p-0">
-                            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5">
+                            <DialogContent className="max-w-4xl border-gray-800 bg-gray-950 text-white max-h-[90vh] overflow-hidden p-0">
+                            <div className="p-5 overflow-y-auto max-h-[70vh] space-y-4">
                               <DialogHeader>
                                 <DialogTitle className="text-2xl">Choose advisories</DialogTitle>
                                 <DialogDescription className="text-white/70">
@@ -3780,8 +3814,8 @@ const CreateEvent = () => {
                                         type="button"
                                         className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${
                                           active
-                                            ? "border-[#2563eb]/70 bg-[#2563eb]/15 text-white shadow-[0_12px_40px_rgba(37,99,235,0.25)]"
-                                            : "border-white/15 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10"
+                                            ? "border-[#D60024] bg-[#D60024]/10 text-white"
+                                            : "border-gray-700 bg-[#0a0a0a] text-gray-400 hover:border-[#D60024]/50 hover:bg-[#0a0a0a]"
                                         }`}
                                         onClick={() => setAdvisory({ ...advisory, [item.id]: !active })}
                                       >
@@ -3795,7 +3829,7 @@ const CreateEvent = () => {
                                   })}
                                 </div>
 
-                                <div className="border-t border-white/10 pt-4 space-y-3">
+                                <div className="border-t border-gray-700 pt-4 space-y-3">
                                   <p className="text-sm font-semibold text-white">Custom advisory</p>
                                   <div className="flex flex-col sm:flex-row gap-3">
                                     <div className="flex-1 flex gap-2">
@@ -3803,12 +3837,12 @@ const CreateEvent = () => {
                                         placeholder="e.g., No re-entry after 10 PM"
                                         value={newCustomAdvisory}
                                         onChange={(e) => setNewCustomAdvisory(e.target.value)}
-                                        className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                                        className="bg-[#0a0a0a] border-gray-700 text-white placeholder:text-gray-500"
                                       />
                                       <Button
                                         type="button"
                                         variant="outline"
-                                        className="border-white/20 text-white bg-white/5 hover:bg-white/10"
+                                        className="border-gray-700 bg-[#0a0a0a] text-white hover:border-[#D60024]/50"
                                         onClick={() => setShowEmojiPicker((prev) => !prev)}
                                       >
                                         <Smile className="w-4 h-4" />
@@ -3817,7 +3851,7 @@ const CreateEvent = () => {
                                     <Button
                                       type="button"
                                       variant="accent"
-                                      className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg"
+                                      className="bg-[#D60024] text-white hover:bg-[#ff1a3c]"
                                       onClick={() => {
                                         const trimmed = newCustomAdvisory.trim();
                                         if (!trimmed) return;
@@ -3831,14 +3865,14 @@ const CreateEvent = () => {
                                   </div>
 
                                   {showEmojiPicker && (
-                                    <div className="rounded-xl border border-white/15 bg-[#0f172a] p-3 space-y-2 max-h-60 overflow-y-auto">
-                                      <p className="text-xs uppercase tracking-[0.08em] text-white/60">Emoji</p>
+                                    <div className="rounded-xl border border-gray-700 bg-[#0a0a0a] p-3 space-y-2 max-h-60 overflow-y-auto">
+                                      <p className="text-xs uppercase tracking-wider text-gray-500">Emoji</p>
                                       <div className="grid grid-cols-8 gap-2 text-lg">
                                         {emojiPalette.map((emoji, idx) => (
                                           <button
                                             key={`emoji-${idx}`}
                                             type="button"
-                                            className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 transition"
+                                            className="h-9 w-9 rounded-lg border border-gray-700 bg-[#0a0a0a] hover:border-[#D60024]/50 hover:bg-[#0a0a0a] transition"
                                             onClick={() => setNewCustomAdvisory((prev) => `${prev}${emoji}`)}
                                           >
                                             {emoji}
@@ -3854,7 +3888,7 @@ const CreateEvent = () => {
                                         <button
                                           key={`custom-dialog-${idx}`}
                                           type="button"
-                                          className="group flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white hover:border-[#e11d48]/50 hover:bg-[#e11d48]/15"
+                                          className="group flex items-center gap-2 rounded-full border border-gray-700 bg-[#0a0a0a] px-3 py-1 text-sm text-gray-400 hover:border-[#D60024]/50 hover:bg-[#0a0a0a]"
                                           onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== idx))}
                                         >
                                           ✨ {item}
@@ -3884,7 +3918,7 @@ const CreateEvent = () => {
                                   <Button
                                     type="button"
                                     variant="accent"
-                                    className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg"
+                                    className="bg-[#D60024] text-white hover:bg-[#ff1a3c]"
                                     onClick={() => setAdvisoryDialogOpen(false)}
                                   >
                                     Done
@@ -3900,7 +3934,7 @@ const CreateEvent = () => {
                                 <button
                                   key={item.id}
                                   type="button"
-                                  className="group flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white hover:border-[#e11d48]/40 hover:bg-[#e11d48]/10"
+                                  className="group flex items-center gap-2 rounded-full border border-gray-700 bg-[#0a0a0a] px-3 py-1 text-sm text-gray-400 hover:border-[#D60024]/50 hover:bg-[#0a0a0a]"
                                   onClick={() => setAdvisory({ ...advisory, [item.id]: false })}
                                 >
                                   {item.label}
@@ -3911,7 +3945,7 @@ const CreateEvent = () => {
                                 <button
                                   key={`custom-${idx}`}
                                   type="button"
-                                  className="group flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-sm text-white hover:border-[#e11d48]/40 hover:bg-[#e11d48]/10"
+                                  className="group flex items-center gap-2 rounded-full border border-gray-700 bg-[#0a0a0a] px-3 py-1 text-sm text-gray-400 hover:border-[#D60024]/50 hover:bg-[#0a0a0a]"
                                   onClick={() => setCustomAdvisories(customAdvisories.filter((_, i) => i !== idx))}
                                 >
                                   ✨ {item}
@@ -3920,8 +3954,8 @@ const CreateEvent = () => {
                               ))}
                             </div>
                           ) : (
-                            <div className="text-sm text-white/60 border border-dashed border-white/20 rounded-lg px-3 py-2 bg-white/5">
-                              No advisories selected yet. Use “Select advisories” to add them.
+                            <div className="text-sm text-gray-500 border border-dashed border-gray-700 rounded-lg px-3 py-2 bg-[#0a0a0a]/80">
+                              No advisories selected yet. Use "Open advisory picker" to add them.
                             </div>
                           )}
                         </div>
@@ -3935,7 +3969,7 @@ const CreateEvent = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="border-white/30 text-white bg-white/5 hover:bg-white/10"
+                              className="border-gray-600 text-white bg-gray-800 hover:bg-gray-700"
                               onClick={() => {
                                 if (newQuestion.trim()) {
                                   setCustomQuestions([...customQuestions, { question: newQuestion, answer: newAnswer }]);
@@ -3957,31 +3991,31 @@ const CreateEvent = () => {
                               placeholder="Question (e.g., Dietary requirements?)"
                               value={newQuestion}
                               onChange={(e) => setNewQuestion(e.target.value)}
-                              className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                              className="bg-[#0a0a0a] border-gray-700 text-white placeholder:text-gray-500"
                             />
                             <Textarea
                               placeholder="Answer (optional - organizer can provide default answer)"
                               value={newAnswer}
                               onChange={(e) => setNewAnswer(e.target.value)}
                               rows={2}
-                              className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                              className="bg-[#0a0a0a] border-gray-700 text-white placeholder:text-gray-500"
                             />
                           </div>
 
                           {customQuestions.length > 0 ? (
                             <div className="space-y-3">
                               {customQuestions.map((q, index) => (
-                                <Card key={index} className="border border-white/10 bg-white/5">
+                                <Card key={index} className="border border-gray-800 bg-[#0a0a0a]/80">
                                   <CardContent className="pt-4">
                                     <div className="flex justify-between items-start gap-2">
                                       <div className="flex-1 space-y-1">
                                         <p className="font-medium text-sm text-white">Q: {q.question}</p>
-                                        {q.answer && <p className="text-sm text-white/70">A: {q.answer}</p>}
+                                        {q.answer && <p className="text-sm text-gray-400">A: {q.answer}</p>}
                                       </div>
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-white/70 hover:text-white"
+                                        className="text-gray-400 hover:text-white"
                                         onClick={() => {
                                           setCustomQuestions(customQuestions.filter((_, i) => i !== index));
                                           toast.success('Question removed');
@@ -3995,7 +4029,7 @@ const CreateEvent = () => {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-sm text-white/60">No questions added yet.</p>
+                            <p className="text-sm text-gray-400">No questions added yet.</p>
                           )}
                         </div>
 
@@ -4007,7 +4041,7 @@ const CreateEvent = () => {
                             rows={3}
                             value={organizerNote}
                             onChange={(e) => setOrganizerNote(e.target.value)}
-                            className="bg-white/5 border-white/15 text-white placeholder:text-white/50"
+                            className="bg-[#0a0a0a] border-gray-700 text-white placeholder:text-gray-500"
                           />
                         </div>
                       </CardContent>
@@ -4019,7 +4053,7 @@ const CreateEvent = () => {
               {/* Step 8: Review & Publish */}
               {currentStep === 8 && (() => {
                 const statusBadge = (filled) => (
-                  <Badge className={filled ? 'bg-emerald-500/20 text-emerald-100 border-emerald-400/30 shadow-[0_0_20px_rgba(16,185,129,0.25)]' : 'bg-white/10 text-white/70 border-white/15'}>
+                  <Badge className={filled ? 'bg-[#D60024]/20 text-white border-[#D60024]/40' : 'bg-[#0a0a0a] text-gray-400 border-gray-700'}>
                     {filled ? 'Filled' : 'Missing'}
                   </Badge>
                 );
@@ -4083,7 +4117,7 @@ const CreateEvent = () => {
                 ];
 
                 return (
-                  <div className="space-y-6 bg-gradient-to-br from-[#0b0f18] via-[#0f172a]/90 to-[#0c1324] p-4 md:p-6 rounded-2xl border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
+                  <div className="space-y-4 bg-[#0a0a0a]/80 p-4 rounded-xl border border-gray-800">
                     {/* <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.7)]" />
@@ -4092,7 +4126,7 @@ const CreateEvent = () => {
                       <p className="text-sm text-white/70">Check what’s filled and what’s missing. You can go back to edit anything.</p>
                     </div> */}
 
-                    <div className="flex flex-wrap items-center gap-3 border border-white/10 bg-white/5 rounded-xl p-4">
+                    <div className="flex flex-wrap items-center gap-3 border border-gray-800 bg-[#0a0a0a]/80 rounded-xl p-4">
                       <div className="space-y-1">
                         <p className="text-xs uppercase tracking-[0.12em] text-white/60">Publish State</p>
                         <p className="text-sm text-white/80">Choose whether to keep this as Draft or Publish it now.</p>
@@ -4105,7 +4139,7 @@ const CreateEvent = () => {
                               key={state}
                               type="button"
                               variant={isActive ? "accent" : "outline"}
-                              className={`px-4 ${isActive ? "bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white" : "border-white/30 text-white hover:bg-white/10"}`}
+                              className={`px-4 ${isActive ? "bg-gray-700 text-white" : "border-gray-600 text-white hover:bg-gray-800"}`}
                               onClick={() => setPublishState(state)}
                               disabled={isSubmitting}
                             >
@@ -4163,7 +4197,7 @@ const CreateEvent = () => {
                                   <p className="font-semibold">{s.name || s.company}</p>
                                   <p className="text-xs text-white/60">{s.tier || 'Sponsor'}</p>
                                 </div>
-                                {s.logo && <img src={s.logo} alt="" className="w-10 h-10 object-contain rounded border border-white/10 bg-white/5" />}
+                                {s.logo && <img src={s.logo} alt="" className="w-10 h-10 object-contain rounded border border-gray-700 bg-[#0a0a0a]" />}
                               </div>
                             ))
                           ) : (
@@ -4213,7 +4247,7 @@ const CreateEvent = () => {
                         {galleryImages.length ? (
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {galleryImages.slice(0, 4).map((img, i) => (
-                              <div key={i} className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                              <div key={i} className="aspect-square rounded-lg overflow-hidden border border-gray-700">
                                 <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover" />
                               </div>
                             ))}
@@ -4231,7 +4265,7 @@ const CreateEvent = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {additionalInfoCards.map((info, i) => (
-                          <div key={i} className="flex gap-3 border border-white/10 rounded-lg p-3 bg-white/5 hover:border-white/20 transition">
+                          <div key={i} className="flex gap-3 border border-gray-800 rounded-lg p-3 bg-[#0a0a0a]/80 hover:border-gray-700 transition">
                             <div className="flex-1 space-y-1">
                               <p className="text-[11px] uppercase tracking-[0.12em] text-white/60">{info.title}</p>
                               {info.filled ? (
@@ -4240,7 +4274,7 @@ const CreateEvent = () => {
                                     {info.content.map((chip, idx) => (
                                       <span
                                         key={idx}
-                                        className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm text-emerald-50"
+                                        className="inline-flex items-center gap-1 rounded-full border border-[#D60024]/30 bg-[#D60024]/10 px-3 py-1 text-sm text-white"
                                       >
                                         {chip}
                                       </span>
@@ -4284,7 +4318,7 @@ const CreateEvent = () => {
               variant="outline"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className="border-white/30 text-white hover:bg-white/10"
+              className="border-gray-700 text-white hover:bg-[#0a0a0a]"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Previous
@@ -4294,7 +4328,7 @@ const CreateEvent = () => {
               <Button
                 onClick={nextStep}
                 disabled={isSubmitting}
-                className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                className="bg-[#D60024] text-white hover:bg-[#ff1a3c]"
               >
                 {isSubmitting ? "Saving..." : "Next"}
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -4304,7 +4338,7 @@ const CreateEvent = () => {
                 variant="accent" 
                 onClick={() => handleSubmit(publishState)}
                 disabled={isSubmitting}
-                className="bg-gradient-to-r from-[#2563eb] to-[#e11d48] text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                className="bg-[#D60024] text-white hover:bg-[#ff1a3c]"
               >
                 {isSubmitting
                   ? "Updating..."
