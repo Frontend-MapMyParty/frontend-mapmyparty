@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
   ChevronDown,
   FileText,
   CreditCard,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -42,11 +43,13 @@ const navItems = [
 
 const PromoterDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [footerMenuOpen, setFooterMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [user, setUser] = useState({ name: "Promoter", email: "" });
   const footerMenuRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   // Dummy data inspired by schema entities (organizers, events, bookings, payouts, users)
   const data = useMemo(() => ({
     stats: [
@@ -517,120 +520,181 @@ const PromoterDashboard = () => {
     setIsLoggingOut(false);
   };
 
-  return (
-    <div className="promoter-theme dashboard-theme min-h-screen bg-background text-foreground flex">
-      {/* Sidebar */}
-      <aside
-        className={`hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"} flex-col gap-4 bg-sidebar border-r border-sidebar-border/60 px-3 py-5 sticky top-0 h-screen transition-all duration-300`}
-      >
-        <div className="rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-3 shadow-[var(--shadow-card)]">
-          <div className="flex items-center justify-between gap-3">
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+    setFooterMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileSidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileSidebarOpen]);
+
+  const sidebarContent = (isMobile = false) => (
+    <>
+      <div className="rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-3 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={() => { navigate("/promoter/overview"); if (isMobile) setMobileSidebarOpen(false); }}
+            className="flex items-center gap-3 text-left"
+          >
+            <img src={Logo} alt="MapMyParty" className="h-10 w-10" />
+            {(isMobile || sidebarOpen) && (
+              <div>
+                <p className="text-xs text-foreground/60">MapMyParty</p>
+                <p className="font-semibold tracking-[0.08em]">MAPMYPARTY</p>
+              </div>
+            )}
+          </button>
+          {isMobile ? (
             <button
-              onClick={() => navigate("/promoter/overview")}
-              className="flex items-center gap-3 text-left"
+              onClick={() => setMobileSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-sidebar-accent text-foreground/80"
             >
-              <img src={Logo} alt="MapMyParty" className="h-10 w-10" />
-              {sidebarOpen && (
-                <div>
-                  <p className="text-xs text-foreground/60">MapMyParty</p>
-                  <p className="font-semibold tracking-[0.08em]">MAPMYPARTY</p>
-                </div>
-              )}
+              <X className="w-5 h-5" />
             </button>
+          ) : (
             <button
               onClick={() => setSidebarOpen((v) => !v)}
               className="p-2 rounded-lg hover:bg-sidebar-accent text-foreground/80"
             >
               {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-          </div>
+          )}
         </div>
+      </div>
 
-        <nav className="rounded-2xl border border-sidebar-border/60 bg-sidebar/70 p-2 space-y-1 shadow-[var(--shadow-card)]">
-          {navItems.map(({ label, to, icon: Icon }) => (
-            <NavLink
-              key={label}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-xl transition ${
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
-                }`
-              }
-            >
-              <Icon className="w-4 h-4" />
-              {sidebarOpen && <span className="text-sm font-medium">{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="mt-auto">
-          <div
-            ref={footerMenuRef}
-            className="relative rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-2 shadow-[var(--shadow-card)]"
+      <nav className="rounded-2xl border border-sidebar-border/60 bg-sidebar/70 p-2 space-y-1 shadow-[var(--shadow-card)]">
+        {navItems.map(({ label, to, icon: Icon }) => (
+          <NavLink
+            key={label}
+            to={to}
+            onClick={() => { if (isMobile) setMobileSidebarOpen(false); }}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-xl transition ${
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-foreground"
+                  : "hover:bg-sidebar-accent/60 text-sidebar-foreground/80"
+              }`
+            }
           >
-            <button
-              onClick={() => setFooterMenuOpen((v) => !v)}
-              className="flex items-center gap-3 w-full text-left hover:bg-sidebar-accent/60 transition rounded-lg px-2 py-2"
-            >
-              <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary-foreground font-semibold border border-primary/30">
-                {(user.name || "P").charAt(0).toUpperCase()}
-              </div>
-              {sidebarOpen && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{user.name || "Promoter"}</p>
-                  <p className="text-xs text-foreground/60 truncate">{user.email || "promoter@mapmyparty"}</p>
-                </div>
-              )}
-              {sidebarOpen && (
-                <ChevronDown
-                  className={`w-4 h-4 text-foreground/70 transition-transform ${
-                    footerMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-              )}
-            </button>
+            <Icon className="w-4 h-4" />
+            {(isMobile || sidebarOpen) && <span className="text-sm font-medium">{label}</span>}
+          </NavLink>
+        ))}
+      </nav>
 
-            {footerMenuOpen && (
-              <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 z-20">
-                <div className="rounded-xl border border-sidebar-border/60 bg-sidebar/95 backdrop-blur-md shadow-[var(--shadow-card)] p-2 space-y-2">
-                  <button
-                    onClick={() => {
-                      setFooterMenuOpen(false);
-                      navigate("/promoter/profile");
-                    }}
-                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-sidebar-accent/40 border border-sidebar-border/60 text-foreground hover:bg-sidebar-accent transition"
-                  >
-                    <User className="w-4 h-4" />
-                    {sidebarOpen && <span>My Profile</span>}
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25 transition disabled:opacity-60"
-                  >
-                    {isLoggingOut ? (
-                      <span className="h-4 w-4 border-2 border-destructive/60 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <LogOut className="w-4 h-4" />
-                    )}
-                    {sidebarOpen && <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>}
-                  </button>
-                </div>
+      <div className="mt-auto">
+        <div
+          ref={footerMenuRef}
+          className="relative rounded-2xl border border-sidebar-border/60 bg-sidebar/80 p-2 shadow-[var(--shadow-card)]"
+        >
+          <button
+            onClick={() => setFooterMenuOpen((v) => !v)}
+            className="flex items-center gap-3 w-full text-left hover:bg-sidebar-accent/60 transition rounded-lg px-2 py-2"
+          >
+            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary-foreground font-semibold border border-primary/30">
+              {(user.name || "P").charAt(0).toUpperCase()}
+            </div>
+            {(isMobile || sidebarOpen) && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{user.name || "Promoter"}</p>
+                <p className="text-xs text-foreground/60 truncate">{user.email || "promoter@mapmyparty"}</p>
               </div>
             )}
-          </div>
+            {(isMobile || sidebarOpen) && (
+              <ChevronDown
+                className={`w-4 h-4 text-foreground/70 transition-transform ${
+                  footerMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            )}
+          </button>
+
+          {footerMenuOpen && (
+            <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 z-20">
+              <div className="rounded-xl border border-sidebar-border/60 bg-sidebar/95 backdrop-blur-md shadow-[var(--shadow-card)] p-2 space-y-2">
+                <button
+                  onClick={() => {
+                    setFooterMenuOpen(false);
+                    if (isMobile) setMobileSidebarOpen(false);
+                    navigate("/promoter/profile");
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-sidebar-accent/40 border border-sidebar-border/60 text-foreground hover:bg-sidebar-accent transition"
+                >
+                  <User className="w-4 h-4" />
+                  {(isMobile || sidebarOpen) && <span>My Profile</span>}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-destructive/15 border border-destructive/30 text-destructive-foreground hover:bg-destructive/25 transition disabled:opacity-60"
+                >
+                  {isLoggingOut ? (
+                    <span className="h-4 w-4 border-2 border-destructive/60 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <LogOut className="w-4 h-4" />
+                  )}
+                  {(isMobile || sidebarOpen) && <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="promoter-theme dashboard-theme min-h-screen bg-background text-foreground flex">
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Drawer */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 flex flex-col gap-4 bg-sidebar border-r border-sidebar-border/60 px-3 py-5 transition-transform duration-300 lg:hidden ${
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {sidebarContent(true)}
+      </aside>
+
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden lg:flex ${sidebarOpen ? "w-64" : "w-20"} flex-col gap-4 bg-sidebar border-r border-sidebar-border/60 px-3 py-5 sticky top-0 h-screen transition-all duration-300`}
+      >
+        {sidebarContent(false)}
       </aside>
 
       {/* Main content */}
       <div className="flex-1 min-h-screen">
         <div className="border-b border-border/60 bg-card/70 backdrop-blur sticky top-0 z-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Promoter Super Admin</p>
-              <h1 className="text-2xl font-semibold">Control Center</h1>
+            <div className="flex items-center gap-3">
+              {/* Hamburger button for mobile/tablet */}
+              <Button
+                variant="outline"
+                size="icon"
+                className="lg:hidden border-border/60 text-foreground/80 hover:bg-muted"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Promoter Super Admin</p>
+                <h1 className="text-2xl font-semibold">Control Center</h1>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" className="border-border/60 text-foreground/80 hover:bg-muted">
@@ -640,7 +704,7 @@ const PromoterDashboard = () => {
                 <Bell className="w-4 h-4" />
                 <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-accent" />
               </Button>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-[var(--shadow-card)]">
+              <Button className="hidden sm:inline-flex bg-primary text-primary-foreground hover:bg-primary/90 border-none shadow-[var(--shadow-card)]">
                 New Broadcast
               </Button>
             </div>

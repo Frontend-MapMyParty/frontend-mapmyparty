@@ -5,15 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, User, Building2, UserCog, Loader2, Eye, EyeOff, ArrowLeft, Sparkles, Star, Music, MapPin, Ticket } from "lucide-react";
+import { Calendar, User, Building2, Loader2, Eye, EyeOff, ArrowLeft, Sparkles, Star, Music, MapPin, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { resetSessionCache, fetchSession } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import OTPVerificationModal from "@/components/OTPVerificationModal";
 import Logo from "../assets/android-chrome-192x192.png";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { login: contextLogin } = useAuth();
   const [userType, setUserType] = useState(null);
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,16 +28,14 @@ const Auth = () => {
   // Password visibility states
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [showPromoterPassword, setShowPromoterPassword] = useState(false);
 
   const handleSubmit = async (e, type) => {
     e.preventDefault();
 
     try {
       const form = e.currentTarget;
-      const isPromoter = type === "promoter";
-      const mode = isPromoter || isLogin ? "login" : "signup";
-      const roleMap = { user: "USER", organizer: "ORGANIZER", promoter: "PROMOTER" };
+      const mode = isLogin ? "login" : "signup";
+      const roleMap = { user: "USER", organizer: "ORGANIZER" };
       const role = roleMap[type] || "USER";
 
       if (mode === "login") {
@@ -62,15 +62,16 @@ const Auth = () => {
           throw new Error("Login succeeded but session validation failed");
         }
 
+        // Populate auth context before navigating
+        contextLogin(session);
+
         toast.success("Logged in successfully!");
 
         // Navigate after session is established
         const dashboardPath =
           type === "organizer"
             ? "/organizer/dashboard-v2"
-            : type === "promoter"
-              ? "/promoter"
-              : "/dashboard";
+            : "/dashboard";
 
         navigate(dashboardPath, { replace: true });
         return;
@@ -124,30 +125,6 @@ const Auth = () => {
     }
   };
 
-  const handlePromoterLogin = () => {
-    // Directly mark promoter as authenticated (guest) and redirect to dashboard
-    sessionStorage.setItem("isAuthenticated", "true");
-    sessionStorage.setItem("role", "PROMOTER");
-    sessionStorage.setItem("userType", "promoter");
-    sessionStorage.setItem("authProvider", "promoter-guest");
-    sessionStorage.setItem("promoterGuest", "true");
-
-    const guestProfile = {
-      role: "PROMOTER",
-      type: "promoter",
-      name: "Promoter Guest",
-      authProvider: "promoter-guest",
-    };
-
-    try {
-      sessionStorage.setItem("userProfile", JSON.stringify(guestProfile));
-    } catch (err) {
-      console.warn("Unable to persist promoter guest profile", err);
-    }
-
-    navigate("/promoter", { replace: true });
-  };
-
   const handleGoogleLogin = () => {
     // Redirect to backend Google OAuth endpoint
     // Backend will handle OAuth and redirect to /dashboard?auth=success
@@ -175,15 +152,16 @@ const Auth = () => {
       return;
     }
 
+    // Populate auth context before navigating
+    contextLogin(session);
+
     toast.success("Account created successfully!");
 
     // Navigate to dashboard
     const dashboardPath =
       signupType === "organizer"
         ? "/organizer/dashboard-v2"
-        : signupType === "promoter"
-          ? "/promoter/dashboard"
-          : "/dashboard";
+        : "/dashboard";
 
     navigate(dashboardPath, { replace: true });
   };
@@ -206,19 +184,6 @@ const Auth = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back 
         </Button>
-
-        {/* Promoter Login Button */}
-        <div className="absolute top-6 right-6">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handlePromoterLogin}
-            className="border-gray-700 hover:border-gray-600 hover:bg-gray-900 text-gray-300"
-          >
-            <UserCog className="w-4 h-4 mr-2" />
-            Promoter Access
-          </Button>
-        </div>
 
         <div className="w-full max-w-3xl">
           {/* Logo and Welcome */}
@@ -302,11 +267,7 @@ const Auth = () => {
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-white">
-              {userType === "organizer"
-                ? "Organizer"
-                : userType === "promoter"
-                ? "Promoter"
-                : "Attendee"}{" "}
+              {userType === "organizer" ? "Organizer" : "Attendee"}{" "}
               Account
             </CardTitle>
             <CardDescription className="text-gray-400 text-sm mt-1">
@@ -316,49 +277,7 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-6 pb-6">
-            {userType === "promoter" ? (
-              <form onSubmit={(e) => handleSubmit(e, userType)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300 text-sm font-medium">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="Enter your email" 
-                    required 
-                    className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 h-10 text-sm"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-300 text-sm font-medium">Password</Label>
-                  <div className="relative">
-                    <Input 
-                      id="password" 
-                      type={showPromoterPassword ? "text" : "password"} 
-                      placeholder="Enter your password" 
-                      required 
-                      className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 pr-10 h-10 text-sm"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-gray-300"
-                      onClick={() => setShowPromoterPassword(!showPromoterPassword)}
-                    >
-                      {showPromoterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white h-10 text-sm font-medium mt-1" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing In...</> : "Sign In"}
-                </Button>
-              </form>
-            ) : (
-              <Tabs value={isLogin ? "login" : "signup"} onValueChange={(v) => setIsLogin(v === "login")} className="w-full">
+            <Tabs value={isLogin ? "login" : "signup"} onValueChange={(v) => setIsLogin(v === "login")} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-5 bg-gray-800 p-1 rounded-lg h-10">
                   <TabsTrigger value="login" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white text-gray-400 text-sm font-medium rounded-md">
                     Login
@@ -502,7 +421,6 @@ const Auth = () => {
                   </form>
                 </TabsContent>
               </Tabs>
-            )}
           </CardContent>
         </Card>
 

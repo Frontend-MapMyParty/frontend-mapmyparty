@@ -46,7 +46,7 @@ import UserDashboardHeader from "@/components/UserDashboardHeader";
 import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
 import Footer from "@/components/Footer";
 import Dashboard from "@/components/dashboard/Dashboard";
-import { fetchSession } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import logoSvg from '@/assets/MMP logo.svg';
 
 const INDIAN_STATES = [
@@ -121,54 +121,20 @@ const NewUserDashboard = () => {
   const [geocodeResult, setGeocodeResult] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const { user: authUser } = useAuth();
+
+  // Hydrate user info from auth context instead of fetching
   useEffect(() => {
-    let isMounted = true;
-
-    const hydrateUser = async () => {
+    if (authUser) {
       const fallback = getStoredUserInfo();
-      try {
-        const session = await fetchSession();
-        if (!isMounted) return;
-
-        const sessionUser = session?.user || session?.data?.user || null;
-        if (sessionUser) {
-          const updated = {
-            name: sessionUser.name || fallback.name,
-            email: sessionUser.email || fallback.email,
-            avatar: sessionUser.avatar || sessionUser.avatarUrl || sessionUser.photo || fallback.avatar,
-          };
-          setUserInfo(updated);
-
-          // Keep storage in sync for other components
-          sessionStorage.setItem("userName", updated.name || "");
-          sessionStorage.setItem("userEmail", updated.email || "");
-          if (updated.avatar) {
-            sessionStorage.setItem("userAvatar", updated.avatar);
-          }
-        } else {
-          setUserInfo(fallback);
-        }
-      } catch (err) {
-        console.warn("Could not hydrate user from session", err);
-        setUserInfo(fallback);
-      }
-    };
-
-    hydrateUser();
-
-    const handleStorage = (event) => {
-      if (!event || event.storageArea !== sessionStorage) return;
-      if (["userName", "userEmail", "userProfile", "userAvatar"].includes(event.key)) {
-        setUserInfo(getStoredUserInfo());
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => {
-      isMounted = false;
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
+      const updated = {
+        name: authUser.name || fallback.name,
+        email: authUser.email || fallback.email,
+        avatar: authUser.avatar || authUser.avatarUrl || authUser.photo || fallback.avatar,
+      };
+      setUserInfo(updated);
+    }
+  }, [authUser]);
 
   // Note: Authentication is handled by ProtectedRoute wrapper (via UserDashboard)
   // Set loading to false immediately as ProtectedRoute handles auth

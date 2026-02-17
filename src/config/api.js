@@ -57,6 +57,7 @@ const customFetch = async (url, options = {}) => {
       const { tryRefreshToken: refresh } = await getAuthUtils();
       const refreshed = await refresh();
       if (refreshed) {
+        window.dispatchEvent(new Event("auth:token-refreshed"));
         return doFetch(true);
       }
     }

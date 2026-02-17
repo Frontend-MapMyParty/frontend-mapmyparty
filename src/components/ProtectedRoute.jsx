@@ -1,58 +1,11 @@
-import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { fetchSession, getCachedSession } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const location = useLocation();
+  const { isAuthenticated, user, loading } = useAuth();
 
-  // Use cached session for instant render (no loading flash)
-  const cached = getCachedSession();
-  const [state, setState] = useState({
-    loading: !cached,
-    isAuthenticated: cached?.isAuthenticated || false,
-    user: cached?.user || null,
-  });
-
-  useEffect(() => {
-    let mounted = true;
-    const guestRole = sessionStorage.getItem("role");
-    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
-
-    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
-      setState({ loading: false, isAuthenticated: false, user: null });
-      return () => {
-        mounted = false;
-      };
-    }
-
-    const validateSession = async () => {
-      try {
-        // Uses TTL-based cache — no force refresh, no redundant /auth/me calls
-        const session = await fetchSession();
-
-        if (!mounted) return;
-
-        setState({
-          loading: false,
-          isAuthenticated: session?.isAuthenticated || false,
-          user: session?.user || null,
-        });
-      } catch (err) {
-        console.error("Failed to validate session:", err);
-        if (mounted) {
-          setState({ loading: false, isAuthenticated: false, user: null });
-        }
-      }
-    };
-
-    validateSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, []); // Only validate once on mount — cache handles freshness
-
-  if (state.loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0b1220] via-[#0c1426] to-[#0a0f1a] flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-3">
@@ -63,14 +16,16 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
     );
   }
 
-  if (!state.isAuthenticated) {
-    const guestRole = sessionStorage.getItem("role");
-    const isPromoterGuest = sessionStorage.getItem("promoterGuest") === "true";
-
-    if (requiredRole?.toUpperCase() === "PROMOTER" && isPromoterGuest && guestRole === "PROMOTER") {
-      return children;
+  if (!isAuthenticated) {
+    // Redirect promoter/admin routes to the dedicated promoter login page
+    if (requiredRole?.toUpperCase() === "PROMOTER") {
+      return (
+        <Navigate
+          to={`/promoter/login?redirect=${encodeURIComponent(location.pathname)}`}
+          replace
+        />
+      );
     }
-
     return (
       <Navigate
         to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}
@@ -80,8 +35,13 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   if (requiredRole) {
-    const userRole = (state.user?.role || "").toString().toUpperCase();
-    const normalizedRequiredRole = requiredRole.toUpperCase();
+    const userRole = (user?.role || "").toString().toUpperCase();
+    let normalizedRequiredRole = requiredRole.toUpperCase();
+
+    // Promoter and Admin are the same role
+    if (normalizedRequiredRole === "PROMOTER") {
+      normalizedRequiredRole = "ADMIN";
+    }
 
     if (userRole !== normalizedRequiredRole) {
       console.warn(
