@@ -204,7 +204,7 @@ const App = () => {
               <Route index element={<Navigate to="/promoter/overview" replace />} />
               <Route path="overview" element={<PromoterOverview />} />
               <Route path="organizers" element={<PromoterOrganizers />} />
-              <Route path="organizers/:slug" element={<PromoterOrganizerDetail />} />
+              <Route path="organizers/:id" element={<PromoterOrganizerDetail />} />
               <Route path="events" element={<PromoterEvents />} />
               <Route path="events/:id" element={<PromoterEventDetail />} />
               <Route path="users" element={<PromoterUsers />} />

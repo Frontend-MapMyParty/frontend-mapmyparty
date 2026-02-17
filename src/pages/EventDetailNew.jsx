@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
+import usePublicEventDetail from "@/hooks/usePublicEventDetail";
 import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from "@/utils/auth";
 import BillingDetailsModal from "@/components/BillingDetailsModal";
 // import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
@@ -28,8 +29,7 @@ const EventDetailNew = () => {
   const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { event, loading, error } = usePublicEventDetail(organizerSlug, eventSlug);
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState("about");
   const [autoRotatePausedUntil, setAutoRotatePausedUntil] = useState(0);
@@ -278,287 +278,6 @@ const EventDetailNew = () => {
 
   const getArtistImage = (artist) =>
     artist.image || artist.photo || artist.avatar || artist.profileImage || FALLBACK_IMAGE;
-
-  const formatAdvisory = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === "string") return raw;
-    if (Array.isArray(raw)) {
-      const items = raw
-        .map((item) => {
-          if (!item) return null;
-          if (typeof item === "string") return item;
-          if (typeof item === "object") {
-            return Object.entries(item)
-              .filter(([, v]) => v)
-              .map(([k]) => k)
-              .join(", ");
-          }
-          return String(item);
-        })
-        .filter(Boolean);
-      return items.length ? items.join(", ") : null;
-    }
-    if (typeof raw === "object") {
-      const items = Object.entries(raw)
-        .filter(([, v]) => v !== false && v !== null && v !== undefined)
-        .map(([k, v]) => (typeof v === "boolean" ? k : `${k}: ${v}`));
-      return items.length ? items.join(", ") : null;
-    }
-    return String(raw);
-  };
-
-  const buildAdvisoryItems = (raw) => {
-    if (!raw) return [];
-    // Already an array of strings
-    if (Array.isArray(raw) && raw.every((i) => typeof i === "string")) return raw.filter(Boolean);
-
-    // Object with booleans/customAdvisories
-    if (typeof raw === "object") {
-      const list = [];
-      Object.entries(raw).forEach(([key, val]) => {
-        if (key === "customAdvisories" && Array.isArray(val)) {
-          val.forEach((c) => c && list.push(c));
-          return;
-        }
-        if (val === true) {
-          const label = key
-            .replace(/([A-Z])/g, " $1")
-            .replace(/_/g, " ")
-            .trim();
-          list.push(label.charAt(0).toUpperCase() + label.slice(1));
-        }
-      });
-      return list;
-    }
-
-    // Fallback to formatted string split by comma
-    const formatted = formatAdvisory(raw);
-    if (!formatted) return [];
-    return formatted.split(",").map((i) => i.trim()).filter(Boolean);
-  };
-
-  const normalizeEvent = (raw = {}) => {
-    const data = raw?.data ?? raw; // handle api shapes {data:{...}}
-    const startDate = data.startDate || data.date || data.start_time || data.start;
-    const endDate = data.endDate || data.end_time || data.end;
-    const venue = data.venue || (data.venues && data.venues[0]) || {};
-    const cityState = `${data.city || venue.city || ""}${(data.city || venue.city) && (data.state || venue.state) ? ", " : ""
-      }${data.state || venue.state || ""}`.trim();
-
-    const galleryImages = Array.isArray(data.galleryImages)
-      ? data.galleryImages
-      : Array.isArray(data.images)
-        ? data.images
-          .filter((img) =>
-            typeof img === "object" ? (img.type || "").toUpperCase() === "EVENT_GALLERY" : true
-          )
-          .map((img) => (typeof img === "object" ? img.url : img))
-        : data.gallery || [];
-
-    const tickets = Array.isArray(data.tickets)
-      ? data.tickets.map((t) => ({
-        id: t.id || t._id,
-        name: t.name || t.title || "Ticket",
-        description: t.info || t.description || "",
-        price: Number(t.price) || 0,
-        available: Math.max(
-          0,
-          (Number(t.totalQty) || 0) -
-          (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
-        ),
-        maxPerUser:
-          t.maxPerUser !== undefined && t.maxPerUser !== null
-            ? Number(t.maxPerUser)
-            : null,
-      }))
-      : [];
-
-    const sponsors = Array.isArray(data.sponsors)
-      ? data.sponsors.map((s) => {
-        const nested = s.sponsor || {};
-        return {
-          id: s.id || s._id || s.sponsorId || nested.id || nested._id || nested.name || nested.logoUrl || s.name || s.logoUrl || s.logo || s.image,
-          name: s.name || nested.name || s.brandName || "Sponsor",
-          logo:
-            s.logoUrl ||
-            nested.logoUrl ||
-            s.logo ||
-            nested.logo ||
-            s.image ||
-            nested.image ||
-            s.flyerImage ||
-            s.flyerImageUrl ||
-            SPONSOR_PLACEHOLDER,
-          website: s.websiteUrl || nested.websiteUrl || s.website || nested.website || s.url || nested.url || s.link || "",
-          isPrimary: !!(s.isPrimary ?? s.primary ?? nested.isPrimary),
-          description: s.description || nested.description || s.about || nested.about || "",
-        };
-      })
-      : [];
-
-    const reviewsCount = Array.isArray(data.reviews)
-      ? data.reviews.length
-      : data._count?.reviews || data.reviews || 0;
-
-    const advisoryItems = buildAdvisoryItems(data.advisory?.warnings || data.advisory || data.advisories);
-
-    return {
-      id: data.id || data._id,
-      slug: data.slug || data.id,
-      title: data.title || data.eventTitle || "Untitled Event",
-      category: data.category || data.mainCategory || "EVENT",
-      image:
-        data.flyerImage ||
-        data.flyerImageUrl ||
-        data.coverImage ||
-        data.image ||
-        galleryImages[0] ||
-        FALLBACK_IMAGE,
-      startDate,
-      endDate,
-      location:
-        typeof data.location === "string"
-          ? data.location
-          : venue.name || cityState || "Location TBA",
-      venue:
-        typeof data.venue === "string"
-          ? data.venue
-          : venue.name || "Venue TBA",
-      address:
-        data.address ||
-        data.fullAddress ||
-        venue.fullAddress ||
-        venue.address ||
-        [data.address, venue.address, cityState, data.pincode || venue.pincode]
-          .filter(Boolean)
-          .join(", ") ||
-        "Address TBA",
-      coordinates: data.coordinates || venue.coordinates,
-      attendees:
-        data.attendees ||
-        data.analytics?.totalAttendees ||
-        data.analytics?.attendees ||
-        data._count?.bookings ||
-        data.stats?.confirmedBookings ||
-        0,
-      rating: data.rating || data.averageRating || 0,
-      description: data.description || data.summary || "No description available.",
-      about: data.description || data.summary || "No description available.",
-      highlights: data.highlights || [],
-      gallery: galleryImages.length > 0 ? galleryImages : [FALLBACK_IMAGE],
-      tickets,
-      organizer: data.organizer
-        ? {
-          name: data.organizer.name || "Organizer",
-          email: data.organizer.email || "",
-          phone: data.organizer.phone || "",
-          website: data.organizer.website || "",
-          logo:
-            data.organizer.logo ||
-            "https://via.placeholder.com/200x200?text=Organizer",
-          verified: !!data.organizer.isVerified,
-          bio: data.organizer.description || "",
-          eventsOrganized: data.organizer.eventsOrganized || 0,
-          followers: data.organizer.followers || 0,
-        }
-        : {
-          name: data.organizerName || "Organizer",
-          email: data.organizerEmail || "",
-          phone: data.organizerPhone || "",
-          website: data.organizerWebsite || "",
-          logo: "https://via.placeholder.com/200x200?text=Organizer",
-          verified: false,
-          bio: "",
-          eventsOrganized: 0,
-          followers: 0,
-        },
-      tags: data.tags || [],
-      ageRestriction: data.TC?.ageRestriction || data.ageRestriction || data.age_limit || "Not specified",
-      dresscode: data.dresscode || "Not specified",
-      parking: data.parking || "Not specified",
-      accessibility: data.accessibility || "Not specified",
-      reviews: reviewsCount,
-      advisory: formatAdvisory(data.advisory?.warnings || data.advisory || data.advisories),
-      advisoryItems,
-      terms: data.TC?.terms || data.terms || "",
-      termsHtml: data.TC?.content || data.termsHtml || "",
-      termsUpdated: data.TC?.lastUpdated || data.termsUpdated || "",
-      reviewsList: Array.isArray(data.reviews)
-        ? data.reviews.map((r) => ({
-          user: r.user?.name || "Guest",
-          rating: r.rating || 0,
-          comment: r.comment || "",
-          userName: r.user?.name || "Guest",
-          avatar: r.user?.avatar,
-          createdAt: r.createdAt,
-        }))
-        : [],
-      stats: data.stats || data._count || {},
-      artists: data.artists || [],
-      type: data.type,
-      publishStatus: data.publishStatus,
-      eventStatus: data.eventStatus,
-      organizerNote: data.organizerNote,
-      subCategory: data.subCategory,
-      categorySlug: data.categorySlug,
-      questions: data.questions,
-      sponsors,
-      flyerImage: data.flyerImage,
-      flyerPublicId: data.flyerPublicId,
-      isSponsored: data.isSponsored,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-      statsCount: data._count,
-      revenue: data.stats?.totalRevenue,
-      ticketsSold: data.stats?.totalTicketsSold,
-      confirmedBookings: data.stats?.confirmedBookings,
-      capacity: venue.totalQty || tickets.reduce((sum, t) => sum + (t.available || 0), 0),
-      primaryVenue: venue,
-      raw: data,
-    };
-  };
-
-  useEffect(() => {
-    const fetchEvent = async () => {
-      const tryFetch = async (path) => {
-        const response = await apiFetch(path, { method: "GET" });
-        return (
-          response?.data?.event ||
-          response?.data?.data ||
-          response?.data ||
-          response
-        );
-      };
-
-      try {
-        setLoading(true);
-        let raw = null;
-
-        if (organizerSlug && eventSlug) {
-          raw = await tryFetch(
-            `/api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
-          );
-        }
-
-        if (raw) {
-          const normalized = normalizeEvent(raw);
-          setEvent(normalized);
-          setSelectedImage(null);
-        } else {
-          setEvent(null);
-        }
-      } catch (err) {
-        console.error("Failed to fetch event", err);
-        setEvent(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (organizerSlug && eventSlug) {
-      fetchEvent();
-    }
-  }, [organizerSlug, eventSlug]);
 
   // Resume booking after Google OAuth redirect
   useEffect(() => {
@@ -1102,7 +821,7 @@ const EventDetailNew = () => {
                   <button
                     type="button"
                     onClick={() => setAdvisoryModalOpen(true)}
-                    className="text-red-600 hover:text-red-500 flex items-center gap-1"
+                    className="text-red-600 hover:text-red-500 flex items-center gap-1 text-sm font-medium transition-colors"
                   >
                     See all <ChevronRight className="h-4 w-4" />
                   </button>
@@ -1110,16 +829,96 @@ const EventDetailNew = () => {
               </div>
 
               {event.advisoryItems?.length ? (
-                <div className="flex flex-wrap gap-4">
-                  {event.advisoryItems.slice(0, 4).map((item, idx) => (
-                    <div
-                      key={`advisory-preview-${idx}`}
-                      className="flex items-center gap-2"
-                    >
-                      <span className="text-lg">{item.includes('18+') ? '🔞' : item.includes('Parking') ? '🅿️' : item.includes('ID') ? '🆔' : 'ℹ️'}</span>
-                      <span className="text-sm text-gray-300">{item}</span>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {event.advisoryItems.slice(0, 4).map((item, idx) => {
+                    const getIcon = (text) => {
+                      const lower = text.toLowerCase();
+
+                      // Age restrictions
+                      if (lower.includes('18+') || lower.includes('18 +') || lower.includes('age limit') ||
+                          lower.includes('age restriction') || lower.includes('adults only') ||
+                          lower.includes('21+') || lower.includes('21 +') || lower.includes('mature')) return '🔞';
+
+                      // Parking
+                      if (lower.includes('parking') || lower.includes('valet') || lower.includes('vehicle')) return '🅿️';
+
+                      // ID/Documents
+                      if (lower.includes('id') || lower.includes('identification') || lower.includes('valid id') ||
+                          lower.includes('government id') || lower.includes('photo id') ||
+                          lower.includes('passport') || lower.includes('license') || lower.includes('proof')) return '🆔';
+
+                      // Food & Drinks
+                      if (lower.includes('food') || lower.includes('drink') || lower.includes('beverage') ||
+                          lower.includes('refreshment') || lower.includes('meal') || lower.includes('dining') ||
+                          lower.includes('outside food') || lower.includes('outside drink') ||
+                          lower.includes('catering') || lower.includes('restaurant')) return '🍽️';
+
+                      // Photography/Camera
+                      if (lower.includes('camera') || lower.includes('photo') || lower.includes('photography') ||
+                          lower.includes('recording') || lower.includes('video') || lower.includes('filming')) return '📸';
+
+                      // Entry/Gate/Doors
+                      if (lower.includes('entry') || lower.includes('gate') || lower.includes('door') ||
+                          lower.includes('entrance') || lower.includes('admission') || lower.includes('check-in') ||
+                          lower.includes('checkin') || lower.includes('arrive') || lower.includes('arrival')) return '🚪';
+
+                      // Timing/Schedule
+                      if (lower.includes('time') || lower.includes('schedule') || lower.includes('timing') ||
+                          lower.includes('start') || lower.includes('duration') || lower.includes('hours') ||
+                          lower.includes('clock') || lower.includes('punctual')) return '⏰';
+
+                      // Dress Code
+                      if (lower.includes('dress') || lower.includes('attire') || lower.includes('clothing') ||
+                          lower.includes('outfit') || lower.includes('formal') || lower.includes('casual') ||
+                          lower.includes('wear')) return '👔';
+
+                      // Safety/Security
+                      if (lower.includes('security') || lower.includes('safety') || lower.includes('safe') ||
+                          lower.includes('emergency') || lower.includes('first aid') || lower.includes('medical')) return '🛡️';
+
+                      // Prohibited Items
+                      if (lower.includes('prohibited') || lower.includes('not allowed') || lower.includes('banned') ||
+                          lower.includes('restricted') || lower.includes('forbidden') || lower.includes('no smoking') ||
+                          lower.includes('weapons') || lower.includes('drugs')) return '🚫';
+
+                      // Tickets/Passes
+                      if (lower.includes('ticket') || lower.includes('pass') || lower.includes('wristband') ||
+                          lower.includes('badge') || lower.includes('qr') || lower.includes('barcode')) return '🎫';
+
+                      // Weather
+                      if (lower.includes('weather') || lower.includes('rain') || lower.includes('outdoor') ||
+                          lower.includes('indoor') || lower.includes('umbrella') || lower.includes('sun')) return '⛅';
+
+                      // Accessibility
+                      if (lower.includes('wheelchair') || lower.includes('accessible') || lower.includes('disability') ||
+                          lower.includes('special needs') || lower.includes('mobility')) return '♿';
+
+                      // Children/Kids
+                      if (lower.includes('child') || lower.includes('kid') || lower.includes('minor') ||
+                          lower.includes('baby') || lower.includes('stroller') || lower.includes('family')) return '👶';
+
+                      // Pets/Animals
+                      if (lower.includes('pet') || lower.includes('dog') || lower.includes('animal') ||
+                          lower.includes('service animal')) return '🐕';
+
+                      // Seating
+                      if (lower.includes('seat') || lower.includes('chair') || lower.includes('standing') ||
+                          lower.includes('reserved seating')) return '💺';
+
+                      // Default icon for custom advisories
+                      return '⚠️';
+                    };
+
+                    return (
+                      <div
+                        key={`advisory-preview-${idx}`}
+                        className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50 transition-colors"
+                      >
+                        <span className="text-lg flex-shrink-0">{getIcon(item)}</span>
+                        <span className="text-sm text-gray-300">{item}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">No advisories provided.</p>
@@ -1515,28 +1314,107 @@ const EventDetailNew = () => {
 
             {/* Advisory Modal */}
             <Dialog open={advisoryModalOpen} onOpenChange={setAdvisoryModalOpen}>
-              <DialogContent className="max-w-xl border-gray-800 bg-gray-900 text-white">
+              <DialogContent className="max-w-lg border-gray-800 bg-gray-900 text-white">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl">Event Guide</DialogTitle>
-                  <DialogDescription className="text-gray-400">
-                    All advisories and notes for this event.
+                  <DialogTitle className="text-xl font-bold">Event Guide</DialogTitle>
+                  <DialogDescription className="text-gray-400 text-sm">
+                    All advisories and notes for this event
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                   {event?.advisoryItems?.length ? (
-                    event.advisoryItems.map((item, idx) => (
-                      <div
-                        key={`advisory-modal-${idx}`}
-                        className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-800 border border-gray-700"
-                      >
-                        <div className="h-10 w-10 rounded-lg bg-gray-700 border border-gray-600 flex items-center justify-center text-gray-400">
-                          <AlertTriangle className="h-5 w-5" />
+                    event.advisoryItems.map((item, idx) => {
+                      const getIcon = (text) => {
+                        const lower = text.toLowerCase();
+
+                        // Age restrictions
+                        if (lower.includes('18+') || lower.includes('18 +') || lower.includes('age limit') ||
+                            lower.includes('age restriction') || lower.includes('adults only') ||
+                            lower.includes('21+') || lower.includes('21 +') || lower.includes('mature')) return '🔞';
+
+                        // Parking
+                        if (lower.includes('parking') || lower.includes('valet') || lower.includes('vehicle')) return '🅿️';
+
+                        // ID/Documents
+                        if (lower.includes('id') || lower.includes('identification') || lower.includes('valid id') ||
+                            lower.includes('government id') || lower.includes('photo id') ||
+                            lower.includes('passport') || lower.includes('license') || lower.includes('proof')) return '🆔';
+
+                        // Food & Drinks
+                        if (lower.includes('food') || lower.includes('drink') || lower.includes('beverage') ||
+                            lower.includes('refreshment') || lower.includes('meal') || lower.includes('dining') ||
+                            lower.includes('outside food') || lower.includes('outside drink') ||
+                            lower.includes('catering') || lower.includes('restaurant')) return '🍽️';
+
+                        // Photography/Camera
+                        if (lower.includes('camera') || lower.includes('photo') || lower.includes('photography') ||
+                            lower.includes('recording') || lower.includes('video') || lower.includes('filming')) return '📸';
+
+                        // Entry/Gate/Doors
+                        if (lower.includes('entry') || lower.includes('gate') || lower.includes('door') ||
+                            lower.includes('entrance') || lower.includes('admission') || lower.includes('check-in') ||
+                            lower.includes('checkin') || lower.includes('arrive') || lower.includes('arrival')) return '🚪';
+
+                        // Timing/Schedule
+                        if (lower.includes('time') || lower.includes('schedule') || lower.includes('timing') ||
+                            lower.includes('start') || lower.includes('duration') || lower.includes('hours') ||
+                            lower.includes('clock') || lower.includes('punctual')) return '⏰';
+
+                        // Dress Code
+                        if (lower.includes('dress') || lower.includes('attire') || lower.includes('clothing') ||
+                            lower.includes('outfit') || lower.includes('formal') || lower.includes('casual') ||
+                            lower.includes('wear')) return '👔';
+
+                        // Safety/Security
+                        if (lower.includes('security') || lower.includes('safety') || lower.includes('safe') ||
+                            lower.includes('emergency') || lower.includes('first aid') || lower.includes('medical')) return '🛡️';
+
+                        // Prohibited Items
+                        if (lower.includes('prohibited') || lower.includes('not allowed') || lower.includes('banned') ||
+                            lower.includes('restricted') || lower.includes('forbidden') || lower.includes('no smoking') ||
+                            lower.includes('weapons') || lower.includes('drugs')) return '🚫';
+
+                        // Tickets/Passes
+                        if (lower.includes('ticket') || lower.includes('pass') || lower.includes('wristband') ||
+                            lower.includes('badge') || lower.includes('qr') || lower.includes('barcode')) return '🎫';
+
+                        // Weather
+                        if (lower.includes('weather') || lower.includes('rain') || lower.includes('outdoor') ||
+                            lower.includes('indoor') || lower.includes('umbrella') || lower.includes('sun')) return '⛅';
+
+                        // Accessibility
+                        if (lower.includes('wheelchair') || lower.includes('accessible') || lower.includes('disability') ||
+                            lower.includes('special needs') || lower.includes('mobility')) return '♿';
+
+                        // Children/Kids
+                        if (lower.includes('child') || lower.includes('kid') || lower.includes('minor') ||
+                            lower.includes('baby') || lower.includes('stroller') || lower.includes('family')) return '👶';
+
+                        // Pets/Animals
+                        if (lower.includes('pet') || lower.includes('dog') || lower.includes('animal') ||
+                            lower.includes('service animal')) return '🐕';
+
+                        // Seating
+                        if (lower.includes('seat') || lower.includes('chair') || lower.includes('standing') ||
+                            lower.includes('reserved seating')) return '💺';
+
+                        // Default icon for custom advisories
+                        return '⚠️';
+                      };
+
+                      return (
+                        <div
+                          key={`advisory-modal-${idx}`}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50 transition-colors"
+                        >
+                          <span className="text-xl flex-shrink-0">{getIcon(item)}</span>
+                          <p className="text-white text-sm">{item}</p>
                         </div>
-                        <div className="text-white font-medium text-sm">{item}</div>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
-                    <p className="text-sm text-gray-500">No advisories provided.</p>
+                    <p className="text-sm text-gray-500 text-center py-8">No advisories provided.</p>
                   )}
                 </div>
               </DialogContent>
