@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { buildUrl } from "@/config/api";
 import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import Logo from "@/assets/MMP logo.svg";
+import { usePromoterDashboard } from "@/hooks/usePromoterDashboard";
 import {
   LayoutDashboard,
   Users,
@@ -50,15 +51,65 @@ const PromoterDashboard = () => {
   const footerMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch real dashboard data
+  const { dashboard, loading: dashboardLoading } = usePromoterDashboard();
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    if (!amount) return "₹0";
+    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+    if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
+    return `₹${amount.toLocaleString()}`;
+  };
+
   // Dummy data inspired by schema entities (organizers, events, bookings, payouts, users)
   const data = useMemo(() => ({
-    stats: [
-      { title: "Total Events", value: 42, delta: "+9 this month", icon: CalendarClock },
-      { title: "Total Organizers", value: 18, delta: "+3 onboarded", icon: Users },
-      { title: "Gross Revenue", value: "₹12.4M", delta: "+18% MoM", icon: Wallet2 },
-      { title: "Platform Earnings", value: "₹1.6M", delta: "13% of GMV", icon: BarChart3 },
-      { title: "Live Events", value: 7, delta: "Running now", icon: Activity },
-      { title: "Pending Payouts", value: "₹4.2L", delta: "Across 5 orgs", icon: ShieldCheck },
+    stats: dashboard ? [
+      {
+        title: "Total Events",
+        value: dashboard.events?.total || 0,
+        delta: `+${dashboard.events?.currentMonth || 0} this month`,
+        icon: CalendarClock
+      },
+      {
+        title: "Total Organizers",
+        value: dashboard.organizers?.total || 0,
+        delta: `+${dashboard.organizers?.currentMonth || 0} onboarded`,
+        icon: Users
+      },
+      {
+        title: "Gross Revenue",
+        value: formatCurrency(dashboard.grossRevenue || 0),
+        delta: `${dashboard.revenue?.incrementPercentage >= 0 ? '+' : ''}${dashboard.revenue?.incrementPercentage?.toFixed(1) || 0}% MoM`,
+        icon: Wallet2
+      },
+      {
+        title: "Platform Earnings",
+        value: formatCurrency(dashboard.platformEarnings || 0),
+        delta: dashboard.grossRevenue > 0 ? `${((dashboard.platformEarnings / dashboard.grossRevenue) * 100).toFixed(1)}% of GMV` : "0% of GMV",
+        icon: BarChart3
+      },
+      {
+        title: "Live Events",
+        value: dashboard.liveEvents?.count || 0,
+        delta: "Running now",
+        icon: Activity
+      },
+      {
+        title: "Pending Payouts",
+        value: formatCurrency(dashboard.pendingPayouts?.totalAmount || 0),
+        delta: `Across ${dashboard.pendingPayouts?.count || 0} payouts`,
+        icon: ShieldCheck
+      },
+    ] : [
+      { title: "Total Events", value: 0, delta: "+0 this month", icon: CalendarClock },
+      { title: "Total Organizers", value: 0, delta: "+0 onboarded", icon: Users },
+      { title: "Gross Revenue", value: "₹0", delta: "+0% MoM", icon: Wallet2 },
+      { title: "Platform Earnings", value: "₹0", delta: "0% of GMV", icon: BarChart3 },
+      { title: "Live Events", value: 0, delta: "Running now", icon: Activity },
+      { title: "Pending Payouts", value: "₹0", delta: "Across 0 payouts", icon: ShieldCheck },
     ],
     organizers: [
       {
@@ -454,7 +505,7 @@ const PromoterDashboard = () => {
       categoryMix: { music: 35, conference: 28, food: 20, arts: 12, sports: 5 },
       risk: { refundRatio: 1.4, chargebacks: 0.08, kycPending: 1 },
     },
-  }), []);
+  }), [dashboard]);
 
   const statusBadge = (status) => {
     const map = {
@@ -712,7 +763,7 @@ const PromoterDashboard = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          <Outlet context={{ data, currency, statusBadge }} />
+          <Outlet context={{ data, currency, statusBadge, dashboardLoading }} />
         </div>
       </div>
     </div>

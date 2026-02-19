@@ -1,10 +1,10 @@
  import { useOutletContext } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LayoutDashboard, Building2, CalendarClock, Wallet2, Users, Ticket, Activity, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Building2, CalendarClock, Wallet2, Users, Ticket, Activity, BarChart3, RefreshCw } from "lucide-react";
 
 const PromoterOverview = () => {
-  const { data, currency, statusBadge } = useOutletContext();
+  const { data, currency, statusBadge, dashboardLoading } = useOutletContext();
 
   return (
     <div className="space-y-6">
@@ -17,22 +17,29 @@ const PromoterOverview = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {data.stats.map((item) => (
-              <Card key={item.title} className="bg-white/5 border-white/10">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white/60">{item.title}</p>
-                    <p className="text-2xl font-semibold mt-1">{item.value}</p>
-                    <p className="text-xs text-emerald-400 mt-1">{item.delta}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center">
-                    <item.icon className="w-6 h-6 text-white/80" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {dashboardLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-8 h-8 animate-spin text-white/60" />
+              <span className="ml-3 text-white/60">Loading dashboard data...</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {data.stats.map((item) => (
+                <Card key={item.title} className="bg-white/5 border-white/10">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white/60">{item.title}</p>
+                      <p className="text-2xl font-semibold mt-1">{item.value}</p>
+                      <p className="text-xs text-emerald-400 mt-1">{item.delta}</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center">
+                      <item.icon className="w-6 h-6 text-white/80" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
