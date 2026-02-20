@@ -35,3 +35,40 @@ export async function fetchTicketDistribution(params = {}) {
   const response = await apiFetch(`analytics/ticket-distribution${buildQuery(params)}`);
   return response.data;
 }
+
+export async function fetchEventAnalytics(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics`);
+  return response.data;
+}
+
+// ─── Split Event Analytics Endpoints ─────────────────────────────────────────
+
+export async function fetchEventSummary(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/summary`);
+  return response.data;
+}
+
+export async function fetchEventTicketBreakdown(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/ticket-breakdown`);
+  return response.data;
+}
+
+export async function fetchEventSalesTimeline(organizerId, eventId, groupBy = 'day') {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/sales-timeline?groupBy=${groupBy}`);
+  return response.data;
+}
+
+export async function fetchEventRevenueBreakdown(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/revenue-breakdown`);
+  return response.data;
+}
+
+export async function fetchEventBookingStats(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/booking-stats`);
+  return response.data;
+}
+
+export async function fetchEventCheckinStats(organizerId, eventId) {
+  const response = await apiFetch(`organizer/${organizerId}/events/${eventId}/analytics/checkin-stats`);
+  return response.data;
+}

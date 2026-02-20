@@ -39,6 +39,7 @@ import Profile from "./pages/Profile";
 import PromoterProfile from "./pages/PromoterProfile";
 import PromoterLogin from "./pages/PromoterLogin";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
+import EventAnalyticsPage from "./pages/EventAnalyticsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
 import ReceptionDetail from "./pages/ReceptionDetail";
@@ -166,6 +167,11 @@ const App = () => {
             <Route path="/organizer/events/:eventId/refunds" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/:organizerSlug/events/:eventSlug/analytics" element={
+              <ProtectedRoute requiredRole="organizer">
+                <EventAnalyticsPage />
               </ProtectedRoute>
             } />
             {/* <Route path="/organizer/financial" element={

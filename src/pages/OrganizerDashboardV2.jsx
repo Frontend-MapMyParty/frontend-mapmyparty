@@ -109,6 +109,7 @@ const OrganizerProfileContent = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isBankPanelOpen, setIsBankPanelOpen] = useState(false);
   const [isBankEditing, setIsBankEditing] = useState(false);
+  const [bankExists, setBankExists] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isBankSaving, setIsBankSaving] = useState(false);
   const [isBankLoading, setIsBankLoading] = useState(false);
@@ -219,14 +220,18 @@ const OrganizerProfileContent = ({ user }) => {
     try {
       const res = await apiFetch("organizer/me/bank-details", { method: "GET" });
       const data = res?.data || res || {};
+      const exists = !!(data?.accountHolder || data?.accountNumber);
+      setBankExists(exists);
       setBankDraft((prev) => ({ ...prev, ...data }));
       setProfileData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
       setEditData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
+      setIsBankEditing(!exists); // auto-open form when no bank details yet
     } catch (error) {
       console.error("Failed to load bank details:", error);
       setBankDraft(editData.bankDetails);
+      setBankExists(false);
+      setIsBankEditing(true); // assume no details on error, open form
     } finally {
-      setIsBankEditing(false);
       setIsBankPanelOpen(true);
       setIsBankLoading(false);
     }
@@ -247,10 +252,11 @@ const OrganizerProfileContent = ({ user }) => {
         bankName: bankDraft.bankName,
       };
       const res = await apiFetch("organizer/me/bank-details", {
-        method: "PATCH",
+        method: bankExists ? "PATCH" : "POST",
         body: JSON.stringify(payload),
       });
       const data = res?.data || res || {};
+      setBankExists(true);
       setBankDraft((prev) => ({ ...prev, ...data }));
       setProfileData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
       setEditData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
@@ -935,15 +941,25 @@ const OrganizerProfileContent = ({ user }) => {
               {/* Bank Summary */}
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-400/40">
-                    <CreditCard className="w-5 h-5 text-emerald-100" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${bankExists ? "bg-emerald-500/20 border-emerald-400/40" : "bg-amber-500/10 border-amber-400/30"}`}>
+                    <CreditCard className={`w-5 h-5 ${bankExists ? "text-emerald-100" : "text-amber-300"}`} />
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Payout Provider</p>
-                    <p className="text-base font-semibold text-white">
-                      {editData.bankDetails.providerName} • {editData.bankDetails.verificationStatus}
-                    </p>
-                    <p className="text-xs text-white/60">Txn ID: {editData.bankDetails.verificationTxnId}</p>
+                    {bankExists ? (
+                      <>
+                        <p className="text-xs uppercase tracking-wide text-white/50">Payout Provider</p>
+                        <p className="text-base font-semibold text-white">
+                          {editData.bankDetails.providerName} • {editData.bankDetails.verificationStatus}
+                        </p>
+                        <p className="text-xs text-white/60">Txn ID: {editData.bankDetails.verificationTxnId}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs uppercase tracking-wide text-white/50">Bank Account</p>
+                        <p className="text-base font-semibold text-amber-300">Not added yet</p>
+                        <p className="text-xs text-white/50">Add bank details to receive payouts</p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -952,7 +968,7 @@ const OrganizerProfileContent = ({ user }) => {
                     onClick={handleOpenBankPanel}
                     className="px-3 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-md"
                   >
-                    View Bank
+                    {bankExists ? "View Bank" : "Add Bank"}
                   </button>
                 </div>
               </div>
@@ -1070,7 +1086,7 @@ const OrganizerProfileContent = ({ user }) => {
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/50">Payouts</p>
                 <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-emerald-200" />
-                  Bank Details
+                  {bankExists ? "Bank Details" : "Add Bank Details"}
                 </h2>
               </div>
               <button onClick={handleCancelBank} className="text-white/60 hover:text-white">
@@ -1079,28 +1095,44 @@ const OrganizerProfileContent = ({ user }) => {
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Provider</p>
-                  <p className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-emerald-200" />
-                    {bankDraft.providerName}
-                  </p>
+              {/* Provider / Status — only shown when bank details exist */}
+              {bankExists && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Provider</p>
+                    <p className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-200" />
+                      {bankDraft.providerName}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Status</p>
+                    <p className="text-lg font-semibold text-white flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      {bankDraft.verificationStatus}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Status</p>
-                  <p className="text-lg font-semibold text-white flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                    {bankDraft.verificationStatus}
-                  </p>
+              )}
+
+              {/* Prompt when no bank details */}
+              {!bankExists && (
+                <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+                  <CreditCard className="w-5 h-5 text-amber-300 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-200">No bank details added</p>
+                    <p className="text-xs text-white/50 mt-0.5">Fill in the form below to set up your payout account.</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-white">Account</h4>
-                  <span className="text-xs text-white/60">Txn: {bankDraft.verificationTxnId}</span>
-                </div>
+                {bankExists && (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-white">Account</h4>
+                    <span className="text-xs text-white/60">Txn: {bankDraft.verificationTxnId}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { key: "accountHolder", label: "Account Holder" },
@@ -1125,16 +1157,19 @@ const OrganizerProfileContent = ({ user }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Created</p>
-                  <p className="text-base font-semibold text-white">{formatDate(bankDraft.createdAt)}</p>
+              {/* Created / Updated — only shown when bank details exist */}
+              {bankExists && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Created</p>
+                    <p className="text-base font-semibold text-white">{formatDate(bankDraft.createdAt)}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Updated</p>
+                    <p className="text-base font-semibold text-white">{formatDate(bankDraft.updatedAt)}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Updated</p>
-                  <p className="text-base font-semibold text-white">{formatDate(bankDraft.updatedAt)}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 bg-white/5 flex items-center gap-3">
@@ -1142,10 +1177,11 @@ const OrganizerProfileContent = ({ user }) => {
                 <>
                   <button
                     onClick={handleSaveBank}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition"
+                    disabled={isBankSaving}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Save className="w-4 h-4" />
-                    Save Bank Details
+                    {isBankSaving ? "Saving…" : bankExists ? "Save Bank Details" : "Add Bank Details"}
                   </button>
                   <button
                     onClick={handleCancelBank}

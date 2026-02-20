@@ -18,6 +18,7 @@ import {
   Ban,
   Users,
   RotateCcw,
+  BarChart2,
 } from "lucide-react";
 import { useOrganizerEvents } from "@/hooks/useOrganizerEvents";
 import { apiFetch } from "@/config/api";
@@ -363,24 +364,42 @@ const MyEvents = () => {
                       <button
                         onClick={() => event.organizer?.slug && event.slug && navigate(`/events/${event.organizer.slug}/${event.slug}`)}
                         className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white text-zinc-900 hover:bg-white/90 transition-colors"
+                        title="View event"
                       >
                         <Eye className="w-3 h-3" />
                         View
                       </button>
                       <button
                         onClick={() => navigate(`/organizer/create-event?edit=${event.id}`, { state: { event } })}
-                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white/[0.06] text-white/80 ring-1 ring-white/[0.08] hover:bg-white/10 transition-colors"
+                        className="p-1.5 rounded-md text-white/30 hover:text-white/80 hover:bg-white/[0.06] transition-colors"
+                        title="Edit event"
                       >
-                        <Edit2 className="w-3 h-3" />
-                        Edit
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => navigate(`/organizer/events/${event.id}/attendees`)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium rounded-md bg-white/[0.06] text-white/80 ring-1 ring-white/[0.08] hover:bg-white/10 transition-colors"
+                        className="p-1.5 rounded-md text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                         title="View attendees"
                       >
-                        <Users className="w-3 h-3" />
-                        Attendees
+                        <Users className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/organizer/${event.organizer?.slug}/events/${event.slug}/analytics`,
+                            {
+                              state: {
+                                organizerId: event.organizer?.id,
+                                eventId: event.id,
+                                eventTitle: event.title,
+                              },
+                            }
+                          )
+                        }
+                        className="p-1.5 rounded-md text-white/30 hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                        title="View analytics"
+                      >
+                        <BarChart2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => navigate(`/organizer/events/${event.id}/refunds`)}
