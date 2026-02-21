@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -22,7 +22,17 @@ import {
   PercentIcon,
   ChevronDown,
   ChevronUp,
+  Pencil,
+  Trash2,
+  Plus,
+  X,
 } from "lucide-react";
+import {
+  fetchOffPlatformTickets,
+  createOffPlatformTicket,
+  updateOffPlatformTicket,
+  deleteOffPlatformTicket,
+} from "@/services/offPlatformService";
 import {
   AreaChart,
   Area,
@@ -151,6 +161,114 @@ const EventAnalyticsPage = () => {
 
   const [downloading, setDownloading] = useState(false);
   const [showAllBookings, setShowAllBookings] = useState(false);
+
+  // ── Off-Platform Tickets state ──────────────────────────────────────────
+  const [records, setRecords] = useState([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [modalForm, setModalForm] = useState({
+    recipientName: "",
+    ticketLabel: "",
+    members: 1,
+    price: 0,
+    checkinTime: "",
+    notes: "",
+  });
+
+  const loadRecords = useCallback(async () => {
+    if (!organizerId || !eventId) return;
+    setLoadingRecords(true);
+    try {
+      const data = await fetchOffPlatformTickets(organizerId, eventId);
+      setRecords(data?.items || data || []);
+    } catch (err) {
+      console.error("Failed to load off-platform tickets:", err);
+    } finally {
+      setLoadingRecords(false);
+    }
+  }, [organizerId, eventId]);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
+
+  const openAddModal = () => {
+    setEditingRecord(null);
+    setModalForm({ recipientName: "", ticketLabel: "", members: 1, price: 0, checkinTime: "", notes: "" });
+    setShowModal(true);
+  };
+
+  const openEditModal = (record) => {
+    setEditingRecord(record);
+    setModalForm({
+      recipientName: record.recipientName,
+      ticketLabel: record.ticketLabel,
+      members: record.members,
+      price: record.price,
+      checkinTime: record.checkinTime
+        ? new Date(record.checkinTime).toISOString().slice(0, 16)
+        : "",
+      notes: record.notes || "",
+    });
+    setShowModal(true);
+  };
+
+  const handleModalSave = async () => {
+    if (!modalForm.recipientName.trim() || !modalForm.ticketLabel.trim()) return;
+    setSaving(true);
+    try {
+      const payload = {
+        ...modalForm,
+        members: Number(modalForm.members),
+        price: Number(modalForm.price),
+        checkinTime: modalForm.checkinTime || null,
+        notes: modalForm.notes || null,
+      };
+      if (editingRecord) {
+        await updateOffPlatformTicket(organizerId, eventId, editingRecord.id, payload);
+      } else {
+        await createOffPlatformTicket(organizerId, eventId, payload);
+      }
+      setShowModal(false);
+      await loadRecords();
+    } catch (err) {
+      console.error("Failed to save off-platform ticket:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (record) => {
+    if (!window.confirm(`Delete record for "${record.recipientName}"?`)) return;
+    try {
+      await deleteOffPlatformTicket(organizerId, eventId, record.id);
+      await loadRecords();
+    } catch (err) {
+      console.error("Failed to delete off-platform ticket:", err);
+    }
+  };
+
+  const handleMarkCheckedIn = async (record) => {
+    try {
+      await updateOffPlatformTicket(organizerId, eventId, record.id, {
+        checkinTime: new Date().toISOString(),
+      });
+      await loadRecords();
+    } catch (err) {
+      console.error("Failed to mark checked in:", err);
+    }
+  };
+
+  const offPlatformTotals = records.reduce(
+    (acc, r) => ({
+      count: acc.count + 1,
+      members: acc.members + (r.members || 0),
+      revenue: acc.revenue + (r.price || 0),
+    }),
+    { count: 0, members: 0, revenue: 0 }
+  );
 
   const {
     summary,
@@ -621,7 +739,217 @@ const EventAnalyticsPage = () => {
             )}
           </div>
         ) : null}
+
+        {/* ── Off-Platform Tickets ──────────────────────────────────────── */}
+        <div className="border-t border-white/[0.06] pt-6 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Ticket className="w-4 h-4 text-amber-400" />
+              Off-Platform Tickets
+            </h2>
+            <button
+              onClick={openAddModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Record
+            </button>
+          </div>
+
+          {/* Summary strip */}
+          {records.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.07] p-3 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-0.5">Records</p>
+                <p className="text-lg font-semibold text-white">{offPlatformTotals.count}</p>
+              </div>
+              <div className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.07] p-3 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-0.5">Total Members</p>
+                <p className="text-lg font-semibold text-white">{offPlatformTotals.members}</p>
+              </div>
+              <div className="rounded-lg bg-white/[0.04] ring-1 ring-white/[0.07] p-3 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-white/40 mb-0.5">Total Revenue</p>
+                <p className="text-lg font-semibold text-amber-400">{fmt(offPlatformTotals.revenue)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="rounded-xl bg-white/[0.03] ring-1 ring-white/[0.07] overflow-hidden">
+            {loadingRecords ? (
+              <div className="p-6 text-center">
+                <Loader className="w-4 h-4 animate-spin text-white/30 mx-auto" />
+              </div>
+            ) : records.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-white/40">
+                No off-platform tickets recorded yet. Click "Add Record" to get started.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-white/[0.06]">
+                      {["Recipient", "Ticket Label", "Members", "Price", "Check-in Time", "Notes", "Actions"].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-left font-medium text-white/40 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map((r) => (
+                      <tr key={r.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 font-medium text-white/90">{r.recipientName}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400">
+                            {r.ticketLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-white/70">{r.members}</td>
+                        <td className="px-4 py-3 text-emerald-400">{fmt(r.price)}</td>
+                        <td className="px-4 py-3">
+                          {r.checkinTime ? (
+                            <span className="text-cyan-400">
+                              {new Date(r.checkinTime).toLocaleDateString("en-IN", {
+                                day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                              })}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleMarkCheckedIn(r)}
+                              className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors whitespace-nowrap"
+                            >
+                              Mark Checked In
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-white/40 max-w-[140px] truncate">{r.notes || "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditModal(r)}
+                              className="p-1 rounded text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(r)}
+                              className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* ── Off-Platform Ticket Modal ─────────────────────────────────────── */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-xl bg-[#0c1120] ring-1 ring-white/[0.1] shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
+              <h3 className="text-sm font-semibold text-white">
+                {editingRecord ? "Edit Record" : "Add Off-Platform Ticket"}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Recipient Name *</label>
+                <input
+                  type="text"
+                  value={modalForm.recipientName}
+                  onChange={(e) => setModalForm((f) => ({ ...f, recipientName: e.target.value }))}
+                  className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:ring-violet-500"
+                  placeholder="e.g. John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Ticket Label *</label>
+                <input
+                  type="text"
+                  value={modalForm.ticketLabel}
+                  onChange={(e) => setModalForm((f) => ({ ...f, ticketLabel: e.target.value }))}
+                  className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:ring-violet-500"
+                  placeholder="e.g. VIP, General, Backstage"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Members *</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={modalForm.members}
+                    onChange={(e) => setModalForm((f) => ({ ...f, members: e.target.value }))}
+                    className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Price (₹) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={modalForm.price}
+                    onChange={(e) => setModalForm((f) => ({ ...f, price: e.target.value }))}
+                    className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-violet-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Check-in Time (optional)</label>
+                <input
+                  type="datetime-local"
+                  value={modalForm.checkinTime}
+                  onChange={(e) => setModalForm((f) => ({ ...f, checkinTime: e.target.value }))}
+                  className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-violet-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">Notes (optional)</label>
+                <textarea
+                  value={modalForm.notes}
+                  onChange={(e) => setModalForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={2}
+                  className="w-full bg-white/[0.05] ring-1 ring-white/[0.1] rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:ring-violet-500 resize-none"
+                  placeholder="Any notes about this ticket..."
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/[0.07]">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm text-white/50 hover:text-white rounded-lg hover:bg-white/[0.05] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleModalSave}
+                disabled={saving || !modalForm.recipientName.trim() || !modalForm.ticketLabel.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {saving && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                {editingRecord ? "Save Changes" : "Add Record"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
