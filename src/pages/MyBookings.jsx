@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import StarRating from "@/components/StarRating";
+import { buildCanonicalQrPayload } from "@/utils/qrPayload";
 
 const MyBookings = () => {
   const feedbackSuggestions = [
@@ -177,9 +178,11 @@ const MyBookings = () => {
       doc.text(`Venue: ${venue}`, 20, 110);
       if (ticket.ticketPrice) doc.text(`Price: ₹${ticket.ticketPrice.toLocaleString()}`, 20, 120);
       if (ticket.qrCode) {
-        const qrData = JSON.stringify({ qr: ticket.qrCode, booking: ticket.bookingId });
-        const qrUrl = await QRCode.toDataURL(qrData, { width: 120 });
-        doc.addImage(qrUrl, 'PNG', pageWidth - 60, 60, 45, 45);
+        const qrData = buildCanonicalQrPayload(ticket.qrCode);
+        if (qrData) {
+          const qrUrl = await QRCode.toDataURL(qrData, { width: 120 });
+          doc.addImage(qrUrl, 'PNG', pageWidth - 60, 60, 45, 45);
+        }
       }
       if (ticket.manualCheckInCode) doc.text(`Check-in Code: ${ticket.manualCheckInCode.toUpperCase()}`, 20, 135);
       doc.setFontSize(10);

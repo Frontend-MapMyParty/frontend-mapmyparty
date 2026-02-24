@@ -17,6 +17,8 @@ import {
   Layers,
 } from "lucide-react";
 import { apiFetch } from "@/config/api";
+import QRScanner from "@/components/QRScanner";
+import CheckInResult from "@/components/CheckInResult";
 
 // Date formatter utility
 const formatDateTime = (date) =>
@@ -93,28 +95,14 @@ const TicketPanel = ({
     <div className="flex items-center justify-between gap-3">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-white/60 flex items-center gap-2">
-          <Ticket className="w-4 h-4 text-amber-300" /> Ticket • #{ticket.ticketId}
+          <Ticket className="w-4 h-4 text-amber-300" /> Ticket
         </p>
-        <h3 className="text-xl font-semibold">{ticket.holder}</h3>
-        <p className="text-sm text-white/60">{ticket.email}</p>
+        <h3 className="text-2xl font-bold">{ticket.holder}</h3>
       </div>
       <div className="text-right">
-        <p className="text-xs text-white/60">{ticket.ticketType}</p>
+        <p className="text-sm font-medium text-white/80">{ticket.ticketType}</p>
         <p className="text-lg font-bold">Qty {ticket.quantity}</p>
         <p className="text-sm text-white/60">₹{ticket.price?.toLocaleString()}</p>
-      </div>
-    </div>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-        <p className="text-xs text-white/60">Event</p>
-        <p className="font-semibold">{ticket.eventTitle}</p>
-        <p className="text-xs text-white/60 mt-1">{ticket.schedule}</p>
-      </div>
-      <div className="rounded-xl bg-black/30 border border-white/10 p-3">
-        <p className="text-xs text-white/60">Venue</p>
-        <p className="font-semibold">{ticket.venue}</p>
-        <p className="text-xs text-white/60 mt-1">Booking ID: {ticket.bookingId}</p>
       </div>
     </div>
 
@@ -125,49 +113,6 @@ const TicketPanel = ({
         : decision === "rejected"
         ? "Rejected • Entry denied"
         : ticket.status}
-    </div>
-
-    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/60 mb-2 flex items-center gap-2">
-        <Users className="w-4 h-4 text-emerald-300" /> Attendees ({ticket.attendees?.length || 0})
-      </p>
-      <div className="space-y-2">
-        {(ticket.attendees || []).map((att, idx) => (
-          <div
-            key={att.id || idx}
-            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-          >
-            <div>
-              <p className="text-sm font-semibold">{att.name}</p>
-              <p className="text-xs text-white/60">{att.email}</p>
-            </div>
-            <div className="text-right text-xs text-white/60">
-              <p>{att.type || ticket.ticketType}</p>
-              {att.phone && <p>{att.phone}</p>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/60 mb-2 flex items-center gap-2">
-        <Ticket className="w-4 h-4 text-amber-300" /> Payment
-      </p>
-      <div className="space-y-1 text-sm text-white/70">
-        <div className="flex justify-between">
-          <span>Ticket ({ticket.quantity} × ₹{ticket.price?.toLocaleString()})</span>
-          <span>₹{(ticket.breakdown?.base || 0).toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Fees</span>
-          <span>₹{(ticket.breakdown?.fees || 0).toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between font-semibold text-white">
-          <span>Total Paid</span>
-          <span>₹{(ticket.breakdown?.total || 0).toLocaleString()}</span>
-        </div>
-      </div>
     </div>
 
     {message && <p className="text-sm text-emerald-300">{message}</p>}
@@ -274,6 +219,11 @@ const ReceptionDetail = () => {
   const [showReason, setShowReason] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  // QR Scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanProcessing, setScanProcessing] = useState(false);
+  const [checkInResult, setCheckInResult] = useState(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     hasFetchedRef.current = false;
@@ -349,6 +299,51 @@ const ReceptionDetail = () => {
     setProcessing(false);
   };
 
+  const handleQuickCheckIn = async (qrDataString) => {
+    setScanProcessing(true);
+    setCheckInResult(null);
+
+    try {
+      const response = await apiFetch("booking/quick-check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qrData: qrDataString }),
+      });
+      const data = response.data || response;
+
+      if (data.alreadyCheckedIn) {
+        setCheckInResult({
+          type: "already_checked_in",
+          data,
+        });
+      } else {
+        setCheckInResult({
+          type: "success",
+          data,
+        });
+        setAccepted((prev) => prev + 1);
+      }
+    } catch (err) {
+      console.error("Quick check-in failed:", err);
+      setCheckInResult({
+        type: "error",
+        error: err.message || "Check-in failed. Please try again.",
+      });
+    } finally {
+      setScanProcessing(false);
+    }
+  };
+
+  const handleScanNextFromResult = () => {
+    setCheckInResult(null);
+    // Scanner stays open — ready for next scan
+  };
+
+  const handleCloseResult = () => {
+    setCheckInResult(null);
+    setShowScanner(false);
+  };
+
   const buildTicketFromScan = (scanPayload) => {
     const bookingItem = scanPayload?.bookingItem;
     const booking = scanPayload?.booking;
@@ -385,6 +380,8 @@ const ReceptionDetail = () => {
       eventTitle: eventInfo.title,
       venue: `${eventInfo.venue || ""}, ${eventInfo.city || ""}`.replace(/^[,\s]+|[,\s]+$/g, ""),
       schedule: `${formatDateTime(eventInfo.startDate)} — ${formatDateTime(eventInfo.endDate)}`,
+      manualCheckInCode: bookingItem.manualCheckInCode || null,
+      qrToken: bookingItem.qrCode || null,
       status: bookingItem.checkedIn ? "Already Checked-in" : "Pending Check-in",
       alreadyCheckedIn: bookingItem.checkedIn || false,
     };
@@ -413,6 +410,8 @@ const ReceptionDetail = () => {
       if (!nextTicket) {
         throw new Error("Ticket details incomplete. Please verify again.");
       }
+      // Store the manual code so Allow Entry can use quick-check-in
+      nextTicket.manualCheckInCode = normalizedCode;
       setTicket(nextTicket);
       setDecision(null);
       setMessage(`Loaded ticket ${nextTicket.ticketId}`);
@@ -427,14 +426,6 @@ const ReceptionDetail = () => {
     }
   };
 
-  const handleScan = () => {
-    if (!ticketInput.trim()) {
-      setError("Enter the manual check-in code before scanning.");
-      return;
-    }
-    verifyTicket(ticketInput.trim());
-  };
-
   const handleSubmitId = (e) => {
     e.preventDefault();
     verifyTicket(ticketInput.trim());
@@ -445,10 +436,11 @@ const ReceptionDetail = () => {
     setProcessing(true);
     setError("");
     try {
-      const response = await apiFetch("booking/check-in", {
+      // Use quick-check-in (single round trip) instead of the old 2-step check-in
+      const response = await apiFetch("booking/quick-check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingItemId: ticket.bookingItemId }),
+        body: JSON.stringify({ manualCheckInCode: ticket.manualCheckInCode }),
       });
       const data = response.data || response;
       if (!data?.checkedIn) {
@@ -542,14 +534,13 @@ const ReceptionDetail = () => {
               <p className="text-sm font-semibold flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-cyan-300" /> QR Scan
               </p>
-              <p className="text-xs text-white/60 mt-1">Verify a QR scan or manual code (e.g., 9sv9begy).</p>
+              <p className="text-xs text-white/60 mt-1">Scan a ticket QR code with your camera for instant check-in.</p>
               <button
-                onClick={handleScan}
-                disabled={processing}
-                className="mt-3 w-full px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/30 to-emerald-500/30 border border-white/10 hover:border-emerald-300/40 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                onClick={() => setShowScanner(true)}
+                className="mt-3 w-full px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500/30 to-emerald-500/30 border border-white/10 hover:border-emerald-300/40 transition flex items-center justify-center gap-2"
               >
-                {loadingTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-                Verify Code
+                <QrCode className="w-4 h-4" />
+                Open QR Scanner
               </button>
             </div>
 
@@ -609,6 +600,22 @@ const ReceptionDetail = () => {
           </div>
         </div>
       </div>
+
+      {showScanner && (
+        <QRScanner
+          onScan={handleQuickCheckIn}
+          onClose={() => setShowScanner(false)}
+          isProcessing={scanProcessing}
+        />
+      )}
+
+      {checkInResult && (
+        <CheckInResult
+          result={checkInResult}
+          onScanNext={handleScanNextFromResult}
+          onClose={handleCloseResult}
+        />
+      )}
 
       <Modal open={showReason} onClose={() => setShowReason(false)}>
         <h3 className="text-lg font-semibold text-white mb-2">Reject ticket</h3>

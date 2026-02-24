@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Ticket, User, Download, Share2, Clock, Hash, Mail } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { buildCanonicalQrPayload } from "@/utils/qrPayload";
 
 const TicketModal = ({ isOpen, onClose, ticket }) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   useEffect(() => {
     if (ticket && isOpen) {
-      const qrData = `Order: ${ticket.orderId}\nEvent: ${ticket.eventTitle}\nDate: ${ticket.eventDate}\nQR: ${ticket.qrCode || ticket.id}`;
+      const qrData = buildCanonicalQrPayload(ticket.qrCode || "");
+      if (!qrData) {
+        setQrCodeUrl("");
+        return;
+      }
       QRCode.toDataURL(qrData, { width: 200, margin: 2 })
         .then(url => setQrCodeUrl(url))
         .catch(err => console.error(err));

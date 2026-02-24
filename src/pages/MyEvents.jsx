@@ -175,17 +175,13 @@ const MyEvents = () => {
       }
       invalidateCache();
       refresh();
-      const refunded = response.data?.refundedBookings || 0;
-      const cancelled = response.data?.cancelledBookings || 0;
-      const parts = [];
-      if (refunded > 0) parts.push(`${refunded} booking${refunded > 1 ? "s" : ""} refunded`);
-      if (cancelled > 0) parts.push(`${cancelled} booking${cancelled > 1 ? "s" : ""} cancelled`);
       toast.success(
-        `Event cancelled successfully.${parts.length > 0 ? " " + parts.join(", ") + "." : ""} Attendees have been notified.`
+        response?.message ||
+          "Cancellation request submitted. Promoter/Admin will handle cancellation approval and refund initiation."
       );
     } catch (err) {
       console.error("Error cancelling event:", err);
-      toast.error(err.message || "Failed to cancel event. Please try again.");
+      toast.error(err.message || "Failed to submit cancellation request. Please try again.");
     } finally {
       setCancelLoading(false);
       setConfirmCancel(null);
@@ -558,13 +554,13 @@ const MyEvents = () => {
               <div>
                 <h3 className="text-sm font-semibold">Cancel event?</h3>
                 <p className="text-xs text-white/50 mt-0.5 leading-relaxed">
-                  <span className="text-white/70 font-medium">"{confirmCancel.title || "Untitled"}"</span> will be cancelled and all attendees will be notified.
+                  <span className="text-white/70 font-medium">"{confirmCancel.title || "Untitled"}"</span> cancellation will be submitted for promoter/admin approval.
                 </p>
               </div>
             </div>
             <div className="rounded-lg bg-amber-500/5 ring-1 ring-amber-500/15 px-3 py-2">
               <p className="text-[11px] text-amber-200/70 leading-relaxed">
-                All confirmed bookings with payments will be automatically refunded. This action cannot be undone.
+                Refunds are not initiated from organizer side. Promoter/Admin will manually approve and trigger automated refunds.
               </p>
             </div>
             <div className="flex gap-2 pt-1">
@@ -581,7 +577,7 @@ const MyEvents = () => {
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-60"
               >
                 {cancelLoading ? <Loader className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
-                Cancel Event
+                Submit Request
               </button>
             </div>
           </div>
