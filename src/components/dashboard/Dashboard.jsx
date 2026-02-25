@@ -248,42 +248,36 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 py-3 sm:py-4 md:py-6 lg:py-8 text-white bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] space-y-4 sm:space-y-6 lg:space-y-8">
-      {/* Enhanced Hero Section - Compact & Interactive */}
-      <section className="relative overflow-hidden mt-6 sm:mt-10 md:mt-10 rounded-xl sm:rounded-2xl border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[#1a0008] via-[#0a0a15] to-[#000510] p-4 sm:p-6 md:p-8 shadow-[0_20px_60px_-20px_rgba(100,180,255,0.15)]">
-        <div className="absolute inset-0 opacity-30 pointer-events-none">
-          <div className="absolute -left-16 -top-16 h-40 sm:h-48 w-40 sm:w-48 rounded-full bg-[#D60024] blur-[80px] sm:blur-[100px]" />
-          <div className="absolute right-0 bottom-0 h-44 sm:h-52 w-44 sm:w-52 rounded-full bg-[#60a5fa]/20 blur-[100px] sm:blur-[120px]" />
-          <div className="absolute left-1/2 top-1/2 h-36 w-36 rounded-full bg-[#3b82f6]/15 blur-[90px]" />
-        </div>
-        
-        <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start lg:items-center">
-          <div className="space-y-3 sm:space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-[rgba(214,0,36,0.15)] to-[rgba(59,130,246,0.1)] border border-[#60a5fa]/30 text-xs text-[#93c5fd] font-medium hover:bg-gradient-to-r hover:from-[rgba(214,0,36,0.25)] hover:to-[rgba(59,130,246,0.15)] transition-all duration-300">
-              <Zap className="h-3.5 w-3.5" />
+    <div className="w-full px-6 lg:px-12 py-8 text-white bg-[#0a0a0a] space-y-8">
+      {/* Clean Hero Section */}
+      <section className="rounded-2xl border border-[#1a1a1a] bg-[#111111] p-6 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-xs text-gray-400">
+              <Zap className="h-3.5 w-3.5 text-[#D60024]" />
               <span>Your next adventure awaits</span> 
             </div>
             
             <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
-                Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D60024] to-[#ff6b7a] animate-pulse">party seeker</span>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white">
+                Welcome back, <span className="text-[#D60024]">party seeker</span>
               </h1>
-              <p className="text-[rgba(255,255,255,0.7)] max-w-lg text-xs sm:text-sm md:text-base leading-relaxed">
+              <p className="text-gray-400 max-w-lg text-sm leading-relaxed">
                 Discover unforgettable events, manage tickets, and dive into experiences that match your vibe.
               </p>
             </div>
             
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-3 pt-2">
               <Link to="/dashboard/browse-events">
-                <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_12px_30px_-8px_rgba(214,0,36,0.5)] text-white px-4 sm:px-5 py-2 font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 text-xs sm:text-sm">
+                <Button className="bg-[#D60024] hover:bg-[#b8001f] text-white px-5 py-2 font-medium transition-colors text-sm">
                   Explore Events
-                  <ChevronRight className="ml-1.5 h-3.5 sm:h-4 w-3.5 sm:w-4" />
+                  <ChevronRight className="ml-1.5 h-4 w-4" />
                 </Button>
               </Link>
             </div>
             
-            {/* Compact Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+            {/* Clean Stats Grid */}
+            <div className="grid grid-cols-4 gap-3 pt-4">
               {[
                 { label: "Booked", value: totalBooked, icon: Ticket },
                 { label: "Upcoming", value: totalUpcoming, icon: Calendar },
@@ -292,155 +286,145 @@ const Dashboard = () => {
               ].map((stat) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={stat.label} className="group rounded-lg border border-[rgba(100,200,255,0.15)] bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] p-2.5 sm:p-3 hover:border-[#60a5fa]/50 hover:bg-gradient-to-br hover:from-[rgba(214,0,36,0.08)] hover:to-[rgba(59,130,246,0.1)] transition-all duration-300 cursor-pointer">
+                  <div key={stat.label} className="rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] p-3 hover:border-[#D60024]/30 transition-colors">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs text-[rgba(255,255,255,0.5)] font-medium line-clamp-1">{stat.label}</p>
-                      <Icon className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-[rgba(100,200,255,0.4)] group-hover:text-[#60a5fa] transition-colors duration-300 flex-shrink-0" />
+                      <p className="text-xs text-gray-500 font-medium">{stat.label}</p>
+                      <Icon className="h-3.5 w-3.5 text-gray-600" />
                     </div>
-                    <p className="text-xl sm:text-2xl font-bold text-white">{stat.value}</p>
+                    <p className="text-xl font-bold text-white">{stat.value}</p>
                   </div>
                 );
               })}
             </div>
           </div>
           
-          {/* Next Event Card - Compact & Interactive */}
-          <div className="relative mt-4 sm:mt-0">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#D60024]/5 to-transparent rounded-xl sm:rounded-2xl blur-xl pointer-events-none" />
-            <div className="relative rounded-xl sm:rounded-2xl border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.04)] to-[rgba(59,130,246,0.05)] backdrop-blur-sm p-4 sm:p-5 shadow-[0_15px_40px_-15px_rgba(59,130,246,0.2)] hover:border-[rgba(100,200,255,0.35)] transition-all duration-300">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-[#D60024]/15 to-[#3b82f6]/15 border border-[#60a5fa]/30">
-                    <CalendarIcon className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-[#D60024]" />
-                  </div>
-                  <span className="text-xs font-semibold text-white">Next Event</span>
+          {/* Next Event Card - Clean Design */}
+          <div className="rounded-2xl border border-[#1a1a1a] bg-[#111111] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#1a1a1a]">
+                  <CalendarIcon className="h-4 w-4 text-[#D60024]" />
                 </div>
-                <Badge className="bg-gradient-to-r from-[#D60024]/20 to-[#3b82f6]/20 text-[#93c5fd] border border-[#60a5fa]/40 font-medium text-xs">
-                  <Zap className="h-2.5 w-2.5 mr-1" />
-                  Live
-                </Badge>
+                <span className="text-sm font-medium text-white">Next Event</span>
               </div>
-              
-              {loadingUpcoming ? (
-                <div className="py-6 sm:py-8 text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-[rgba(214,0,36,0.2)] border-t-[#D60024]"></div>
-                  <p className="text-[rgba(255,255,255,0.6)] mt-2 text-xs">Loading...</p>
+              <Badge className="bg-[#D60024]/10 text-[#D60024] border border-[#D60024]/20 font-medium text-xs">
+                Live
+              </Badge>
+            </div>
+            
+            {loadingUpcoming ? (
+              <div className="py-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-[#1a1a1a] border-t-[#D60024]"></div>
+                <p className="text-gray-500 mt-2 text-xs">Loading...</p>
+              </div>
+            ) : nextEvent ? (
+              <div className="space-y-3">
+                <div className="relative overflow-hidden rounded-xl h-32 bg-[#1a1a1a]">
+                  <img 
+                    src={nextEvent.image} 
+                    alt={nextEvent.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <Badge className="absolute top-3 left-3 bg-[#D60024] text-white font-medium text-xs">
+                    {nextEvent.category}
+                  </Badge>
                 </div>
-              ) : nextEvent ? (
-                <div className="space-y-2.5 sm:space-y-3">
-                  <div className="relative overflow-hidden rounded-lg sm:rounded-xl h-28 sm:h-32 bg-gradient-to-br from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.08)] border border-[rgba(100,200,255,0.15)] group">
-                    <img 
-                      src={nextEvent.image} 
-                      alt={nextEvent.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 will-change-transform"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <Badge className="absolute top-2 left-2 bg-[#D60024] text-white font-semibold text-xs">
-                      {nextEvent.category}
-                    </Badge>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-white line-clamp-2">{nextEvent.title}</h3>
-                    <div className="space-y-1 mt-1.5 sm:mt-2">
-                      <div className="flex items-center gap-2 text-xs text-[rgba(255,255,255,0.75)]">
-                        <Clock className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-[#60a5fa] flex-shrink-0" />
-                        <span className="line-clamp-1">{formatDate(nextEvent.date)}</span>
-                        <span className="text-[rgba(255,255,255,0.4)]">•</span>
-                        <span className="flex-shrink-0">{nextEvent.time}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-[rgba(255,255,255,0.75)]">
-                        <MapPin className="h-3 sm:h-3.5 w-3 sm:w-3.5 text-[#60a5fa] flex-shrink-0" />
-                        <span className="line-clamp-1">{nextEvent.location}</span>
-                      </div>
+                
+                <div>
+                  <h3 className="text-base font-semibold text-white line-clamp-1">{nextEvent.title}</h3>
+                  <div className="space-y-1 mt-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <Clock className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                      <span className="line-clamp-1">{formatDate(nextEvent.date)} • {nextEvent.time}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <MapPin className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                      <span className="line-clamp-1">{nextEvent.location}</span>
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2 pt-1">
-                    {nextEvent.organizer?.slug && nextEvent.slug ? (
-                      <Link to={`/events/${nextEvent.organizer.slug}/${nextEvent.slug}`} className="flex-1">
-                        <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
-                          View Details
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Button size="sm" className="w-full bg-gray-500 text-white text-xs" disabled>
+                </div>
+                
+                <div className="pt-1">
+                  {nextEvent.organizer?.slug && nextEvent.slug ? (
+                    <Link to={`/events/${nextEvent.organizer.slug}/${nextEvent.slug}`} className="flex-1">
+                      <Button size="sm" className="w-full bg-[#D60024] hover:bg-[#b8001f] text-white font-medium text-xs">
                         View Details
                       </Button>
-                    )}
-                  </div>
+                    </Link>
+                  ) : (
+                    <Button size="sm" className="w-full bg-gray-700 text-white text-xs" disabled>
+                      View Details
+                    </Button>
+                  )}
                 </div>
+              </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Calendar className="h-12 w-12 text-[rgba(100,200,255,0.3)] mb-3" />
-              <p className="text-sm text-[rgba(255,255,255,0.6)]">No upcoming events</p>
+              <Calendar className="h-10 w-10 text-gray-600 mb-3" />
+              <p className="text-sm text-gray-500">No upcoming events</p>
             </div>
           )}
         </div>
 
         </div>
-      </div>
+      </section>
 
-        {/* Popular Events Carousel */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold bg-gradient-to-r from-[#93c5fd] via-[#60a5fa] to-[#D60024] bg-clip-text text-transparent">Popular Events</h2>
-          </div>
-          {upcomingEvents.length > 0 ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
-              {upcomingEvents.map((event) => {
-                if (event.organizer?.slug && event.slug) {
-                  return (
-                    <div key={event.id} className="group flex-shrink-0 w-80">
-                      <div className="flex items-center gap-2">
-                        <Link to={`/events/${event.organizer.slug}/${event.slug}`} className="flex-1">
-                          <Button size="sm" className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all duration-300 text-xs">
-                            View Details
-                          </Button>
-                        </Link>
-                        <Button size="sm" variant="outline" className="border-[rgba(100,200,255,0.3)] text-[#93c5fd] hover:bg-[rgba(59,130,246,0.15)] hover:border-[#60a5fa] transition-all duration-300">
-                          <Heart className="h-3.5 w-3.5" />
-                        </Button>
+      {/* Popular Events Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Popular Events</h2>
+          <Link to="/dashboard/browse-events">
+            <Button variant="outline" className="border-[#2a2a2a] text-gray-400 hover:text-white hover:bg-[#1a1a1a] text-xs">
+              View All
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
+        
+        {upcomingEvents.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {upcomingEvents.slice(0, 5).map((event) => (
+              event.organizer?.slug && event.slug ? (
+                <Link 
+                  key={event.id} 
+                  to={`/events/${event.organizer.slug}/${event.slug}`}
+                  className="group flex-shrink-0 w-72"
+                >
+                  <div className="rounded-xl border border-[#1a1a1a] bg-[#111111] overflow-hidden hover:border-[#2a2a2a] transition-colors">
+                    <div className="relative h-40 overflow-hidden">
+                      <img 
+                        src={event.image} 
+                        alt={event.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <Badge className="absolute top-3 left-3 bg-[#D60024] text-white font-medium text-xs">
+                        {event.category}
+                      </Badge>
+                    </div>
+                    <div className="p-4 space-y-2">
+                      <h3 className="font-semibold text-white text-sm line-clamp-1">{event.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{formatDate(event.date)}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs text-gray-500">From</span>
+                        <span className="text-lg font-bold text-[#D60024]">₹{(Number(event.price) || 0).toLocaleString()}</span>
                       </div>
                     </div>
-                  );
-                }
-
-                return (
-                  <div key={event.id} className="py-4 sm:py-6 text-center space-y-2 sm:space-y-3">
-                    <div className="inline-flex items-center justify-center h-10 sm:h-12 w-10 sm:w-12 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.2)]">
-                      <Calendar className="h-5 sm:h-6 w-5 sm:w-6 text-[rgba(214,0,36,0.4)]" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">No Events Yet</p>
-                      <p className="text-[rgba(255,255,255,0.6)] text-xs mt-0.5">Book your first event!</p>
-                    </div>
-                    <Link to="/dashboard/browse-events">
-                      <Button size="sm" className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold text-xs">
-                        Browse Events
-                      </Button>
-                    </Link>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-4 sm:py-6 text-center space-y-2 sm:space-y-3">
-              <div className="inline-flex items-center justify-center h-10 sm:h-12 w-10 sm:w-12 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.2)]">
-                <Calendar className="h-5 sm:h-6 w-5 sm:w-6 text-[rgba(214,0,36,0.4)]" />
-              </div>
-              <div>
-                <p className="text-white font-semibold text-sm">No Events Yet</p>
-                <p className="text-[rgba(255,255,255,0.6)] text-xs mt-0.5">Book your first event!</p>
-              </div>
-              <Link to="/dashboard/browse-events">
-                <Button size="sm" className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold text-xs">
-                  Browse Events
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+                </Link>
+              ) : null
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center border border-[#1a1a1a] rounded-xl bg-[#111111]">
+            <Calendar className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No events available</p>
+          </div>
+        )}
       </section>
 
       {/* Main Content Grid */}
@@ -465,147 +449,116 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* All Upcoming Events - Horizontal Scrollable Single Column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-[#60a5fa]" />
-                📅 Upcoming Events
-              </h2>
-              <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Discover all events happening near you</p>
-            </div>
-            <Link to="/dashboard/browse-events">
-              <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all duration-300">
-                Browse Events <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+      {/* Upcoming Events Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Upcoming Events</h2>
+          <Link to="/dashboard/browse-events">
+            <Button variant="outline" className="border-[#2a2a2a] text-gray-400 hover:text-white hover:bg-[#1a1a1a] text-xs">
+              Browse All
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </Link>
+        </div>
 
-          {loadingUpcoming ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex-shrink-0 w-80 h-[440px] rounded-xl bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.08)] border border-[rgba(100,200,255,0.2)] animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
-              {upcomingEvents.map((event) => (
-                event.organizer?.slug && event.slug ? (
-                  <Link key={event.id} to={`/events/${event.organizer.slug}/${event.slug}`} className="group flex-shrink-0 w-80">
-                  <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] hover:border-[#60a5fa]/70 transition-all duration-300 hover:shadow-[0_15px_40px_-10px_rgba(100,180,255,0.3)]">
-                    {/* Image Section */}
-                    <div className="relative h-52 overflow-hidden bg-[rgba(255,255,255,0.05)]">
+        {loadingUpcoming ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex-shrink-0 w-72 h-96 rounded-xl bg-[#111111] border border-[#1a1a1a] animate-pulse" />
+            ))}
+          </div>
+        ) : upcomingEvents.length > 0 ? (
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+            {upcomingEvents.map((event) => (
+              event.organizer?.slug && event.slug ? (
+                <Link 
+                  key={event.id} 
+                  to={`/events/${event.organizer.slug}/${event.slug}`}
+                  className="group flex-shrink-0 w-72"
+                >
+                  <div className="h-96 rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#111111] hover:border-[#2a2a2a] transition-colors">
+                    <div className="relative h-44 overflow-hidden">
                       <img 
                         src={event.image} 
                         alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-120 transition-transform duration-500 will-change-transform"
+                        className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                      
-                      {/* Category Badge */}
-                      <div className="absolute top-3 left-3">
-                        <Badge className="bg-[#D60024]/90 text-white font-semibold text-xs transition-all duration-300">
-                          {event.category}
-                        </Badge>
-                      </div>
-
-                      {/* Rating Badge */}
-                      <div className="absolute top-3 right-3">
-                        <Badge className="bg-black/70 backdrop-blur-sm text-white font-bold text-xs border border-[#60a5fa]/40 transition-all duration-300 flex items-center gap-1">
-                          <Star className="h-3 w-3 text-[#60a5fa] fill-[#60a5fa]" />
-                          {event.rating}
-                        </Badge>
-                      </div>
-
-                      {/* Attendees Count */}
-                      <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-md rounded-lg px-3 py-1.5 border border-[rgba(100,200,255,0.3)] hover:bg-black/90 transition-all">
-                        <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 text-[#60a5fa]" />
-                          <span>{(event.attendees / 1000).toFixed(1)}K attending</span>
-                        </p>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <Badge className="absolute top-3 left-3 bg-[#D60024] text-white font-medium text-xs">
+                        {event.category}
+                      </Badge>
+                      <div className="absolute bottom-3 left-3 flex items-center gap-1 text-white text-xs">
+                        <Star className="h-3 w-3 fill-[#D60024] text-[#D60024]" />
+                        <span>{event.rating}</span>
                       </div>
                     </div>
-
-                    {/* Content Section */}
-                    <div className="p-5 space-y-3 flex flex-col flex-1 h-56">
-                      <div>
-                        <h3 className="font-bold text-white text-base line-clamp-2 group-hover:text-[#60a5fa] transition-colors duration-300">
-                          {event.title}
-                        </h3>
-                      </div>
-
-                      {/* Event Details */}
-                      <div className="space-y-2 text-xs flex-1">
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)] group-hover:text-[rgba(255,255,255,0.95)] transition-colors duration-300">
-                          <Clock className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{formatDate(event.date)}</span>
-                            <span className="text-[rgba(255,255,255,0.6)]">{event.time}</span>
-                          </div>
+                    <div className="p-4 space-y-3 flex flex-col h-52">
+                      <h3 className="font-semibold text-white text-sm line-clamp-2">{event.title}</h3>
+                      <div className="space-y-2 text-xs text-gray-500 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span>{formatDate(event.date)} • {event.time}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)] group-hover:text-[rgba(255,255,255,0.95)] transition-colors duration-300">
-                          <MapPin className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="line-clamp-1 font-medium">{event.location}</span>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5" />
+                          <span className="line-clamp-1">{event.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3.5 w-3.5" />
+                          <span>{(event.attendees / 1000).toFixed(1)}K attending</span>
                         </div>
                       </div>
-
-                      {/* Price */}
-                      <div className="pt-2 border-t border-[rgba(255,255,255,0.1)]">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs text-[rgba(255,255,255,0.65)] uppercase tracking-wide">Price</span>
-                          <p className="text-xl font-bold text-[#D60024]">₹{(Number(event.price) || 0).toLocaleString()}</p>
-                        </div>
+                      <div className="pt-3 border-t border-[#1a1a1a] flex items-center justify-between">
+                        <span className="text-xs text-gray-500">From</span>
+                        <span className="text-lg font-bold text-[#D60024]">₹{(Number(event.price) || 0).toLocaleString()}</span>
                       </div>
-
-                      {/* Quick Book Button */}
-                      <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-bold transition-all duration-300 text-sm">
+                      <Button className="w-full bg-[#D60024] hover:bg-[#b8001f] text-white font-medium text-xs">
                         View Details
                       </Button>
                     </div>
                   </div>
                 </Link>
-                ) : null
-              ))}
-            </div>
-          )}
-        </div>
+              ) : null
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center border border-[#1a1a1a] rounded-xl bg-[#111111]">
+            <Calendar className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm">No upcoming events</p>
+          </div>
+        )}
+      </section>
 
         {/* My Bookings Section */}
-        <div className="space-y-4">
+        <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Ticket className="h-6 w-6 text-[#60a5fa]" />
-                My Bookings
-              </h2>
-              <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Your confirmed event experiences</p>
-            </div>
+            <h2 className="text-xl font-semibold text-white">My Bookings</h2>
             {bookedEvents.length > 0 && (
               <Link to="/dashboard/bookings">
-                <Button variant="outline" className="border-[rgba(255,255,255,0.18)] text-white hover:bg-[rgba(255,255,255,0.08)]">
-                  View All <ChevronRight className="ml-1 h-4 w-4" />
+                <Button variant="outline" className="border-[#2a2a2a] text-gray-400 hover:text-white hover:bg-[#1a1a1a] text-xs">
+                  View All
+                  <ChevronRight className="ml-1 h-3.5 w-3.5" />
                 </Button>
               </Link>
             )}
           </div>
 
           {loadingBooked ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-80 rounded-2xl bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(59,130,246,0.08)] border border-[rgba(100,200,255,0.2)] animate-pulse" />
+                <div key={i} className="flex-shrink-0 w-72 h-80 rounded-xl bg-[#111111] border border-[#1a1a1a] animate-pulse" />
               ))}
             </div>
           ) : bookedEvents.length === 0 ? (
-            <Card className="border border-[rgba(100,200,255,0.25)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.08)] to-[rgba(214,0,36,0.05)]">
+            <Card className="border border-[#1a1a1a] bg-[#111111]">
               <CardContent className="p-12 text-center">
-                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-[rgba(214,0,36,0.1)] to-[rgba(59,130,246,0.1)] border border-[rgba(100,200,255,0.3)] mb-4">
-                  <Ticket className="h-8 w-8 text-[rgba(214,0,36,0.5)]" />
+                <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] mb-4">
+                  <Ticket className="h-6 w-6 text-[#D60024]" />
                 </div>
-                <p className="text-white font-semibold text-lg">No booked events yet</p>
-                <p className="text-[rgba(255,255,255,0.65)] text-sm mt-2 mb-6">Start exploring and book your first event experience!</p>
+                <p className="text-white font-medium text-lg">No booked events yet</p>
+                <p className="text-gray-500 text-sm mt-2 mb-6">Start exploring and book your first event experience!</p>
                 <Link to="/dashboard/browse-events">
-                  <Button className="bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)]">
+                  <Button className="bg-[#D60024] hover:bg-[#b8001f] text-white font-medium">
                     Explore Events
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -613,150 +566,116 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide scroll-smooth">
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
               {bookedEvents.map((event) => (
                 event.organizer?.slug && event.slug ? (
-                  <Link key={event.id} to={`/events/${event.organizer.slug}/${event.slug}`} className="group flex-shrink-0 w-80">
-                  <div className="relative h-[440px] rounded-xl overflow-hidden border border-[rgba(100,200,255,0.2)] bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] hover:border-[rgba(100,200,255,0.4)] transition-all duration-300 hover:shadow-[0_20px_50px_-20px_rgba(100,180,255,0.35)]">
-                    {/* Image Section */}
-                    <div className="relative h-48 overflow-hidden bg-[rgba(255,255,255,0.05)]">
-                      <img 
-                        src={event.image} 
-                        alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 will-change-transform"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      
-                      {/* Status Badge */}
-                      <div className="absolute top-3 right-3 flex gap-2">
-                        <Badge className="bg-[#D60024] text-white font-semibold">
+                  <Link key={event.id} to={`/events/${event.organizer.slug}/${event.slug}`} className="group flex-shrink-0 w-72">
+                    <div className="h-80 rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#111111] hover:border-[#2a2a2a] transition-colors">
+                      <div className="relative h-40 overflow-hidden">
+                        <img 
+                          src={event.image} 
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                        <Badge className="absolute top-3 left-3 bg-[#D60024] text-white font-medium text-xs">
                           {event.category}
                         </Badge>
                         {event.status === "confirmed" && (
-                          <Badge className="bg-green-500/20 text-green-300 border border-green-500/30">
-                            ✓ Confirmed
+                          <Badge className="absolute top-3 right-3 bg-green-500/20 text-green-400 border border-green-500/30 font-medium text-xs">
+                            Confirmed
                           </Badge>
                         )}
-                      </div>
-
-                      {/* Ticket Count */}
-                      <div className="absolute bottom-3 left-3 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-[rgba(100,200,255,0.3)]">
-                        <p className="text-sm font-semibold text-white">{event.ticketCount} {event.ticketCount > 1 ? 'Tickets' : 'Ticket'}</p>
-                      </div>
-                    </div>
-
-                    {/* Content Section */}
-                    <div className="p-5 space-y-3 flex flex-col flex-1 h-56">
-                      <div>
-                        <h3 className="font-bold text-white text-base line-clamp-2 group-hover:text-[#60a5fa] transition-colors">
-                          {event.title}
-                        </h3>
-                      </div>
-
-                      {/* Event Details */}
-                      <div className="space-y-2 text-xs flex-1">
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)]">
-                          <Clock className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="font-medium">{formatDate(event.date)}</span>
-                          <span className="text-[rgba(255,255,255,0.5)]">•</span>
-                          <span>{event.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[rgba(255,255,255,0.8)]">
-                          <MapPin className="h-4 w-4 text-[#60a5fa] flex-shrink-0" />
-                          <span className="font-medium line-clamp-1">{event.location}</span>
+                        <div className="absolute bottom-3 left-3 bg-black/60 rounded-lg px-2.5 py-1">
+                          <p className="text-xs font-medium text-white">{event.ticketCount} {event.ticketCount > 1 ? 'Tickets' : 'Ticket'}</p>
                         </div>
                       </div>
-
-                      {/* Price */}
-                      <div className="pt-2 border-t border-[rgba(255,255,255,0.1)]">
-                        <p className="text-[rgba(255,255,255,0.65)] text-xs uppercase tracking-wide mb-1">Total Paid</p>
-                        <p className="text-xl font-bold text-[#D60024]">₹{(event.price * event.ticketCount || 0).toLocaleString()}</p>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          className="flex-1 bg-gradient-to-r from-[#D60024] to-[#ff4d67] hover:shadow-[0_8px_20px_-6px_rgba(214,0,36,0.4)] text-white font-semibold transition-all text-xs"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownloadTicket(event); }}
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          Download
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="flex-1 border-[rgba(100,200,255,0.3)] text-[#93c5fd] hover:bg-[rgba(59,130,246,0.15)] text-xs"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleResendTicket(event); }}
-                        >
-                          <Mail className="h-3 w-3 mr-1" />
-                          Email
-                        </Button>
+                      <div className="p-4 space-y-3 flex flex-col h-40">
+                        <h3 className="font-semibold text-white text-sm line-clamp-1">{event.title}</h3>
+                        <div className="space-y-1.5 text-xs text-gray-500 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{formatDate(event.date)} • {event.time}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5" />
+                            <span className="line-clamp-1">{event.location}</span>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-[#1a1a1a]">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-500">Total Paid</span>
+                            <span className="text-lg font-bold text-[#D60024]">₹{(event.price * event.ticketCount || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="flex-1 bg-[#D60024] hover:bg-[#b8001f] text-white font-medium text-xs"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDownloadTicket(event); }}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Ticket
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="flex-1 border-[#2a2a2a] text-gray-400 hover:text-white hover:bg-[#1a1a1a] text-xs"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleResendTicket(event); }}
+                            >
+                              <Mail className="h-3 w-3 mr-1" />
+                              Email
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
                 ) : null
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Quick Actions & Calendar Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Quick Actions Card */}
-          <Card className="border-2 border-[rgba(255,255,255,0.12)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(214,0,36,0.4)] hover:border-[#D60024]/30 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[rgba(255,255,255,0.04)] rounded-2xl flex flex-col h-full">
-            <CardHeader className="p-6 pb-4 border-b border-[rgba(255,255,255,0.12)]">
-              <div>
-                <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                  ⚡ Quick Actions
-                </CardTitle>
-                <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Get started in seconds</p>
-              </div>
+          <Card className="border border-[#1a1a1a] bg-[#111111] rounded-xl flex flex-col h-full">
+            <CardHeader className="p-5 pb-3 border-b border-[#1a1a1a]">
+              <CardTitle className="text-lg font-semibold text-white">
+                Quick Actions
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
+            <CardContent className="p-5 pt-3 flex-1 flex flex-col">
               <div className="grid grid-cols-2 gap-3 flex-1 auto-rows-fr">
                 {[
                   { 
-                    icon: <Ticket className="h-5 w-5" />, 
+                    icon: <Ticket className="h-4 w-4" />, 
                     label: 'Browse Events',
-                    path: '/dashboard/browse-events',
-                    gradient: 'from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)]',
-                    iconBg: 'from-[rgba(59,130,246,0.25)] to-[rgba(59,130,246,0.1)]',
-                    iconColor: 'text-[#60a5fa]'
+                    path: '/dashboard/browse-events'
                   },
                   { 
-                    icon: <Calendar className="h-5 w-5" />, 
+                    icon: <Calendar className="h-4 w-4" />, 
                     label: 'My Bookings',
-                    path: '/dashboard/bookings',
-                    gradient: 'from-[rgba(168,85,247,0.15)] to-[rgba(168,85,247,0.05)]',
-                    iconBg: 'from-[rgba(168,85,247,0.25)] to-[rgba(168,85,247,0.1)]',
-                    iconColor: 'text-[#a855f7]'
+                    path: '/dashboard/bookings'
                   },
                   { 
-                    icon: <Download className="h-5 w-5" />, 
+                    icon: <Download className="h-4 w-4" />, 
                     label: 'My Tickets',
-                    path: '/dashboard/bookings',
-                    gradient: 'from-[rgba(34,197,94,0.15)] to-[rgba(34,197,94,0.05)]',
-                    iconBg: 'from-[rgba(34,197,94,0.25)] to-[rgba(34,197,94,0.1)]',
-                    iconColor: 'text-[#22c55e]'
+                    path: '/dashboard/bookings'
                   },
                   { 
-                    icon: <MapPin className="h-5 w-5" />, 
+                    icon: <MapPin className="h-4 w-4" />, 
                     label: 'Nearby',
-                    path: '/dashboard/browse-events',
-                    gradient: 'from-[rgba(249,115,22,0.15)] to-[rgba(249,115,22,0.05)]',
-                    iconBg: 'from-[rgba(249,115,22,0.25)] to-[rgba(249,115,22,0.1)]',
-                    iconColor: 'text-[#f97316]'
+                    path: '/dashboard/browse-events'
                   },
                 ].map((action, index) => (
                   <Link key={index} to={action.path}>
-                    <div className={`h-full flex flex-col items-center justify-center p-4 rounded-xl transition-all bg-gradient-to-br ${action.gradient} text-white hover:shadow-[0_10px_25px_-10px_rgba(100,180,255,0.3)] hover:scale-[1.03] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.4)] group cursor-pointer`}>
-                      <div className={`p-3 rounded-lg bg-gradient-to-br ${action.iconBg} ${action.iconColor} mb-2.5 group-hover:scale-110 transition-all duration-300`}>
+                    <div className="h-full flex flex-col items-center justify-center p-4 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#D60024]/30 text-white transition-all group cursor-pointer">
+                      <div className="p-2.5 rounded-lg bg-[#2a2a2a] text-gray-400 mb-2 group-hover:text-[#D60024] transition-colors">
                         {action.icon}
                       </div>
-                      <span className="text-xs font-semibold text-center text-white group-hover:text-white transition-colors leading-tight">{action.label}</span>
+                      <span className="text-xs font-medium text-center text-gray-400 group-hover:text-white transition-colors">{action.label}</span>
                     </div>
                   </Link>
                 ))}
@@ -765,65 +684,62 @@ const Dashboard = () => {
           </Card>
 
           {/* Event Calendar Card */}
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl overflow-hidden flex flex-col h-full">
-            <CardHeader className="p-6 pb-4 border-b border-[rgba(100,200,255,0.15)]">
+          <Card className="border border-[#1a1a1a] bg-[#111111] rounded-xl overflow-hidden flex flex-col h-full">
+            <CardHeader className="p-5 pb-3 border-b border-[#1a1a1a]">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                    📅 Event Calendar
-                  </CardTitle>
-                  <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Your upcoming schedule</p>
-                </div>
-                <div className="p-2.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] via-[rgba(59,130,246,0.2)] to-[rgba(59,130,246,0.15)] border border-[#60a5fa]/40">
-                  <Calendar className="h-5 w-5 text-[#60a5fa]" />
+                <CardTitle className="text-lg font-semibold text-white">
+                  Event Calendar
+                </CardTitle>
+                <div className="p-1.5 rounded-lg bg-[#1a1a1a]">
+                  <Calendar className="h-4 w-4 text-[#D60024]" />
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
+            <CardContent className="p-5 pt-3 flex-1 flex flex-col">
               {loadingUpcoming ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#D60024]"></div>
-                    <p className="text-[rgba(255,255,255,0.65)] mt-2 text-sm">Loading events...</p>
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-2 border-[#1a1a1a] border-t-[#D60024]"></div>
+                    <p className="text-gray-500 mt-2 text-sm">Loading events...</p>
                   </div>
                 </div>
               ) : upcomingEvents.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <Calendar className="h-10 w-10 text-[rgba(255,255,255,0.65)] mx-auto mb-2" />
-                    <p className="text-white text-sm font-medium">No upcoming events</p>
+                    <Calendar className="h-8 w-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm font-medium">No upcoming events</p>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col flex-1">
-                  <div className="space-y-3 flex-1">
+                  <div className="space-y-2 flex-1">
                     {upcomingEvents.slice(0, 4).map((event, idx) => (
                       event.organizer?.slug && event.slug ? (
                         <Link key={`cal-${event.id}`} to={`/events/${event.organizer.slug}/${event.slug}`} className="block group">
-                        <div className="flex items-start p-3 bg-gradient-to-r from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.05)] to-[rgba(214,0,36,0.04)] rounded-lg hover:from-[rgba(59,130,246,0.15)] hover:to-[rgba(214,0,36,0.1)] transition-all border border-[rgba(100,200,255,0.15)] hover:border-[#60a5fa]/60 group-hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)]">
-                          <div className="bg-gradient-to-br from-[rgba(59,130,246,0.3)] via-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.15)] p-2 rounded-lg mr-3 text-center min-w-[60px] border border-[#60a5fa]/40 group-hover:from-[rgba(59,130,246,0.5)] group-hover:to-[rgba(214,0,36,0.3)] transition-all">
-                            <div className="text-[#60a5fa] text-xs font-bold uppercase">
-                              {new Date(event.date).toLocaleString('default', { month: 'short' })}
+                          <div className="flex items-center p-2.5 bg-[#1a1a1a] rounded-lg hover:bg-[#2a2a2a] transition-colors border border-transparent hover:border-[#D60024]/20">
+                            <div className="bg-[#2a2a2a] p-2 rounded-lg mr-3 text-center min-w-[50px]">
+                              <div className="text-gray-500 text-[10px] font-medium uppercase">
+                                {new Date(event.date).toLocaleString('default', { month: 'short' })}
+                              </div>
+                              <div className="text-lg font-bold text-white">
+                                {new Date(event.date).getDate()}
+                              </div>
                             </div>
-                            <div className="text-2xl font-bold text-white group-hover:text-[#93c5fd] transition-colors">
-                              {new Date(event.date).getDate()}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-white group-hover:text-[#D60024] transition-colors truncate text-sm">{event.title}</h4>
+                              <div className="flex items-center text-xs text-gray-500 mt-0.5 gap-1.5">
+                                <Clock className="h-3 w-3" />
+                                <span>{event.time}</span>
+                              </div>
                             </div>
+                            <ChevronRight className="h-4 w-4 text-gray-600 group-hover:text-[#D60024] transition-all group-hover:translate-x-1 flex-shrink-0" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-white group-hover:text-[#60a5fa] transition-colors truncate text-sm">{event.title}</h4>
-                            <div className="flex items-center text-xs text-[rgba(255,255,255,0.65)] mt-1 gap-2 group-hover:text-[rgba(255,255,255,0.8)] transition-colors">
-                              <Clock className="h-3 w-3 text-[#60a5fa] flex-shrink-0" />
-                              <span>{event.time}</span>
-                            </div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-[rgba(255,255,255,0.4)] group-hover:text-[#60a5fa] transition-all group-hover:translate-x-1 flex-shrink-0" />
-                        </div>
-                      </Link>
+                        </Link>
                       ) : null
                     ))}
                   </div>
-                  <Link to="/dashboard/browse-events" className="mt-4">
-                    <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                  <Link to="/dashboard/browse-events" className="mt-3">
+                    <Button className="w-full bg-[#D60024] hover:bg-[#b8001f] text-white font-medium text-xs">
                       View All Events
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
@@ -834,91 +750,63 @@ const Dashboard = () => {
           </Card>
           
           {/* Activity Stats */}
-          <Card className="border-2 border-[rgba(100,200,255,0.2)] shadow-[0_22px_60px_-25px_rgba(0,0,0,0.7)] hover:shadow-[0_30px_80px_-20px_rgba(100,180,255,0.3)] hover:border-[#60a5fa]/50 transition-all duration-300 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[rgba(59,130,246,0.06)] to-[rgba(214,0,36,0.04)] rounded-2xl flex flex-col h-full">
-            <CardHeader className="p-6 pb-4 border-b border-[rgba(100,200,255,0.15)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white flex items-center gap-2">
-                    📊 Your Activity
-                  </CardTitle>
-                  <p className="text-sm text-[rgba(255,255,255,0.65)] mt-1">Track your event journey</p>
-                </div>
-              </div>
+          <Card className="border border-[#1a1a1a] bg-[#111111] rounded-xl flex flex-col h-full">
+            <CardHeader className="p-5 pb-3 border-b border-[#1a1a1a]">
+              <CardTitle className="text-lg font-semibold text-white">
+                Your Activity
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 pt-4 flex-1 flex flex-col">
-              <div className="space-y-5 flex-1 flex flex-col">
-                {/* Stats Grid - API Ready: GET /api/user/stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Total Bookings Stat */}
-                  <div className="p-5 rounded-xl bg-gradient-to-br from-[rgba(214,0,36,0.15)] to-[rgba(214,0,36,0.05)] border border-[rgba(214,0,36,0.3)] hover:border-[#D60024]/50 hover:shadow-[0_8px_20px_-8px_rgba(214,0,36,0.3)] transition-all group cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.25)] to-[rgba(214,0,36,0.1)]">
-                        <Ticket className="h-5 w-5 text-[#D60024] group-hover:scale-110 transition-transform" />
+            <CardContent className="p-5 pt-3 flex-1 flex flex-col">
+              <div className="space-y-4 flex-1 flex flex-col">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#D60024]/30 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-1.5 rounded-lg bg-[#2a2a2a]">
+                        <Ticket className="h-4 w-4 text-[#D60024]" />
                       </div>
-                      <TrendingUp className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
                     </div>
-                    <p className="text-3xl font-bold text-white mb-1">{totalBooked}</p>
-                    <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">Total Bookings</p>
+                    <p className="text-2xl font-bold text-white mb-0.5">{totalBooked}</p>
+                    <p className="text-xs text-gray-500">Total Bookings</p>
                   </div>
 
-                  {/* This Week Stat */}
-                  <div className="p-5 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.3)] hover:border-[#60a5fa]/50 hover:shadow-[0_8px_20px_-8px_rgba(100,180,255,0.3)] transition-all group cursor-pointer">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 rounded-lg bg-gradient-to-br from-[rgba(59,130,246,0.25)] to-[rgba(59,130,246,0.1)]">
-                        <Calendar className="h-5 w-5 text-[#60a5fa] group-hover:scale-110 transition-transform" />
+                  <div className="p-4 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#D60024]/30 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-1.5 rounded-lg bg-[#2a2a2a]">
+                        <Calendar className="h-4 w-4 text-[#D60024]" />
                       </div>
-                      <Zap className="h-4 w-4 text-[rgba(255,255,255,0.4)]" />
                     </div>
-                    <p className="text-3xl font-bold text-white mb-1">{upcomingThisWeek}</p>
-                    <p className="text-xs text-[rgba(255,255,255,0.65)] font-medium">This Week</p>
+                    <p className="text-2xl font-bold text-white mb-0.5">{upcomingThisWeek}</p>
+                    <p className="text-xs text-gray-500">This Week</p>
                   </div>
                 </div>
 
-                {/* Progress Section - API Ready: GET /api/user/progress */}
-                {/* <div className="p-5 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-[rgba(59,130,246,0.05)] border border-[rgba(100,200,255,0.2)] hover:border-[rgba(100,200,255,0.35)] transition-all">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)]">
-                        <Heart className="h-4 w-4 text-[#D60024]" />
+                {/* User Preferences */}
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-[#2a2a2a]">
+                        <Star className="h-3.5 w-3.5 text-[#D60024]" />
                       </div>
-                      <span className="text-sm font-semibold text-white">Event Explorer</span>
+                      <span className="text-sm text-gray-400">Favorite Category</span>
                     </div>
-                    <span className="text-sm text-[#60a5fa] font-bold">{Math.min(totalBooked * 10, 100)}%</span>
-                  </div>
-                  <Progress value={Math.min(totalBooked * 10, 100)} className="h-2.5 bg-[rgba(255,255,255,0.1)]" />
-                  <p className="text-xs text-[rgba(255,255,255,0.5)] mt-2.5 leading-relaxed">
-                    {totalBooked < 5 ? 'Almost there! Keep exploring!' : totalBooked < 10 ? 'Great progress! Keep going!' : 'Amazing! You\'re an event pro! 🎉'}
-                  </p>
-                </div> */}
-
-                {/* User Preferences - API Ready: GET /api/user/preferences */}
-                <div className="space-y-3">
-                  {/* Favorite Category */}
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.15)] hover:border-[rgba(100,200,255,0.35)] hover:bg-gradient-to-r hover:from-[rgba(59,130,246,0.08)] hover:to-transparent transition-all group">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] group-hover:from-[rgba(214,0,36,0.3)] group-hover:to-[rgba(59,130,246,0.3)] transition-all">
-                        <Star className="h-4 w-4 text-[#60a5fa]" />
-                      </div>
-                      <span className="text-sm text-white font-medium">Favorite Category</span>
-                    </div>
-                    <span className="text-sm text-[#60a5fa] font-bold">Music</span>
+                    <span className="text-sm text-white font-medium">Music</span>
                   </div>
 
-                  {/* Top Location */}
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[rgba(255,255,255,0.05)] to-transparent border border-[rgba(100,200,255,0.15)] hover:border-[rgba(100,200,255,0.35)] hover:bg-gradient-to-r hover:from-[rgba(59,130,246,0.08)] hover:to-transparent transition-all group">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-[rgba(214,0,36,0.2)] to-[rgba(59,130,246,0.2)] group-hover:from-[rgba(214,0,36,0.3)] group-hover:to-[rgba(59,130,246,0.3)] transition-all">
-                        <MapPin className="h-4 w-4 text-[#D60024]" />
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-[#2a2a2a]">
+                        <MapPin className="h-3.5 w-3.5 text-[#D60024]" />
                       </div>
-                      <span className="text-sm text-white font-medium">Top Location</span>
+                      <span className="text-sm text-gray-400">Top Location</span>
                     </div>
-                    <span className="text-sm text-[#60a5fa] font-bold">Mumbai</span>
+                    <span className="text-sm text-white font-medium">Mumbai</span>
                   </div>
                 </div>
 
                 {/* CTA Button */}
                 <Link to="/dashboard/browse-events" className="block">
-                  <Button className="w-full bg-gradient-to-r from-[#D60024] to-[#ff4d67] text-white font-bold hover:shadow-[0_10px_25px_-10px_rgba(214,0,36,0.4)] transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                  <Button className="w-full bg-[#D60024] hover:bg-[#b8001f] text-white font-medium text-xs">
                     Discover More Events
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
