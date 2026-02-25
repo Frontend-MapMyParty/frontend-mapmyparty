@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const ProtectedRoute = ({ children, requiredRole = null }) => {
   const location = useLocation();
   const { isAuthenticated, user, loading } = useAuth();
+  const redirectTarget = `${location.pathname}${location.search}`;
 
   if (loading) {
     return (
@@ -17,18 +18,21 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   if (!isAuthenticated) {
-    // Redirect promoter/admin routes to the dedicated promoter login page
-    if (requiredRole?.toUpperCase() === "PROMOTER") {
+    const normalizedRequiredRole = requiredRole?.toUpperCase();
+
+    // Use dedicated login page for promoter/admin class routes.
+    if (normalizedRequiredRole === "PROMOTER" || normalizedRequiredRole === "ADMIN") {
       return (
         <Navigate
-          to={`/promoter/login?redirect=${encodeURIComponent(location.pathname)}`}
+          to={`/promoter/login?redirect=${encodeURIComponent(redirectTarget)}`}
           replace
         />
       );
     }
+
     return (
       <Navigate
-        to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}
+        to={`/auth?redirect=${encodeURIComponent(redirectTarget)}`}
         replace
       />
     );
@@ -36,16 +40,21 @@ const ProtectedRoute = ({ children, requiredRole = null }) => {
 
   if (requiredRole) {
     const userRole = (user?.role || "").toString().toUpperCase();
-    let normalizedRequiredRole = requiredRole.toUpperCase();
+    const normalizedRequiredRole = requiredRole.toUpperCase();
 
-    // Promoter and Admin are the same role
-    if (normalizedRequiredRole === "PROMOTER") {
-      normalizedRequiredRole = "ADMIN";
-    }
+    // App aliases promoter -> admin in backend role naming.
+    const roleAliases = {
+      PROMOTER: ["PROMOTER", "ADMIN"],
+      ADMIN: ["PROMOTER", "ADMIN"],
+      USER: ["USER"],
+      ORGANIZER: ["ORGANIZER"],
+    };
 
-    if (userRole !== normalizedRequiredRole) {
+    const acceptedRoles = roleAliases[normalizedRequiredRole] || [normalizedRequiredRole];
+
+    if (!acceptedRoles.includes(userRole)) {
       console.warn(
-        `Role mismatch: required "${normalizedRequiredRole}", got "${userRole}"`
+        `Role mismatch: required one of [${acceptedRoles.join(", ")}], got "${userRole}"`
       );
       return <Navigate to="/" replace />;
     }
