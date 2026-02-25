@@ -169,9 +169,6 @@ const UserDashboard = () => {
     return bookings.map((booking) => {
       const event = booking.event || {};
       const venue = event.venue || {};
-      const analytics = booking.analytics || {};
-      const ticketsArray = booking.tickets || [];
-      const amounts = analytics.amounts || {};
       
       const { date, time } = formatDate(event.startDate || booking.createdAt);
       const bookingDate = new Date(booking.createdAt || Date.now()).toLocaleDateString(
@@ -197,13 +194,9 @@ const UserDashboard = () => {
         ? locationParts.join(", ") 
         : "Location TBA";
 
-      // Get all ticket types as a formatted string
-      const ticketTypesList = ticketsArray.map(t => 
-        `${t.name || t.type || "General Admission"} (${t.quantity}x)`
-      ).join(", ");
-
-      // Get primary ticket type (first one or most common)
-      const primaryTicketType = ticketsArray[0]?.name || ticketsArray[0]?.type || "General Admission";
+      const primaryTicketType = "Ticket";
+      const totalTickets = Number(booking.totalTickets) || 1;
+      const ticketTypesList = `${primaryTicketType} (${totalTickets}x)`;
 
       return {
         id: booking.id,
@@ -214,14 +207,14 @@ const UserDashboard = () => {
         eventTime: time,
         location,
         image: event.flyerImage || eventPlaceholder,
-        ticketTypes: ticketsArray,
+        ticketTypes: [],
         ticketTypesList,
         primaryTicketType,
-        totalTickets: analytics.totalTickets || ticketsArray.reduce((sum, t) => sum + (t.quantity || 0), 0) || 1,
-        totalPrice: amounts.total || 0,
-        subtotal: amounts.subtotal || 0,
-        platformFee: amounts.platformFee || 0,
-        gst: amounts.gst || 0,
+        totalTickets,
+        totalPrice: Number(booking.totalAmount) || 0,
+        subtotal: 0,
+        platformFee: 0,
+        gst: 0,
         bookingDate,
         status: (booking.status || "").toLowerCase(),
         review: booking.review || null,
@@ -475,7 +468,7 @@ const UserDashboard = () => {
 
                       <div>
                         <div className="text-xs font-medium text-gray-500">PAYMENT METHOD</div>
-                        <div className="mt-1 font-semibold text-gray-800">{ticket.raw?.paymentMethod || ticket.raw?.payment || "N/A"}</div>
+                        <div className="mt-1 font-semibold text-gray-800">{ticket.raw?.payment?.paymentMethod || "N/A"}</div>
                       </div>
 
                       <div className="text-right">

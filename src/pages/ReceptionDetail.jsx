@@ -304,7 +304,7 @@ const ReceptionDetail = () => {
     setCheckInResult(null);
 
     try {
-      const response = await apiFetch("booking/quick-check-in", {
+      const response = await apiFetch("booking/quick-check-in-qr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ qrData: qrDataString }),
@@ -400,7 +400,7 @@ const ReceptionDetail = () => {
     setMessage("");
 
     try {
-      const response = await apiFetch("booking/scan-qr", {
+      const response = await apiFetch("booking/scan-manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ manualCheckInCode: normalizedCode }),

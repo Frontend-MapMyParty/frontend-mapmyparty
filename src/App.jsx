@@ -14,7 +14,7 @@ import UserDashboard from "./pages/NewUserDashboard";
 import Dashboard from "./components/dashboard/Dashboard";
 import BrowseEvents from "./components/dashboard/BrowseEvents";
 import MyBookings from "./pages/MyBookings";
-import UserProfile from "./components/dashboard/UserProfile";
+import AttendeeProfile from "./pages/AttendeeProfile";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import PromoterDashboard from "./pages/PromoterDashboard";
 import PromoterEventDetail from "./pages/PromoterEventDetail";
@@ -107,7 +107,7 @@ const App = () => {
               <Route index element={<Dashboard />} />
               <Route path="browse-events" element={<BrowseEvents />} />
               <Route path="bookings" element={<MyBookings />} />
-              <Route path="profile" element={<UserProfile />} />
+              <Route path="profile" element={<AttendeeProfile />} />
               <Route path="*" element={<Dashboard />} />
             </Route>
             
