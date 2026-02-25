@@ -46,6 +46,9 @@ import ReceptionDetail from "./pages/ReceptionDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Policies from "./pages/Policies";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsConditions from "./pages/TermsConditions";
+import CookiePolicy from "./pages/CookiePolicy";
 import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
 
@@ -93,6 +96,9 @@ const App = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/policies" element={<Policies />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-conditions" element={<TermsConditions />} />
+              <Route path="/cookie-policy" element={<CookiePolicy />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/google/callback" element={<GoogleCallback />} />
               <Route path="/promoter/login" element={<PromoterLogin />} />
