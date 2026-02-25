@@ -1,22 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Calendar, Clock, MapPin, Ticket, Download, Mail, ChevronRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar, Clock, MapPin, Ticket, Download, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import { jsPDF } from "jspdf";
-import QRCode from "qrcode";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { apiFetch } from "@/config/api";
 
 const Dashboard = () => {
-  const [bookedEvents, setBookedEvents] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [loadingBooked, setLoadingBooked] = useState(true);
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
-  const [errorBooked, setErrorBooked] = useState(null);
-  const [errorUpcoming, setErrorUpcoming] = useState(null);
+  const [, setErrorUpcoming] = useState(null);
 
   const normalizeUpcomingEvent = (event) => {
     const startDate = event.startDate || event.date || event.start_time || event.start;
@@ -55,63 +48,6 @@ const Dashboard = () => {
     };
   };
 
-  const normalizeBooking = (item) => {
-    const evt = item.event || {};
-    const amounts = item.analytics?.amounts || {};
-    const tickets = Array.isArray(item.tickets) ? item.tickets : [];
-    const totalTickets = item.analytics?.totalTickets ?? tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
-    const startDate = evt.startDate || evt.date || item.eventDate;
-    const formatTime = (date) => {
-      if (!date) return "Time TBA";
-      const d = new Date(date);
-      if (isNaN(d)) return "Time TBA";
-      return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    };
-    const venue = evt.venue || (Array.isArray(evt.venues) ? evt.venues[0] : null);
-    const location = venue ? [venue.city, venue.state].filter(Boolean).join(", ") : evt.location || "Venue TBA";
-    const fallbackTotal =
-      tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) ||
-      tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
-
-    return {
-      id: item.id || item._id,
-      slug: evt.slug || evt.eventSlug || evt.eventId || evt.id || evt._id,
-      title: evt.title || "Event",
-      date: startDate || evt.endDate,
-      bookingDate: item.createdAt || item.bookingDate || startDate || evt.createdAt,
-      time: formatTime(startDate),
-      location,
-      price: amounts.total || fallbackTotal || 0,
-      image: evt.flyerImage || evt.image || evt.coverImage || evt.thumbnail || "https://via.placeholder.com/600x400?text=Event",
-      category: evt.category || evt.subCategory || "Event",
-      status: item.status || "confirmed",
-      ticketCount: totalTickets || 0,
-      organizer: evt.organizer,
-    };
-  };
-
-  const fetchBookedEvents = useCallback(async () => {
-    try {
-      setLoadingBooked(true);
-      setErrorBooked(null);
-      const response = await apiFetch("/api/user/bookings", { method: "GET" });
-      const items = response?.data?.items || response?.data || response?.bookings || [];
-      const normalized = Array.isArray(items) ? items.map(normalizeBooking) : [];
-      const sorted = normalized.sort((a, b) => {
-        const da = new Date(a.bookingDate || a.date).getTime();
-        const db = new Date(b.bookingDate || b.date).getTime();
-        return isNaN(db) - isNaN(da) || db - da;
-      });
-      setBookedEvents(sorted.slice(0, 6));
-    } catch (err) {
-      console.error("Error fetching booked events:", err);
-      setErrorBooked(err?.message || "Failed to load booked events");
-      setBookedEvents([]);
-    } finally {
-      setLoadingBooked(false);
-    }
-  }, []);
-
   const fetchUpcomingEvents = useCallback(async () => {
     try {
       setLoadingUpcoming(true);
@@ -148,11 +84,9 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    fetchBookedEvents();
     fetchUpcomingEvents();
-  }, [fetchBookedEvents, fetchUpcomingEvents]);
+  }, [fetchUpcomingEvents]);
 
-  const now = new Date();
   const nextEvent = upcomingEvents
     .map((event) => {
       const parsedDate = event?.date ? new Date(event.date) : null;
@@ -173,28 +107,6 @@ const Dashboard = () => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     } catch { return dateString; }
-  };
-
-  const handleDownloadTicket = (event) => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('EVENT TICKET', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`Event: ${event.title}`, 20, 40);
-    doc.text(`Date: ${formatDateLong(event.date)}`, 20, 50);
-    doc.text(`Time: ${event.time}`, 20, 60);
-    doc.text(`Location: ${event.location}`, 20, 70);
-    const qrData = `Event: ${event.title}\nDate: ${event.date}\nTime: ${event.time}\nLocation: ${event.location}`;
-    QRCode.toDataURL(qrData, { width: 100 }, (err, url) => {
-      if (err) return console.error(err);
-      doc.addImage(url, 'PNG', 150, 40, 40, 40);
-      doc.save(`ticket-${event.id}.pdf`);
-    });
-    toast.success('Ticket downloaded successfully!');
-  };
-
-  const handleResendTicket = (event) => {
-    toast.success(`Ticket for ${event.title} has been sent to your email!`);
   };
 
   // Skeleton loading card
@@ -227,7 +139,7 @@ const Dashboard = () => {
             </Badge>
             {showPrice && (
               <span className="absolute bottom-3 right-3 text-sm font-bold text-white bg-[#D60024] px-2.5 py-1 rounded-lg">
-                {event.price > 0 ? `₹${event.price.toLocaleString()}` : "Free"}
+                {event.price > 0 ? `â‚¹${event.price.toLocaleString()}` : "Free"}
               </span>
             )}
           </div>
@@ -253,77 +165,11 @@ const Dashboard = () => {
     );
   };
 
-  // Booking Card component
-  const BookingCard = ({ event }) => {
-    if (!event.organizer?.slug || !event.slug) return null;
-    return (
-      <div className="rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-200">
-        <Link to={`/events/${event.organizer.slug}/${event.slug}`} className="group block">
-          <div className="relative h-40 overflow-hidden">
-            <img
-              src={event.image}
-              alt={event.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <div className="absolute top-3 right-3 flex gap-1.5">
-              <Badge className="bg-black/50 backdrop-blur-sm text-white text-[10px] border-0">{event.category}</Badge>
-              {event.status === "confirmed" && (
-                <Badge className="bg-emerald-500/20 text-emerald-300 text-[10px] border border-emerald-500/20 backdrop-blur-sm">Confirmed</Badge>
-              )}
-            </div>
-            <div className="absolute bottom-3 left-3">
-              <span className="text-xs font-medium text-white/80 bg-black/40 backdrop-blur-sm px-2 py-1 rounded-md">
-                {event.ticketCount} {event.ticketCount > 1 ? 'tickets' : 'ticket'}
-              </span>
-            </div>
-          </div>
-          <div className="p-4 space-y-2.5">
-            <h3 className="font-semibold text-white text-sm line-clamp-1 group-hover:text-[#D60024] transition-colors">{event.title}</h3>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-xs text-white/50">
-                <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>{formatDate(event.date)}</span>
-                <span className="text-white/20">|</span>
-                <span>{event.time}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-white/50">
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="line-clamp-1">{event.location}</span>
-              </div>
-            </div>
-            <div className="pt-2.5 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="text-base font-bold text-[#D60024]">₹{(event.price || 0).toLocaleString()}</span>
-            </div>
-          </div>
-        </Link>
-        <div className="px-4 pb-4 flex gap-2">
-          <Button
-            size="sm"
-            className="flex-1 h-8 bg-[#D60024] hover:bg-[#b8001f] text-white text-xs font-medium"
-            onClick={(e) => { e.preventDefault(); handleDownloadTicket(event); }}
-          >
-            <Download className="h-3 w-3 mr-1.5" />
-            Download
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 h-8 border-white/[0.1] text-white/70 hover:text-white hover:bg-white/[0.06] text-xs"
-            onClick={(e) => { e.preventDefault(); handleResendTicket(event); }}
-          >
-            <Mail className="h-3 w-3 mr-1.5" />
-            Email
-          </Button>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 text-white space-y-8">
 
-      {/* ── Welcome ── */}
+      {/* â”€â”€ Welcome â”€â”€ */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white">
@@ -339,7 +185,7 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {/* ── Next Event Highlight ── */}
+      {/* â”€â”€ Next Event Highlight â”€â”€ */}
       {!loadingUpcoming && nextEvent && nextEvent.organizer?.slug && nextEvent.slug && (
         <section className="rounded-xl border border-white/[0.06] bg-white/[0.03] overflow-hidden">
           <div className="flex flex-col md:flex-row">
@@ -372,7 +218,7 @@ const Dashboard = () => {
         </section>
       )}
 
-      {/* ── Upcoming Events ── */}
+      {/* â”€â”€ Upcoming Events â”€â”€ */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -405,45 +251,8 @@ const Dashboard = () => {
         )}
       </section>
 
-      {/* ── My Bookings ── */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-white">My Bookings</h2>
-            <p className="text-xs text-white/40 mt-0.5">Your confirmed experiences</p>
-          </div>
-          {bookedEvents.length > 0 && (
-            <Link to="/dashboard/bookings" className="text-xs text-white/40 hover:text-white flex items-center gap-1 transition-colors">
-              View all <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
-        </div>
 
-        {loadingBooked ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : bookedEvents.length === 0 ? (
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-12 text-center">
-            <Ticket className="h-10 w-10 text-white/15 mx-auto mb-3" />
-            <p className="text-sm font-medium text-white/70 mb-1">No bookings yet</p>
-            <p className="text-xs text-white/40 mb-4">Start exploring and book your first event!</p>
-            <Link to="/dashboard/browse-events">
-              <Button className="bg-[#D60024] hover:bg-[#b8001f] text-white text-sm h-9 px-4">
-                Explore Events <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {bookedEvents.map((event) => (
-              <BookingCard key={event.id} event={event} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Quick Actions & Calendar ── */}
+      {/* â”€â”€ Quick Actions & Calendar â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Quick Actions */}
         <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-5">

@@ -45,6 +45,12 @@ const MyBookings = () => {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [selectedBookingTickets, setSelectedBookingTickets] = useState([]);
   const [selectedBookingForTickets, setSelectedBookingForTickets] = useState(null);
+  const [bookingAnalytics, setBookingAnalytics] = useState({
+    totalBookings: 0,
+    upcomingBookings: 0,
+    totalSpent: 0,
+  });
+  const [bookingAnalyticsLoaded, setBookingAnalyticsLoaded] = useState(false);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -54,10 +60,6 @@ const MyBookings = () => {
       if (response?.success && Array.isArray(response?.data?.items)) {
         const normalized = response.data.items.map((item) => {
           const evt = item.event || {};
-          const amounts = item.analytics?.amounts || {};
-          const tickets = Array.isArray(item.tickets) ? item.tickets : [];
-          const totalTickets = item.analytics?.totalTickets ?? tickets.reduce((sum, t) => sum + (t?.quantity || 0), 0);
-          const primaryTicket = tickets[0];
           const startDate = evt.startDate || null;
           const endDate = evt.endDate || null;
           const statusNormalized = (item.status || "").toLowerCase();
@@ -69,15 +71,14 @@ const MyBookings = () => {
             if (isNaN(d)) return "Time TBA";
             return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
           };
-          const fallbackTotal = tickets.reduce((sum, t) => sum + (t?.amount || 0), 0) || tickets.reduce((sum, t) => sum + (t?.price || 0) * (t?.quantity || 0), 0);
           return {
             id: item.id, orderId: item.payment?.transactionId || item.id, bookingDate: item.createdAt || evt.createdAt,
             status: statusNormalized, paymentStatus, eventId: evt.id, eventTitle: evt.title || "Event",
             eventDate: startDate || endDate, eventEndDate: endDate, eventTime: formatTime(startDate),
             image: evt.flyerImage || evt.image || "https://via.placeholder.com/600x400?text=Event",
             category: evt.category || evt.subCategory || "Event", location,
-            ticketType: primaryTicket?.name || "Ticket", quantity: totalTickets || 0,
-            totalPrice: amounts.total || fallbackTotal || 0, tickets, analytics: item.analytics,
+            ticketType: "Ticket", quantity: 1,
+            totalPrice: Number(item.totalAmount) || 0,
             payment: item.payment, review: item.review || null,
             status1: evt.status1, status2: evt.status2, eventStatus: evt.eventStatus,
             venue: evt.venue, organizer: evt.organizer,
@@ -92,7 +93,27 @@ const MyBookings = () => {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+  const fetchBookingsAnalytics = useCallback(async () => {
+    try {
+      const response = await apiFetch("/api/user/bookings/analytics", { method: "GET" });
+      if (response?.success && response?.data) {
+        setBookingAnalytics({
+          totalBookings: Number(response.data.totalBookings) || 0,
+          upcomingBookings: Number(response.data.upcomingBookings) || 0,
+          totalSpent: Number(response.data.totalSpent) || 0,
+        });
+        setBookingAnalyticsLoaded(true);
+      }
+    } catch (err) {
+      console.error("Failed to load booking analytics", err);
+      setBookingAnalyticsLoaded(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBookings();
+    fetchBookingsAnalytics();
+  }, [fetchBookings, fetchBookingsAnalytics]);
 
   const fetchBookingTickets = useCallback(async (booking) => {
     setTicketsLoading(true);
@@ -104,37 +125,51 @@ const MyBookings = () => {
         const bookingTickets = response.data.items.filter(t => t.bookingId === booking.id);
         setSelectedBookingTickets(bookingTickets);
       } else {
-        const tickets = [];
-        (booking.tickets || []).forEach((ticketGroup, groupIndex) => {
-          tickets.push({
-            id: `${booking.id}-${groupIndex}`, bookingId: booking.id, bookingStatus: booking.status?.toUpperCase(),
-            bookingDate: booking.bookingDate, ticketName: ticketGroup.name || "Ticket",
-            ticketType: ticketGroup.type || "STANDARD_TICKET", ticketPrice: ticketGroup.amount || ticketGroup.price || 0,
-            quantity: ticketGroup.quantity || 1, qrCode: null, manualCheckInCode: null, checkedIn: false,
-            eventId: booking.eventId, eventTitle: booking.eventTitle, eventImage: booking.image,
-            eventStartDate: booking.eventDate, eventEndDate: booking.eventEndDate, eventStatus: booking.eventStatus,
-            eventCategory: booking.category, venueName: booking.venue?.name || null,
-            venueCity: booking.venue?.city || null, venueState: booking.venue?.state || null,
-            organizerName: booking.organizer?.name || null,
-          });
-        });
-        setSelectedBookingTickets(tickets);
+        setSelectedBookingTickets([{
+          id: `${booking.id}-fallback`,
+          bookingId: booking.id,
+          bookingStatus: booking.status?.toUpperCase(),
+          bookingDate: booking.bookingDate,
+          ticketName: "Ticket",
+          ticketType: "STANDARD_TICKET",
+          ticketPrice: booking.totalPrice || 0,
+          quantity: 1,
+          qrCode: null,
+          manualCheckInCode: null,
+          checkedIn: false,
+          eventId: booking.eventId,
+          eventTitle: booking.eventTitle,
+          eventImage: booking.image,
+          eventStartDate: booking.eventDate,
+          eventEndDate: booking.eventEndDate,
+          eventStatus: booking.eventStatus,
+          eventCategory: booking.category,
+          venueName: booking.venue?.name || null,
+          venueCity: booking.venue?.city || null,
+          venueState: booking.venue?.state || null,
+          organizerName: booking.organizer?.name || null,
+        }]);
       }
     } catch (err) {
       console.error("Failed to fetch tickets", err);
       toast.error("Failed to load tickets");
-      const tickets = [];
-      (booking.tickets || []).forEach((ticketGroup, groupIndex) => {
-        tickets.push({
-          id: `${booking.id}-${groupIndex}`, bookingId: booking.id, bookingStatus: booking.status?.toUpperCase(),
-          ticketName: ticketGroup.name || "Ticket", ticketType: ticketGroup.type || "STANDARD_TICKET",
-          ticketPrice: ticketGroup.amount || ticketGroup.price || 0, quantity: ticketGroup.quantity || 1,
-          eventId: booking.eventId, eventTitle: booking.eventTitle, eventStartDate: booking.eventDate,
-          eventEndDate: booking.eventEndDate, eventCategory: booking.category,
-          venueName: null, venueCity: booking.location?.split(", ")[0] || null, organizerName: null,
-        });
-      });
-      setSelectedBookingTickets(tickets);
+      setSelectedBookingTickets([{
+        id: `${booking.id}-fallback`,
+        bookingId: booking.id,
+        bookingStatus: booking.status?.toUpperCase(),
+        ticketName: "Ticket",
+        ticketType: "STANDARD_TICKET",
+        ticketPrice: booking.totalPrice || 0,
+        quantity: 1,
+        eventId: booking.eventId,
+        eventTitle: booking.eventTitle,
+        eventStartDate: booking.eventDate,
+        eventEndDate: booking.eventEndDate,
+        eventCategory: booking.category,
+        venueName: null,
+        venueCity: booking.location?.split(", ")[0] || null,
+        organizerName: null,
+      }]);
     } finally { setTicketsLoading(false); }
   }, []);
 
@@ -213,11 +248,19 @@ const MyBookings = () => {
   }, [bookings, searchQuery, filterStatus]);
 
   const stats = useMemo(() => {
-    const total = bookings.length;
-    const totalSpent = bookings.reduce((sum, b) => sum + (b?.totalPrice || 0), 0);
-    const upcoming = bookings.filter(b => b?.eventDate && new Date(b.eventDate) > new Date()).length;
-    return { total, totalSpent, upcoming };
-  }, [bookings]);
+    if (!bookingAnalyticsLoaded) {
+      const total = bookings.length;
+      const totalSpent = bookings.reduce((sum, b) => sum + (b?.totalPrice || 0), 0);
+      const upcoming = bookings.filter((b) => b?.eventDate && new Date(b.eventDate) > new Date()).length;
+      return { total, totalSpent, upcoming };
+    }
+
+    return {
+      total: bookingAnalytics.totalBookings,
+      totalSpent: bookingAnalytics.totalSpent,
+      upcoming: bookingAnalytics.upcomingBookings,
+    };
+  }, [bookingAnalytics, bookingAnalyticsLoaded, bookings]);
 
   const isEventPast = (booking) => {
     const endDate = booking?.eventEndDate || booking?.eventDate;
