@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, MapPin, Clock, User, Ticket as TicketIcon, QrCode, CheckCircle2, Sparkles, Hash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import QRCode from "qrcode";
+import { buildCanonicalQrPayload } from "@/utils/qrPayload";
 
 const VintageTicket = ({ ticket, index = 0, onClick, compact = false }) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
@@ -35,11 +36,11 @@ const VintageTicket = ({ ticket, index = 0, onClick, compact = false }) => {
   // Generate QR code
   useEffect(() => {
     if (ticket.qrCode) {
-      const qrData = JSON.stringify({
-        qr: ticket.qrCode,
-        booking: ticket.bookingId,
-        event: ticket.eventId,
-      });
+      const qrData = buildCanonicalQrPayload(ticket.qrCode);
+      if (!qrData) {
+        setQrCodeUrl("");
+        return;
+      }
       QRCode.toDataURL(qrData, {
         width: 160,
         margin: 1,

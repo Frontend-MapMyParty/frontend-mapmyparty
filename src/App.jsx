@@ -1,4 +1,4 @@
- import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,7 +14,7 @@ import UserDashboard from "./pages/NewUserDashboard";
 import Dashboard from "./components/dashboard/Dashboard";
 import BrowseEvents from "./components/dashboard/BrowseEvents";
 import MyBookings from "./pages/MyBookings";
-import UserProfile from "./components/dashboard/UserProfile";
+import AttendeeProfile from "./pages/AttendeeProfile";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import PromoterDashboard from "./pages/PromoterDashboard";
 import PromoterEventDetail from "./pages/PromoterEventDetail";
@@ -37,7 +37,9 @@ import EventTypeSelection from "./pages/EventTypeSelection";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import PromoterProfile from "./pages/PromoterProfile";
+import PromoterLogin from "./pages/PromoterLogin";
 import OrganizerDashboardV2 from "./pages/OrganizerDashboardV2";
+import EventAnalyticsPage from "./pages/EventAnalyticsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import EventOverviewPage from "./pages/EventOverviewPage";
 import ReceptionDetail from "./pages/ReceptionDetail";
@@ -48,9 +50,17 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsConditions from "./pages/TermsConditions";
 import CookiePolicy from "./pages/CookiePolicy";
 import Footer from "./components/Footer";
-import EventAttendees from "./pages/EventAttendees";
+import { AuthProvider } from "./contexts/AuthContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
+  },
+});
 
 const PublicShell = () => (
   <div className="min-h-screen flex flex-col bg-[#040712] text-white">
@@ -68,6 +78,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AuthProvider>
           <Routes>
             <Route element={<PublicShell />}>
               <Route path="/" element={<Index />} />
@@ -90,6 +101,7 @@ const App = () => {
               <Route path="/cookie-policy" element={<CookiePolicy />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/google/callback" element={<GoogleCallback />} />
+              <Route path="/promoter/login" element={<PromoterLogin />} />
             </Route>
             
             {/* Protected User Dashboard Routes */}
@@ -101,7 +113,7 @@ const App = () => {
               <Route index element={<Dashboard />} />
               <Route path="browse-events" element={<BrowseEvents />} />
               <Route path="bookings" element={<MyBookings />} />
-              <Route path="profile" element={<UserProfile />} />
+              <Route path="profile" element={<AttendeeProfile />} />
               <Route path="*" element={<Dashboard />} />
             </Route>
             
@@ -143,6 +155,31 @@ const App = () => {
                 <OrganizerDashboardV2 />
               </ProtectedRoute>
             } />
+            <Route path="/organizer/payouts" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/payouts/:id" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/events/:eventId/attendees" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/events/:eventId/refunds" element={
+              <ProtectedRoute requiredRole="organizer">
+                <OrganizerDashboardV2 />
+              </ProtectedRoute>
+            } />
+            <Route path="/organizer/:organizerSlug/events/:eventSlug/analytics" element={
+              <ProtectedRoute requiredRole="organizer">
+                <EventAnalyticsPage />
+              </ProtectedRoute>
+            } />
             {/* <Route path="/organizer/financial" element={
               <ProtectedRoute requiredRole="organizer">
                 <OrganizerDashboardV2 />
@@ -169,12 +206,7 @@ const App = () => {
                 <CreateEvent />
               </ProtectedRoute>
             } />
-            <Route path="/organizer/events/:eventId/attendees" element={
-              <ProtectedRoute requiredRole="organizer">
-                <EventAttendees />
-              </ProtectedRoute>
-            } />
-
+            
             {/* Protected Promoter Routes */}
             <Route path="/promoter" element={
               <ProtectedRoute requiredRole="promoter">
@@ -184,7 +216,7 @@ const App = () => {
               <Route index element={<Navigate to="/promoter/overview" replace />} />
               <Route path="overview" element={<PromoterOverview />} />
               <Route path="organizers" element={<PromoterOrganizers />} />
-              <Route path="organizers/:slug" element={<PromoterOrganizerDetail />} />
+              <Route path="organizers/:id" element={<PromoterOrganizerDetail />} />
               <Route path="events" element={<PromoterEvents />} />
               <Route path="events/:id" element={<PromoterEventDetail />} />
               <Route path="users" element={<PromoterUsers />} />
@@ -224,6 +256,7 @@ const App = () => {
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

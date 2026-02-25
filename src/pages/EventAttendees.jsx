@@ -1,539 +1,270 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { apiFetch, buildUrl } from "@/config/api";
+import { Badge } from "@/components/ui/badge";
 import {
-  Users,
+  ArrowLeft,
+  Download,
   Search,
-  Mail,
-  Phone,
-  Ticket,
-  IndianRupee,
+  Loader,
+  Users,
   ChevronLeft,
   ChevronRight,
-  Loader,
-  ArrowLeft,
   CheckCircle2,
-  Clock,
-  Calendar,
-  TrendingUp,
-  Download,
-  Filter,
+  XCircle,
+  DollarSign,
+  Ticket,
 } from "lucide-react";
-import { apiFetch } from "@/config/api";
-import { toast } from "sonner";
 
 const EventAttendees = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [attendees, setAttendees] = useState([]);
-  const [event, setEvent] = useState(null);
-  const [statistics, setStatistics] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState(null);
-  const limit = 20;
-
-  // Load Google Fonts
-  useEffect(() => {
-    const link1 = document.createElement("link");
-    link1.href = "https://fonts.googleapis.com/css2?family=League+Gothic&display=swap";
-    link1.rel = "stylesheet";
-    document.head.appendChild(link1);
-
-    const link2 = document.createElement("link");
-    link2.href = "https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700&display=swap";
-    link2.rel = "stylesheet";
-    document.head.appendChild(link2);
-
-    return () => {
-      document.head.removeChild(link1);
-      document.head.removeChild(link2);
-    };
-  }, []);
-
-  useEffect(() => {
-    fetchAttendees();
-  }, [eventId, currentPage, searchTerm]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [downloading, setDownloading] = useState(false);
+  const limit = 50;
 
   const fetchAttendees = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await apiFetch(
-        `api/booking/event/${eventId}/attendees?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(searchTerm)}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      );
-
-      if (response && response.success) {
-        setAttendees(response.data.attendees || []);
-        setEvent(response.data.event || null);
-        setStatistics(response.data.statistics || null);
-        setPagination(response.data.pagination || null);
-      } else {
-        toast.error(response?.message || "Failed to fetch attendees");
+      const params = new URLSearchParams({ page, limit });
+      if (search) params.append("search", search);
+      const res = await apiFetch(`booking/event/${eventId}/attendees?${params}`);
+      if (res.success) {
+        setData(res.data);
       }
-    } catch (error) {
-      console.error("Error fetching attendees:", error);
-      toast.error("Failed to load attendees. Please try again.");
+    } catch (err) {
+      console.error("Failed to fetch attendees:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
+  useEffect(() => {
+    if (eventId) fetchAttendees();
+  }, [eventId, page]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-    }).format(amount || 0);
-  };
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (eventId) {
+        setPage(1);
+        fetchAttendees();
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const formatDate = (date) => {
-    if (!date) return "N/A";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const formatDateTime = (date) => {
-    if (!date) return "N/A";
-    return new Date(date).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getTotalTickets = (booking) => {
-    return booking.booking_items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-  };
-
-  const getTicketBreakdown = (booking) => {
-    if (!booking.booking_items || booking.booking_items.length === 0) {
-      return "No tickets";
+  const handleDownloadCSV = async () => {
+    setDownloading(true);
+    try {
+      const url = buildUrl(`booking/event/${eventId}/attendees/download`);
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `attendees-${eventId.substring(0, 8)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Failed to download CSV:", err);
+    } finally {
+      setDownloading(false);
     }
-    return booking.booking_items
-      .map((item) => `${item.ticket?.name || "Ticket"} x${item.quantity}`)
-      .join(", ");
   };
+
+  const stats = data?.statistics;
+  const pagination = data?.pagination;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        fontFamily: "'League Spartan', sans-serif",
-        background: "linear-gradient(135deg, #0a0015 0%, #1a0b2e 50%, #0f051d 100%)",
-        color: "#ffffff",
-      }}
-    >
+    <div className="space-y-6">
       {/* Header */}
-      <div
-        className="sticky top-0 z-20 backdrop-blur-xl border-b"
-        style={{
-          backgroundColor: "rgba(72, 40, 93, 0.3)",
-          borderColor: "#ffffff",
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate("/organizer/myevents")}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105"
-              style={{
-                backgroundColor: "rgba(119, 34, 86, 0.2)",
-                border: "1px solid #ffffff",
-                color: "#ffffff",
-              }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span style={{ fontWeight: 500 }}>Back to My Events</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <Users className="w-6 h-6" style={{ color: "#ffffff" }} />
-              <h1
-                className="text-2xl tracking-wide"
-                style={{
-                  fontFamily: "'League Gothic', sans-serif",
-                  color: "#ffffff",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                EVENT ATTENDEES
-              </h1>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-lg hover:bg-white/10 text-white/70"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Event Attendees</h1>
+            {data?.event && (
+              <p className="text-sm text-white/60 mt-0.5">{data.event.title}</p>
+            )}
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+            <input
+              type="text"
+              placeholder="Search attendees..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary/50 w-64"
+            />
+          </div>
+          <button
+            onClick={handleDownloadCSV}
+            disabled={downloading}
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
+          >
+            {downloading ? (
+              <Loader className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Download CSV
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Event Info */}
-        {event && (
-          <div
-            className="rounded-2xl p-6 backdrop-blur-sm border"
-            style={{
-              backgroundColor: "rgba(72, 40, 93, 0.2)",
-              borderColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <h2
-              className="text-3xl mb-2"
-              style={{
-                fontFamily: "'League Gothic', sans-serif",
-                color: "#ffffff",
-                letterSpacing: "0.05em",
-              }}
-            >
-              {event.title}
-            </h2>
-            <div className="flex items-center gap-4 text-sm" style={{ color: "#ffffff" }}>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>{formatDate(event.startDate)}</span>
-              </div>
-              {event.endDate && (
-                <>
-                  <span>→</span>
-                  <span>{formatDate(event.endDate)}</span>
-                </>
-              )}
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-white/50 text-xs mb-1">
+              <Users className="w-3.5 h-3.5" /> Total Bookings
             </div>
+            <p className="text-xl font-bold text-white">{stats.totalBookings}</p>
           </div>
-        )}
-
-        {/* Statistics Cards */}
-        {statistics && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[
-              {
-                label: "Total Bookings",
-                value: statistics.totalBookings,
-                icon: Ticket,
-                color: "#772256",
-              },
-              {
-                label: "Total Revenue",
-                value: formatCurrency(statistics.totalRevenue),
-                icon: IndianRupee,
-                color: "#ffffff",
-              },
-              {
-                label: "Total Tickets",
-                value: statistics.totalTickets,
-                icon: Users,
-                color: "#772256",
-              },
-              {
-                label: "Checked In",
-                value: statistics.checkedInTickets,
-                icon: CheckCircle2,
-                color: "#10b981",
-              },
-              {
-                label: "Check-in Rate",
-                value: `${statistics.checkInRate}%`,
-                icon: TrendingUp,
-                color: "#ffffff",
-              },
-            ].map((stat, index) => (
-              <div
-                key={index}
-                className="rounded-xl p-5 backdrop-blur-sm border transition-all duration-300 hover:scale-105"
-                style={{
-                  backgroundColor: "rgba(119, 34, 86, 0.1)",
-                  borderColor: "rgba(255, 255, 255, 0.3)",
-                }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
-                </div>
-                <div
-                  className="text-2xl font-bold mb-1"
-                  style={{ color: stat.color, fontFamily: "'League Gothic', sans-serif" }}
-                >
-                  {stat.value}
-                </div>
-                <div className="text-xs" style={{ color: "#ffffff", opacity: 0.7 }}>
-                  {stat.label}
-                </div>
-              </div>
-            ))}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-white/50 text-xs mb-1">
+              <DollarSign className="w-3.5 h-3.5" /> Revenue
+            </div>
+            <p className="text-xl font-bold text-white">
+              Rs. {stats.totalRevenue?.toLocaleString("en-IN")}
+            </p>
           </div>
-        )}
-
-        {/* Search Bar */}
-        <div
-          className="rounded-xl p-1 backdrop-blur-sm border"
-          style={{
-            backgroundColor: "rgba(72, 40, 93, 0.2)",
-            borderColor: "rgba(255, 255, 255, 0.3)",
-          }}
-        >
-          <div className="relative">
-            <Search
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5"
-              style={{ color: "#ffffff", opacity: 0.5 }}
-            />
-            <input
-              type="text"
-              placeholder="Search attendees by name, email, or phone..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="w-full pl-12 pr-4 py-3 bg-transparent rounded-lg focus:outline-none"
-              style={{ color: "#ffffff", fontWeight: 400 }}
-            />
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-white/50 text-xs mb-1">
+              <Ticket className="w-3.5 h-3.5" /> Tickets Sold
+            </div>
+            <p className="text-xl font-bold text-white">{stats.totalTickets}</p>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-white/50 text-xs mb-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Check-in Rate
+            </div>
+            <p className="text-xl font-bold text-white">{stats.checkInRate}%</p>
           </div>
         </div>
+      )}
 
-        {/* Loading State */}
-        {loading && (
-          <div
-            className="rounded-2xl p-12 text-center backdrop-blur-sm border"
-            style={{
-              backgroundColor: "rgba(72, 40, 93, 0.2)",
-              borderColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <Loader className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: "#ffffff" }} />
-            <p style={{ color: "#ffffff", opacity: 0.7 }}>Loading attendees...</p>
+      {/* Table */}
+      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader className="w-6 h-6 animate-spin text-white/60" />
           </div>
-        )}
-
-        {/* Attendees Table */}
-        {!loading && attendees.length > 0 && (
-          <div
-            className="rounded-2xl overflow-hidden backdrop-blur-sm border"
-            style={{
-              backgroundColor: "rgba(72, 40, 93, 0.2)",
-              borderColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr
-                    style={{
-                      backgroundColor: "rgba(119, 34, 86, 0.3)",
-                      borderBottom: "2px solid #ffffff",
-                    }}
-                  >
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Attendee
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Contact
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Tickets
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Amount Paid
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Booked On
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-xs uppercase tracking-wider"
-                      style={{ color: "#ffffff", fontWeight: 700 }}
-                    >
-                      Payment Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendees.map((booking, index) => (
-                    <tr
-                      key={booking.id}
-                      className="transition-colors duration-200"
-                      style={{
-                        borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
-                        backgroundColor:
-                          index % 2 === 0 ? "rgba(119, 34, 86, 0.05)" : "transparent",
-                      }}
-                    >
+        ) : !data?.attendees?.length ? (
+          <div className="flex flex-col items-center justify-center py-20 text-white/40">
+            <Users className="w-12 h-12 mb-3 opacity-50" />
+            <p className="text-lg font-medium">No attendees found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-xs text-white/50 uppercase tracking-wider">
+                  <th className="px-6 py-4">Attendee</th>
+                  <th className="px-6 py-4">Contact</th>
+                  <th className="px-6 py-4">Tickets</th>
+                  <th className="px-6 py-4">Amount</th>
+                  <th className="px-6 py-4">Payment</th>
+                  <th className="px-6 py-4">Check-in</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {data.attendees.map((booking) => {
+                  const allCheckedIn = booking.booking_items?.every(
+                    (i) => i.checkedIn
+                  );
+                  const someCheckedIn = booking.booking_items?.some(
+                    (i) => i.checkedIn
+                  );
+                  return (
+                    <tr key={booking.id} className="hover:bg-white/5">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{
-                              backgroundColor: "rgba(255, 255, 255, 0.2)",
-                              border: "1px solid #ffffff",
-                            }}
-                          >
-                            <span
-                              className="text-sm font-bold"
-                              style={{ color: "#ffffff" }}
-                            >
-                              {booking.user?.name?.charAt(0)?.toUpperCase() || "?"}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="font-semibold" style={{ color: "#ffffff" }}>
-                              {booking.user?.name || "N/A"}
-                            </div>
-                            <div className="text-xs" style={{ color: "#ffffff", opacity: 0.7 }}>
-                              ID: {booking.id.substring(0, 8)}...
-                            </div>
-                          </div>
-                        </div>
+                        <p className="text-sm font-medium text-white">
+                          {booking.user?.name}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Mail className="w-3 h-3" style={{ color: "#ffffff" }} />
-                            <span style={{ color: "#ffffff" }}>
-                              {booking.user?.email || "N/A"}
-                            </span>
+                        <p className="text-sm text-white/60">{booking.user?.email}</p>
+                        <p className="text-xs text-white/40">{booking.user?.phone}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {booking.booking_items?.map((item) => (
+                          <div key={item.id} className="text-sm text-white/70">
+                            {item.ticket?.name} x{item.quantity}
                           </div>
-                          {booking.user?.phone && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="w-3 h-3" style={{ color: "#ffffff" }} />
-                              <span style={{ color: "#ffffff" }}>{booking.user.phone}</span>
-                            </div>
-                          )}
-                        </div>
+                        ))}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-white">
+                        Rs. {booking.totalAmount?.toLocaleString("en-IN")}
                       </td>
                       <td className="px-6 py-4">
-                        <div>
-                          <div className="font-semibold" style={{ color: "#ffffff" }}>
-                            {getTotalTickets(booking)} Ticket(s)
-                          </div>
-                          <div className="text-xs mt-1" style={{ color: "#ffffff", opacity: 0.6 }}>
-                            {getTicketBreakdown(booking)}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold" style={{ color: "#ffffff" }}>
-                          {formatCurrency(booking.totalAmount)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="w-3 h-3" style={{ color: "#ffffff" }} />
-                          <span style={{ color: "#ffffff" }}>
-                            {formatDateTime(booking.createdAt)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className="px-3 py-1 rounded-full text-xs font-semibold"
-                          style={{
-                            backgroundColor:
-                              booking.payment?.status === "COMPLETED"
-                                ? "rgba(16, 185, 129, 0.2)"
-                                : "rgba(245, 158, 11, 0.2)",
-                            color:
-                              booking.payment?.status === "COMPLETED" ? "#10b981" : "#f59e0b",
-                            border:
-                              booking.payment?.status === "COMPLETED"
-                                ? "1px solid #10b981"
-                                : "1px solid #f59e0b",
-                          }}
+                        <Badge
+                          className={`text-xs border ${
+                            booking.payment?.status === "SUCCESS"
+                              ? "bg-green-500/20 text-green-400 border-green-500/30"
+                              : booking.payment?.status === "PENDING"
+                              ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                              : "bg-red-500/20 text-red-400 border-red-500/30"
+                          }`}
                         >
-                          {booking.payment?.status || "PENDING"}
-                        </span>
+                          {booking.payment?.status || "N/A"}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4">
+                        {allCheckedIn ? (
+                          <span className="flex items-center gap-1 text-sm text-green-400">
+                            <CheckCircle2 className="w-4 h-4" /> All
+                          </span>
+                        ) : someCheckedIn ? (
+                          <span className="text-sm text-yellow-400">Partial</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-sm text-white/40">
+                            <XCircle className="w-4 h-4" /> No
+                          </span>
+                        )}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && attendees.length === 0 && (
-          <div
-            className="rounded-2xl p-12 text-center backdrop-blur-sm border"
-            style={{
-              backgroundColor: "rgba(72, 40, 93, 0.2)",
-              borderColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <Users className="w-16 h-16 mx-auto mb-4" style={{ color: "#ffffff", opacity: 0.5 }} />
-            <h3
-              className="text-xl mb-2"
-              style={{ fontFamily: "'League Gothic', sans-serif", color: "#ffffff" }}
-            >
-              No Attendees Found
-            </h3>
-            <p style={{ color: "#ffffff", opacity: 0.7 }}>
-              {searchTerm
-                ? "Try adjusting your search terms"
-                : "No confirmed bookings for this event yet"}
-            </p>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Pagination */}
-        {!loading && pagination && pagination.totalPages > 1 && (
-          <div
-            className="flex items-center justify-between rounded-xl p-6 backdrop-blur-sm border"
-            style={{
-              backgroundColor: "rgba(72, 40, 93, 0.2)",
-              borderColor: "rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <div className="text-sm" style={{ color: "#ffffff" }}>
-              Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-              {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{" "}
-              attendees
-            </div>
-            <div className="flex items-center gap-4">
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
+            <span className="text-sm text-white/50">
+              Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            </span>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-                style={{
-                  backgroundColor: "rgba(119, 34, 86, 0.3)",
-                  border: "1px solid #ffffff",
-                  color: "#ffffff",
-                }}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30 text-white/70"
               >
                 <ChevronLeft className="w-4 h-4" />
-                Previous
               </button>
-              <span className="text-sm" style={{ color: "#ffffff" }}>
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
               <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === pagination.totalPages}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-                style={{
-                  backgroundColor: "rgba(119, 34, 86, 0.3)",
-                  border: "1px solid #ffffff",
-                  color: "#ffffff",
-                }}
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                disabled={page === pagination.totalPages}
+                className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30 text-white/70"
               >
-                Next
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

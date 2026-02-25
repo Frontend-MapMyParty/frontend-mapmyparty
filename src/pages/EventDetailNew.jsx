@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,11 +11,12 @@ import {
   ChevronLeft, ChevronDown, ChevronRight, Calendar, MapPin, Clock, Users, Share2, Heart,
   Ticket, Star, TrendingUp, Mail, Phone, Globe, Instagram,
   Facebook, Twitter, Plus, Minus, X, Check, Info, Image as ImageIcon,
-  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck, Sparkles,
+  Navigation, Building, User, BookOpen, Medal, Loader2, ShieldCheck,
   AlertTriangle, Megaphone
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
+import usePublicEventDetail from "@/hooks/usePublicEventDetail";
 import { fetchSession, resetSessionCache, isAuthenticated as isAuthedSync } from "@/utils/auth";
 import BillingDetailsModal from "@/components/BillingDetailsModal";
 // import PromoterDashboardHeader from "@/components/PromoterDashboardHeader";
@@ -27,8 +28,8 @@ const TAB_PAUSE_DURATION_MS = 2 * 60 * 1000; // 2 minutes
 const EventDetailNew = () => {
   const { organizerSlug, eventSlug } = useParams();
   const navigate = useNavigate();
-  const [event, setEvent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { event, loading, error } = usePublicEventDetail(organizerSlug, eventSlug);
   const [selectedImage, setSelectedImage] = useState(null);
   const [activeTab, setActiveTab] = useState("about");
   const [autoRotatePausedUntil, setAutoRotatePausedUntil] = useState(0);
@@ -37,7 +38,6 @@ const EventDetailNew = () => {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [billingModalOpen, setBillingModalOpen] = useState(false);
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [authMode, setAuthMode] = useState("login");
@@ -53,7 +53,6 @@ const EventDetailNew = () => {
   const aboutRef = useRef(null);
   const [organizerNoteExpanded, setOrganizerNoteExpanded] = useState(false);
   const [organizerNoteCanExpand, setOrganizerNoteCanExpand] = useState(true);
-  const [organizerBioExpanded, setOrganizerBioExpanded] = useState(false);
   const normalizedFaqs = useMemo(() => {
     if (Array.isArray(event?.faqs) && event.faqs.length > 0) return event.faqs;
     if (Array.isArray(event?.questions) && event.questions.length > 0) return event.questions;
@@ -120,7 +119,7 @@ const EventDetailNew = () => {
     () =>
       `
       @keyframes tabFadeSlide {0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}
-      @keyframes sponsorMarquee {0%{transform:translateX(0);}100%{transform:translateX(-33.333%);}}
+      @keyframes sponsorMarquee {0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
       `,
     []
   );
@@ -280,286 +279,34 @@ const EventDetailNew = () => {
   const getArtistImage = (artist) =>
     artist.image || artist.photo || artist.avatar || artist.profileImage || FALLBACK_IMAGE;
 
-  const formatAdvisory = (raw) => {
-    if (!raw) return null;
-    if (typeof raw === "string") return raw;
-    if (Array.isArray(raw)) {
-      const items = raw
-        .map((item) => {
-          if (!item) return null;
-          if (typeof item === "string") return item;
-          if (typeof item === "object") {
-            return Object.entries(item)
-              .filter(([, v]) => v)
-              .map(([k]) => k)
-              .join(", ");
-          }
-          return String(item);
-        })
-        .filter(Boolean);
-      return items.length ? items.join(", ") : null;
-    }
-    if (typeof raw === "object") {
-      const items = Object.entries(raw)
-        .filter(([, v]) => v !== false && v !== null && v !== undefined)
-        .map(([k, v]) => (typeof v === "boolean" ? k : `${k}: ${v}`));
-      return items.length ? items.join(", ") : null;
-    }
-    return String(raw);
-  };
-
-  const buildAdvisoryItems = (raw) => {
-    if (!raw) return [];
-    // Already an array of strings
-    if (Array.isArray(raw) && raw.every((i) => typeof i === "string")) return raw.filter(Boolean);
-
-    // Object with booleans/customAdvisories
-    if (typeof raw === "object") {
-      const list = [];
-      Object.entries(raw).forEach(([key, val]) => {
-        if (key === "customAdvisories" && Array.isArray(val)) {
-          val.forEach((c) => c && list.push(c));
-          return;
-        }
-        if (val === true) {
-          const label = key
-            .replace(/([A-Z])/g, " $1")
-            .replace(/_/g, " ")
-            .trim();
-          list.push(label.charAt(0).toUpperCase() + label.slice(1));
-        }
-      });
-      return list;
-    }
-
-    // Fallback to formatted string split by comma
-    const formatted = formatAdvisory(raw);
-    if (!formatted) return [];
-    return formatted.split(",").map((i) => i.trim()).filter(Boolean);
-  };
-
-  const normalizeEvent = (raw = {}) => {
-    const data = raw?.data ?? raw; // handle api shapes {data:{...}}
-    const startDate = data.startDate || data.date || data.start_time || data.start;
-    const endDate = data.endDate || data.end_time || data.end;
-    const venue = data.venue || (data.venues && data.venues[0]) || {};
-    const cityState = `${data.city || venue.city || ""}${(data.city || venue.city) && (data.state || venue.state) ? ", " : ""
-      }${data.state || venue.state || ""}`.trim();
-
-    const galleryImages = Array.isArray(data.galleryImages)
-      ? data.galleryImages
-      : Array.isArray(data.images)
-        ? data.images
-          .filter((img) =>
-            typeof img === "object" ? (img.type || "").toUpperCase() === "EVENT_GALLERY" : true
-          )
-          .map((img) => (typeof img === "object" ? img.url : img))
-        : data.gallery || [];
-
-    const tickets = Array.isArray(data.tickets)
-      ? data.tickets.map((t) => ({
-        id: t.id || t._id,
-        name: t.name || t.title || "Ticket",
-        description: t.info || t.description || "",
-        price: Number(t.price) || 0,
-        available: Math.max(
-          0,
-          (Number(t.totalQty) || 0) -
-          (Number(t.soldQty) || Number(t.bookedQuantity) || 0)
-        ),
-        maxPerUser:
-          t.maxPerUser !== undefined && t.maxPerUser !== null
-            ? Number(t.maxPerUser)
-            : null,
-      }))
-      : [];
-
-    const sponsors = Array.isArray(data.sponsors)
-      ? data.sponsors.map((s) => {
-        const nested = s.sponsor || {};
-        return {
-          id: s.id || s._id || s.sponsorId || nested.id || nested._id || nested.name || nested.logoUrl || s.name || s.logoUrl || s.logo || s.image,
-          name: s.name || nested.name || s.brandName || "Sponsor",
-          logo:
-            s.logoUrl ||
-            nested.logoUrl ||
-            s.logo ||
-            nested.logo ||
-            s.image ||
-            nested.image ||
-            s.flyerImage ||
-            s.flyerImageUrl ||
-            SPONSOR_PLACEHOLDER,
-          website: s.websiteUrl || nested.websiteUrl || s.website || nested.website || s.url || nested.url || s.link || "",
-          isPrimary: !!(s.isPrimary ?? s.primary ?? nested.isPrimary),
-          description: s.description || nested.description || s.about || nested.about || "",
-        };
-      })
-      : [];
-
-    const reviewsCount = Array.isArray(data.reviews)
-      ? data.reviews.length
-      : data._count?.reviews || data.reviews || 0;
-
-    const advisoryItems = buildAdvisoryItems(data.advisory?.warnings || data.advisory || data.advisories);
-
-    return {
-      id: data.id || data._id,
-      slug: data.slug || data.id,
-      title: data.title || data.eventTitle || "Untitled Event",
-      category: data.category || data.mainCategory || "EVENT",
-      image:
-        data.flyerImage ||
-        data.flyerImageUrl ||
-        data.coverImage ||
-        data.image ||
-        galleryImages[0] ||
-        FALLBACK_IMAGE,
-      startDate,
-      endDate,
-      location:
-        typeof data.location === "string"
-          ? data.location
-          : venue.name || cityState || "Location TBA",
-      venue:
-        typeof data.venue === "string"
-          ? data.venue
-          : venue.name || "Venue TBA",
-      address:
-        data.address ||
-        data.fullAddress ||
-        venue.fullAddress ||
-        venue.address ||
-        [data.address, venue.address, cityState, data.pincode || venue.pincode]
-          .filter(Boolean)
-          .join(", ") ||
-        "Address TBA",
-      coordinates: data.coordinates || venue.coordinates,
-      attendees:
-        data.attendees ||
-        data.analytics?.totalAttendees ||
-        data.analytics?.attendees ||
-        data._count?.bookings ||
-        data.stats?.confirmedBookings ||
-        0,
-      rating: data.rating || data.averageRating || 0,
-      description: data.description || data.summary || "No description available.",
-      about: data.description || data.summary || "No description available.",
-      highlights: data.highlights || [],
-      gallery: galleryImages.length > 0 ? galleryImages : [FALLBACK_IMAGE],
-      tickets,
-      organizer: data.organizer
-        ? {
-          name: data.organizer.name || "Organizer",
-          email: data.organizer.email || "",
-          phone: data.organizer.phone || "",
-          website: data.organizer.website || "",
-          logo:
-            data.organizer.logo ||
-            "https://via.placeholder.com/200x200?text=Organizer",
-          verified: !!data.organizer.isVerified,
-          bio: data.organizer.description || "",
-          eventsOrganized: data.organizer.eventsOrganized || 0,
-          followers: data.organizer.followers || 0,
-        }
-        : {
-          name: data.organizerName || "Organizer",
-          email: data.organizerEmail || "",
-          phone: data.organizerPhone || "",
-          website: data.organizerWebsite || "",
-          logo: "https://via.placeholder.com/200x200?text=Organizer",
-          verified: false,
-          bio: "",
-          eventsOrganized: 0,
-          followers: 0,
-        },
-      tags: data.tags || [],
-      ageRestriction: data.TC?.ageRestriction || data.ageRestriction || data.age_limit || "Not specified",
-      dresscode: data.dresscode || "Not specified",
-      parking: data.parking || "Not specified",
-      accessibility: data.accessibility || "Not specified",
-      reviews: reviewsCount,
-      advisory: formatAdvisory(data.advisory?.warnings || data.advisory || data.advisories),
-      advisoryItems,
-      terms: data.TC?.terms || data.terms || "",
-      termsHtml: data.TC?.content || data.termsHtml || "",
-      termsUpdated: data.TC?.lastUpdated || data.termsUpdated || "",
-      reviewsList: Array.isArray(data.reviews)
-        ? data.reviews.map((r) => ({
-          user: r.user?.name || "Guest",
-          rating: r.rating || 0,
-          comment: r.comment || "",
-          userName: r.user?.name || "Guest",
-          avatar: r.user?.avatar,
-          createdAt: r.createdAt,
-        }))
-        : [],
-      stats: data.stats || data._count || {},
-      artists: data.artists || [],
-      type: data.type,
-      publishStatus: data.publishStatus,
-      eventStatus: data.eventStatus,
-      organizerNote: data.organizerNote,
-      subCategory: data.subCategory,
-      categorySlug: data.categorySlug,
-      questions: data.questions,
-      sponsors,
-      flyerImage: data.flyerImage,
-      flyerPublicId: data.flyerPublicId,
-      isSponsored: data.isSponsored,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
-      statsCount: data._count,
-      revenue: data.stats?.totalRevenue,
-      ticketsSold: data.stats?.totalTicketsSold,
-      confirmedBookings: data.stats?.confirmedBookings,
-      capacity: venue.totalQty || tickets.reduce((sum, t) => sum + (t.available || 0), 0),
-      primaryVenue: venue,
-      raw: data,
-    };
-  };
-
+  // Resume booking after Google OAuth redirect
   useEffect(() => {
-    const fetchEvent = async () => {
-      const tryFetch = async (path) => {
-        const response = await apiFetch(path, { method: "GET" });
-        return (
-          response?.data?.event ||
-          response?.data?.data ||
-          response?.data ||
-          response
-        );
-      };
+    if (searchParams.get('resumeBooking') !== 'true') return;
 
-      try {
-        setLoading(true);
-        let raw = null;
+    const pendingRaw = sessionStorage.getItem('pendingBooking');
+    sessionStorage.removeItem('pendingBooking');
 
-        if (organizerSlug && eventSlug) {
-          raw = await tryFetch(
-            `/api/event/${encodeURIComponent(organizerSlug)}/${encodeURIComponent(eventSlug)}`
-          );
-        }
+    // Clean URL
+    searchParams.delete('resumeBooking');
+    setSearchParams(searchParams, { replace: true });
 
-        if (raw) {
-          const normalized = normalizeEvent(raw);
-          setEvent(normalized);
-          setSelectedImage(null);
-        } else {
-          setEvent(null);
-        }
-      } catch (err) {
-        console.error("Failed to fetch event", err);
-        setEvent(null);
-      } finally {
-        setLoading(false);
+    if (!pendingRaw) return;
+    try {
+      const pending = JSON.parse(pendingRaw);
+      if (pending.ticketQuantities) {
+        setTicketQuantities(pending.ticketQuantities);
+      }
+    } catch { return; }
+
+    // Wait for session, then open billing modal
+    const resumeAfterLoad = async () => {
+      const ok = await ensureSession();
+      if (ok) {
+        setBillingModalOpen(true);
       }
     };
-
-    if (organizerSlug && eventSlug) {
-      fetchEvent();
-    }
-  }, [organizerSlug, eventSlug]);
+    resumeAfterLoad();
+  }, [searchParams]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -665,20 +412,6 @@ const EventDetailNew = () => {
     return false;
   };
 
-  const bookTickets = async () => {
-    setBookingLoading(true);
-    try {
-      // Placeholder booking flow; replace with actual booking API when ready
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setSuccessModalOpen(true);
-      toast.success("Your tickets are booked! Confirmation sent to your email.");
-    } catch (err) {
-      toast.error(err?.message || "Booking failed, please try again");
-    } finally {
-      setBookingLoading(false);
-    }
-  };
-
   const handleBookNow = async () => {
     if (totalTickets === 0) {
       toast.error("Please select at least one ticket");
@@ -718,9 +451,9 @@ const EventDetailNew = () => {
         method: "POST",
         body: JSON.stringify(payload),
       });
-
-      if (!res?.success) {
-        throw new Error(res?.errorMessage || res?.message || "Booking failed");
+      const booking = res?.data || res;
+      if (!booking?.success) {
+        throw new Error(booking?.message || "Booking failed");
       }
 
       // Close billing modal
@@ -739,10 +472,9 @@ const EventDetailNew = () => {
             banner: event.flyerImage || event.coverImage || FALLBACK_IMAGE,
           },
           tickets: selectedTickets,
-          bookingData: res.data,
+          bookingData: booking.data,
         },
       });
-      setBookingLoading(false);
     } catch (err) {
       toast.error(err?.message || "Unable to create booking. Please try again.");
       setBookingLoading(false);
@@ -819,6 +551,12 @@ const EventDetailNew = () => {
   };
 
   const handleGoogleLogin = () => {
+    // Save pending booking state before navigating away
+    sessionStorage.setItem('pendingBooking', JSON.stringify({
+      returnUrl: window.location.pathname,
+      ticketQuantities,
+      timestamp: Date.now(),
+    }));
     const redirect = encodeURIComponent(window.location.href);
     const googleAuthUrl = buildUrl(`auth/google?redirect=${redirect}`);
     window.location.href = googleAuthUrl;
@@ -928,9 +666,9 @@ const EventDetailNew = () => {
                   {/* <div className="h-px bg-gray-800"></div> */}
 
                   {/* Date & Time */}
-                  <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-gray-800/80 border border-gray-700">
-                      <Calendar className="h-4 w-4 text-gray-300" />
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 flex items-center justify-center rounded-xl bg-gray-800/80 border border-gray-700">
+                      <Calendar className="h-6 w-6 text-gray-300" />
                     </div>
                     <div className="flex-1">
                       <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Date & Time</p>
@@ -942,9 +680,9 @@ const EventDetailNew = () => {
                   {/* <div className="h-px bg-gray-800"></div> */}
 
                   {/* Location */}
-                  <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-gray-800/80 border border-gray-700">
-                      <MapPin className="h-4 w-4 text-gray-300" />
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 flex items-center justify-center rounded-xl bg-gray-800/80 border border-gray-700">
+                      <MapPin className="h-6 w-6 text-gray-300" />
                     </div>
                     <div className="flex-1">
                       <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-1">Venue</p>
@@ -993,8 +731,8 @@ const EventDetailNew = () => {
             <div className="absolute right-6 lg:right-12 top-0 bottom-0 w-16 lg:w-24 bg-gradient-to-l from-gray-950 to-transparent z-10 pointer-events-none" />
 
             <div className="relative overflow-hidden rounded-2xl border border-gray-800/50 bg-gray-900/30 backdrop-blur-sm">
-              <div className="flex items-center gap-6 py-2 min-w-max animate-[sponsorMarquee_30s_linear_infinite]">
-                {[...sponsorsSorted, ...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
+              <div className="flex items-center gap-6 py-2 min-w-max animate-[sponsorMarquee_25s_linear_infinite] hover:[animation-play-state:paused]">
+                {[...sponsorsSorted, ...sponsorsSorted].map((s, idx) => (
                   <a
                     key={`${s.id || s.name || "sponsor"}-${idx}`}
                     href={s.website || "#"}
@@ -1076,82 +814,115 @@ const EventDetailNew = () => {
             <div className="h-px bg-gray-700 my-6"></div>
 
             {/* Event Guide Section */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-white">Event Guide</h2>
-                {(() => {
-                  const advisories = event.raw?.advisory || {};
-                  const allAdvisories = [
-                    advisories.ageRestricted && { emoji: '🔞', label: '18+ only', priority: 1 },
-                    advisories.wheelchairAccessible && { emoji: '♿', label: 'Wheelchair accessible', priority: 2 },
-                    advisories.securityCheck && { emoji: '👮', label: 'Security check', priority: 3 },
-                    advisories.parkingAvailable && { emoji: '🚗', label: 'Parking available', priority: 4 },
-                    advisories.camerasAllowed && { emoji: '📸', label: 'Photos allowed', priority: 5 },
-                    advisories.liveMusic && { emoji: '🎵', label: 'Live music', priority: 6 },
-                    advisories.cloakroom && { emoji: '🧥', label: 'Cloakroom', priority: 7 },
-                    advisories.reentryAllowed && { emoji: '🔁', label: 'Re-entry allowed', priority: 8 },
-                    advisories.seatingProvided && { emoji: '🪑', label: 'Seating provided', priority: 9 },
-                    advisories.outsideFoodAllowed && { emoji: '🍔', label: 'Outside food allowed', priority: 10 },
-                    advisories.onsitePayments && { emoji: '💳', label: 'On-site payments', priority: 11 },
-                    advisories.drinkingAllowed && { emoji: '🍺', label: 'Drinking allowed', priority: 12 },
-                    advisories.smokingAllowed && { emoji: '🚬', label: 'Smoking allowed', priority: 13 },
-                    advisories.petsAllowed && { emoji: '🐾', label: 'Pets allowed', priority: 14 },
-                    ...(advisories.customAdvisories || []).map(c => ({ emoji: '📋', label: c, priority: 15, isCustom: true })),
-                  ].filter(Boolean);
-                  return allAdvisories.length > 4;
-                })() && (
+                {event.advisoryItems?.length > 4 && (
                   <button
                     type="button"
                     onClick={() => setAdvisoryModalOpen(true)}
-                    className="text-sm text-red-600 hover:text-red-500 flex items-center gap-1 font-medium"
+                    className="text-red-600 hover:text-red-500 flex items-center gap-1 text-sm font-medium transition-colors"
                   >
                     See all <ChevronRight className="h-4 w-4" />
                   </button>
                 )}
               </div>
 
-              {(() => {
-                const advisories = event.raw?.advisory || {};
-                const allAdvisories = [
-                  advisories.ageRestricted && { emoji: '🔞', label: '18+ only', priority: 1 },
-                  advisories.wheelchairAccessible && { emoji: '♿', label: 'Wheelchair accessible', priority: 2 },
-                  advisories.securityCheck && { emoji: '👮', label: 'Security check', priority: 3 },
-                  advisories.parkingAvailable && { emoji: '🚗', label: 'Parking available', priority: 4 },
-                  advisories.camerasAllowed && { emoji: '📸', label: 'Photos allowed', priority: 5 },
-                  advisories.liveMusic && { emoji: '🎵', label: 'Live music', priority: 6 },
-                  advisories.cloakroom && { emoji: '🧥', label: 'Cloakroom', priority: 7 },
-                  advisories.reentryAllowed && { emoji: '🔁', label: 'Re-entry allowed', priority: 8 },
-                  advisories.seatingProvided && { emoji: '🪑', label: 'Seating provided', priority: 9 },
-                  advisories.outsideFoodAllowed && { emoji: '🍔', label: 'Outside food allowed', priority: 10 },
-                  advisories.onsitePayments && { emoji: '💳', label: 'On-site payments', priority: 11 },
-                  advisories.drinkingAllowed && { emoji: '🍺', label: 'Drinking allowed', priority: 12 },
-                  advisories.smokingAllowed && { emoji: '🚬', label: 'Smoking allowed', priority: 13 },
-                  advisories.petsAllowed && { emoji: '🐾', label: 'Pets allowed', priority: 14 },
-                  ...(advisories.customAdvisories || []).map(c => ({ emoji: '📋', label: c, priority: 15, isCustom: true })),
-                ].filter(Boolean);
-                
-                const top4 = allAdvisories.slice(0, 4);
-                
-                return top4.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {top4.map((item, idx) => (
+              {event.advisoryItems?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {event.advisoryItems.slice(0, 4).map((item, idx) => {
+                    const getIcon = (text) => {
+                      const lower = text.toLowerCase();
+
+                      // Age restrictions
+                      if (lower.includes('18+') || lower.includes('18 +') || lower.includes('age limit') ||
+                          lower.includes('age restriction') || lower.includes('adults only') ||
+                          lower.includes('21+') || lower.includes('21 +') || lower.includes('mature')) return '🔞';
+
+                      // Parking
+                      if (lower.includes('parking') || lower.includes('valet') || lower.includes('vehicle')) return '🅿️';
+
+                      // ID/Documents
+                      if (lower.includes('id') || lower.includes('identification') || lower.includes('valid id') ||
+                          lower.includes('government id') || lower.includes('photo id') ||
+                          lower.includes('passport') || lower.includes('license') || lower.includes('proof')) return '🆔';
+
+                      // Food & Drinks
+                      if (lower.includes('food') || lower.includes('drink') || lower.includes('beverage') ||
+                          lower.includes('refreshment') || lower.includes('meal') || lower.includes('dining') ||
+                          lower.includes('outside food') || lower.includes('outside drink') ||
+                          lower.includes('catering') || lower.includes('restaurant')) return '🍽️';
+
+                      // Photography/Camera
+                      if (lower.includes('camera') || lower.includes('photo') || lower.includes('photography') ||
+                          lower.includes('recording') || lower.includes('video') || lower.includes('filming')) return '📸';
+
+                      // Entry/Gate/Doors
+                      if (lower.includes('entry') || lower.includes('gate') || lower.includes('door') ||
+                          lower.includes('entrance') || lower.includes('admission') || lower.includes('check-in') ||
+                          lower.includes('checkin') || lower.includes('arrive') || lower.includes('arrival')) return '🚪';
+
+                      // Timing/Schedule
+                      if (lower.includes('time') || lower.includes('schedule') || lower.includes('timing') ||
+                          lower.includes('start') || lower.includes('duration') || lower.includes('hours') ||
+                          lower.includes('clock') || lower.includes('punctual')) return '⏰';
+
+                      // Dress Code
+                      if (lower.includes('dress') || lower.includes('attire') || lower.includes('clothing') ||
+                          lower.includes('outfit') || lower.includes('formal') || lower.includes('casual') ||
+                          lower.includes('wear')) return '👔';
+
+                      // Safety/Security
+                      if (lower.includes('security') || lower.includes('safety') || lower.includes('safe') ||
+                          lower.includes('emergency') || lower.includes('first aid') || lower.includes('medical')) return '🛡️';
+
+                      // Prohibited Items
+                      if (lower.includes('prohibited') || lower.includes('not allowed') || lower.includes('banned') ||
+                          lower.includes('restricted') || lower.includes('forbidden') || lower.includes('no smoking') ||
+                          lower.includes('weapons') || lower.includes('drugs')) return '🚫';
+
+                      // Tickets/Passes
+                      if (lower.includes('ticket') || lower.includes('pass') || lower.includes('wristband') ||
+                          lower.includes('badge') || lower.includes('qr') || lower.includes('barcode')) return '🎫';
+
+                      // Weather
+                      if (lower.includes('weather') || lower.includes('rain') || lower.includes('outdoor') ||
+                          lower.includes('indoor') || lower.includes('umbrella') || lower.includes('sun')) return '⛅';
+
+                      // Accessibility
+                      if (lower.includes('wheelchair') || lower.includes('accessible') || lower.includes('disability') ||
+                          lower.includes('special needs') || lower.includes('mobility')) return '♿';
+
+                      // Children/Kids
+                      if (lower.includes('child') || lower.includes('kid') || lower.includes('minor') ||
+                          lower.includes('baby') || lower.includes('stroller') || lower.includes('family')) return '👶';
+
+                      // Pets/Animals
+                      if (lower.includes('pet') || lower.includes('dog') || lower.includes('animal') ||
+                          lower.includes('service animal')) return '🐕';
+
+                      // Seating
+                      if (lower.includes('seat') || lower.includes('chair') || lower.includes('standing') ||
+                          lower.includes('reserved seating')) return '💺';
+
+                      // Default icon for custom advisories
+                      return '⚠️';
+                    };
+
+                    return (
                       <div
-                        key={idx}
-                        className="flex items-center gap-3 p-3 rounded-xl border border-gray-700/50 hover:border-gray-600 transition-all group"
+                        key={`advisory-preview-${idx}`}
+                        className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50 transition-colors"
                       >
-                        <div className="h-10 w-10 rounded-lg border border-gray-700/50 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xl">{item.emoji}</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-300 group-hover:text-white leading-tight">
-                          {item.label}
-                        </span>
+                        <span className="text-lg flex-shrink-0">{getIcon(item)}</span>
+                        <span className="text-sm text-gray-300">{item}</span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No advisories provided.</p>
-                );
-              })()}
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No advisories provided.</p>
+              )}
             </div>
 
             <div className="h-px bg-gray-700 my-6"></div>
@@ -1543,254 +1314,124 @@ const EventDetailNew = () => {
 
             {/* Advisory Modal */}
             <Dialog open={advisoryModalOpen} onOpenChange={setAdvisoryModalOpen}>
-              <DialogContent className="max-w-md border-gray-800 bg-gray-950 text-white p-6">
-                <DialogHeader className="mb-4">
-                  <DialogTitle className="text-2xl font-bold">Event Guide</DialogTitle>
-                  <DialogDescription className="text-gray-500 text-sm">
+              <DialogContent className="max-w-lg border-gray-800 bg-gray-900 text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Event Guide</DialogTitle>
+                  <DialogDescription className="text-gray-400 text-sm">
                     All advisories and notes for this event
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                  {event.raw?.advisory ? (
-                    <>
-                  {event.raw?.advisory?.smokingAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🚬</span>
-                          <span className="text-sm text-gray-300">Smoking allowed</span>
+
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                  {event?.advisoryItems?.length ? (
+                    event.advisoryItems.map((item, idx) => {
+                      const getIcon = (text) => {
+                        const lower = text.toLowerCase();
+
+                        // Age restrictions
+                        if (lower.includes('18+') || lower.includes('18 +') || lower.includes('age limit') ||
+                            lower.includes('age restriction') || lower.includes('adults only') ||
+                            lower.includes('21+') || lower.includes('21 +') || lower.includes('mature')) return '🔞';
+
+                        // Parking
+                        if (lower.includes('parking') || lower.includes('valet') || lower.includes('vehicle')) return '🅿️';
+
+                        // ID/Documents
+                        if (lower.includes('id') || lower.includes('identification') || lower.includes('valid id') ||
+                            lower.includes('government id') || lower.includes('photo id') ||
+                            lower.includes('passport') || lower.includes('license') || lower.includes('proof')) return '🆔';
+
+                        // Food & Drinks
+                        if (lower.includes('food') || lower.includes('drink') || lower.includes('beverage') ||
+                            lower.includes('refreshment') || lower.includes('meal') || lower.includes('dining') ||
+                            lower.includes('outside food') || lower.includes('outside drink') ||
+                            lower.includes('catering') || lower.includes('restaurant')) return '🍽️';
+
+                        // Photography/Camera
+                        if (lower.includes('camera') || lower.includes('photo') || lower.includes('photography') ||
+                            lower.includes('recording') || lower.includes('video') || lower.includes('filming')) return '📸';
+
+                        // Entry/Gate/Doors
+                        if (lower.includes('entry') || lower.includes('gate') || lower.includes('door') ||
+                            lower.includes('entrance') || lower.includes('admission') || lower.includes('check-in') ||
+                            lower.includes('checkin') || lower.includes('arrive') || lower.includes('arrival')) return '🚪';
+
+                        // Timing/Schedule
+                        if (lower.includes('time') || lower.includes('schedule') || lower.includes('timing') ||
+                            lower.includes('start') || lower.includes('duration') || lower.includes('hours') ||
+                            lower.includes('clock') || lower.includes('punctual')) return '⏰';
+
+                        // Dress Code
+                        if (lower.includes('dress') || lower.includes('attire') || lower.includes('clothing') ||
+                            lower.includes('outfit') || lower.includes('formal') || lower.includes('casual') ||
+                            lower.includes('wear')) return '👔';
+
+                        // Safety/Security
+                        if (lower.includes('security') || lower.includes('safety') || lower.includes('safe') ||
+                            lower.includes('emergency') || lower.includes('first aid') || lower.includes('medical')) return '🛡️';
+
+                        // Prohibited Items
+                        if (lower.includes('prohibited') || lower.includes('not allowed') || lower.includes('banned') ||
+                            lower.includes('restricted') || lower.includes('forbidden') || lower.includes('no smoking') ||
+                            lower.includes('weapons') || lower.includes('drugs')) return '🚫';
+
+                        // Tickets/Passes
+                        if (lower.includes('ticket') || lower.includes('pass') || lower.includes('wristband') ||
+                            lower.includes('badge') || lower.includes('qr') || lower.includes('barcode')) return '🎫';
+
+                        // Weather
+                        if (lower.includes('weather') || lower.includes('rain') || lower.includes('outdoor') ||
+                            lower.includes('indoor') || lower.includes('umbrella') || lower.includes('sun')) return '⛅';
+
+                        // Accessibility
+                        if (lower.includes('wheelchair') || lower.includes('accessible') || lower.includes('disability') ||
+                            lower.includes('special needs') || lower.includes('mobility')) return '♿';
+
+                        // Children/Kids
+                        if (lower.includes('child') || lower.includes('kid') || lower.includes('minor') ||
+                            lower.includes('baby') || lower.includes('stroller') || lower.includes('family')) return '👶';
+
+                        // Pets/Animals
+                        if (lower.includes('pet') || lower.includes('dog') || lower.includes('animal') ||
+                            lower.includes('service animal')) return '🐕';
+
+                        // Seating
+                        if (lower.includes('seat') || lower.includes('chair') || lower.includes('standing') ||
+                            lower.includes('reserved seating')) return '💺';
+
+                        // Default icon for custom advisories
+                        return '⚠️';
+                      };
+
+                      return (
+                        <div
+                          key={`advisory-modal-${idx}`}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-gray-800/30 border border-gray-700/50 hover:bg-gray-800/50 transition-colors"
+                        >
+                          <span className="text-xl flex-shrink-0">{getIcon(item)}</span>
+                          <p className="text-white text-sm">{item}</p>
                         </div>
-                      )}
-                  {event.raw?.advisory?.drinkingAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🍺</span>
-                          <span className="text-sm text-gray-300">Drinking allowed</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.petsAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🐾</span>
-                          <span className="text-sm text-gray-300">Pets allowed</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.ageRestricted && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🔞</span>
-                          <span className="text-sm text-gray-300">Show is 18+</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.camerasAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">📸</span>
-                          <span className="text-sm text-gray-300">Cameras and photos allowed</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.outsideFoodAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🍔</span>
-                          <span className="text-sm text-gray-300">Outside food & drinks allowed</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.seatingProvided && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🪑</span>
-                          <span className="text-sm text-gray-300">Seating provided</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.wheelchairAccessible && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">♿</span>
-                          <span className="text-sm text-gray-300">Wheelchair accessible venue</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.liveMusic && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🎵</span>
-                          <span className="text-sm text-gray-300">Live music</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.parkingAvailable && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🚗</span>
-                          <span className="text-sm text-gray-300">Parking available</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.reentryAllowed && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🔁</span>
-                          <span className="text-sm text-gray-300">Re-entry allowed</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.onsitePayments && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">💳</span>
-                          <span className="text-sm text-gray-300">On-site payments available</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.securityCheck && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">👮</span>
-                          <span className="text-sm text-gray-300">Security check at entry</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.cloakroom && (
-                        <div className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">🧥</span>
-                          <span className="text-sm text-gray-300">Cloakroom available</span>
-                        </div>
-                      )}
-                  {event.raw?.advisory?.customAdvisories?.map((custom, idx) => (
-                        <div key={idx} className="flex items-center gap-3 py-2.5">
-                          <span className="text-lg">📋</span>
-                          <span className="text-sm text-gray-300">{custom}</span>
-                        </div>
-                      ))}
-                    </>
+                      );
+                    })
                   ) : (
-                    <p className="text-sm text-gray-500 py-4">No advisories provided.</p>
+                    <p className="text-sm text-gray-500 text-center py-8">No advisories provided.</p>
                   )}
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Right Column - Organizer & Tickets */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Organizer Details Section */}
-            <div className="rounded-xl border border-gray-700/50 p-4 space-y-4 bg-transparent">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-gray-800 border border-gray-700">
-                  <Building className="h-4 w-4 text-gray-300" />
-                </div>
-                <h2 className="text-xl font-bold text-white">Organizer</h2>
-              </div>
+          {/* Right Column - Booking Section */}
+          <div className="lg:col-span-1" id="ticket-section">
+            <div className="space-y-3">
+              <div className="rounded-xl border border-gray-700/50 p-4 space-y-3 bg-transparent">
+                <h1 className="text-2xl font-bold text-white mb-3 flex items-center gap-2">
+                  <Ticket className="h-5 w-5 text-red-600" />
+                  Select Tickets
+                </h1>
 
-              {/* Organizer Profile */}
-              <div className="flex items-start gap-3">
-                <img
-                  src={event.organizer.logo}
-                  alt={event.organizer.name}
-                  className="w-12 h-12 rounded-lg object-cover border border-gray-700 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-white text-base">{event.organizer.name}</h3>
-                  {event.organizer.verified && (
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-                      <Check className="h-3 w-3 text-green-500" />
-                      <span>Verified Organizer</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bio with Show More */}
-              {event.organizer.bio && (
-                <div className="space-y-1">
-                  <p
-                    className="text-gray-400 text-sm leading-relaxed"
-                    style={
-                      organizerBioExpanded
-                        ? {}
-                        : {
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }
-                    }
-                  >
-                    {event.organizer.bio}
-                  </p>
-                  {event.organizer.bio.length > 80 && (
-                    <button
-                      type="button"
-                      onClick={() => setOrganizerBioExpanded((prev) => !prev)}
-                      className="text-sm font-medium text-red-600 hover:text-red-500 transition"
-                    >
-                      {organizerBioExpanded ? "Show less" : "See more"}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Contact Info */}
-              <div className="space-y-2 pt-2 border-t border-gray-800">
-                {event.organizer.email && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Mail className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <a href={`mailto:${event.organizer.email}`} className="text-gray-300 hover:text-white truncate">
-                      {event.organizer.email}
-                    </a>
-                  </div>
-                )}
-                {event.organizer.phone && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <a href={`tel:${event.organizer.phone}`} className="text-gray-300 hover:text-white">
-                      {event.organizer.phone}
-                    </a>
-                  </div>
-                )}
-                {event.organizer.website && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Globe className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                    <a
-                      href={event.organizer.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-gray-300 hover:text-white truncate"
-                    >
-                      {event.organizer.website.replace(/^https?:\/\//, '')}
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Social Links */}
-              <div className="flex gap-2 pt-2">
-                {event.organizer.instagram && (
-                  <a
-                    href={event.organizer.instagram}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                  >
-                    <Instagram className="h-3.5 w-3.5" />
-                    <span>Instagram</span>
-                  </a>
-                )}
-                {event.organizer.facebook && (
-                  <a
-                    href={event.organizer.facebook}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                  >
-                    <Facebook className="h-3.5 w-3.5" />
-                    <span>Facebook</span>
-                  </a>
-                )}
-                {event.organizer.twitter && (
-                  <a
-                    href={event.organizer.twitter}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition"
-                  >
-                    <Twitter className="h-3.5 w-3.5" />
-                    <span>Twitter</span>
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {/* Select Tickets Section */}
-            <div id="ticket-section" className="rounded-xl border border-gray-700/50 p-4 space-y-3 bg-transparent">
-              <h1 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
-                <Ticket className="h-5 w-5 text-red-600" />
-                Select Tickets
-              </h1>
-
-              <div className="space-y-3">
-                {event.tickets.map((ticket) => {
+                <div className="space-y-3">
+                  {event.tickets.map((ticket) => {
                     const cap = getTicketCap(ticket);
                     const qty = ticketQuantities[ticket.id] || 0;
                     return (
@@ -1895,6 +1536,7 @@ const EventDetailNew = () => {
             </div>
           </div>
         </div>
+      </div>
 
       {/* Image Lightbox */}
       {selectedImage && (
@@ -2060,62 +1702,6 @@ const EventDetailNew = () => {
               </form>
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      {/* Success Modal */}
-      <Dialog open={successModalOpen} onOpenChange={setSuccessModalOpen}>
-        <DialogContent className="border-gray-800 bg-gray-900 text-white max-w-lg">
-          <DialogHeader className="space-y-2 text-center">
-            <div className="mx-auto w-14 h-14 rounded-full bg-green-600/20 border border-green-600/40 flex items-center justify-center">
-              <Check className="h-7 w-7 text-green-600" />
-            </div>
-            <DialogTitle className="text-2xl">Ticket booked successfully</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              We've emailed your ticket to{" "}
-              <span className="text-white font-medium">
-                {sessionUser?.email || loginForm.email || signupForm.email || "your email"}
-              </span>
-              . See you at the event!
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-4 space-y-3 bg-gray-800 rounded-xl p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Event</span>
-              <span className="font-medium text-white">{event?.title}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Tickets</span>
-              <span className="font-medium text-white">{totalTickets}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400">Amount</span>
-              <span className="font-medium text-green-600">₹{(totalAmount * 1.05).toLocaleString()}</span>
-            </div>
-            <div className="pt-3 border-t border-gray-700 space-y-2">
-              {event?.tickets
-                ?.filter((ticket) => (ticketQuantities[ticket.id] || 0) > 0)
-                .map((ticket) => (
-                  <div key={ticket.id} className="flex items-center justify-between text-sm text-gray-300">
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-red-600" />
-                      {ticket.name}
-                    </span>
-                    <span className="font-medium">
-                      {ticketQuantities[ticket.id]} × ₹{ticket.price.toLocaleString()}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <Button
-            className="w-full mt-4 bg-red-600 hover:bg-red-700"
-            onClick={() => setSuccessModalOpen(false)}
-          >
-            Done
-          </Button>
         </DialogContent>
       </Dialog>
 

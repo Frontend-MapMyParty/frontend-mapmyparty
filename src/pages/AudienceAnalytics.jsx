@@ -269,16 +269,38 @@ const AudienceAnalytics = () => {
       const safePeriod = periodForOthers === "all" ? "year" : periodForOthers; // validators disallow "all" for these endpoints
       const common = { period: safePeriod, startDate, endDate };
       try {
-        const [ticketsRes, timelineRes, overviewRes] = await Promise.all([
+        const [ticketsRes, timelineRes] = await Promise.all([
           apiFetch(buildQuery(`organizer/events/${eventId}/analytics/tickets`, common), { method: "GET" }),
           apiFetch(buildQuery(`organizer/events/${eventId}/analytics/sales-timeline`, common), { method: "GET" }),
-          apiFetch(buildQuery(`event/organizer/events/${eventId}/analytics/overview`, common), { method: "GET" }),
         ]);
-        setEventTickets(unwrap(ticketsRes)?.tickets || unwrap(ticketsRes)?.data || unwrap(ticketsRes) || []);
-        setEventTimeline(
-          unwrap(timelineRes)?.timeline || unwrap(timelineRes)?.trend || unwrap(timelineRes)?.data || unwrap(timelineRes) || []
-        );
-        setEventOverview(unwrap(overviewRes) || {});
+
+        const ticketData = unwrap(ticketsRes);
+        const tickets = ticketData?.tickets || ticketData?.data || (Array.isArray(ticketData) ? ticketData : []);
+        setEventTickets(tickets);
+
+        const timelineData = unwrap(timelineRes);
+        const timeline = timelineData?.timeline || timelineData?.trend || timelineData?.data || (Array.isArray(timelineData) ? timelineData : []);
+        setEventTimeline(timeline);
+
+        // Derive overview from timeline totals and ticket data (no separate overview endpoint)
+        const totals = timelineData?.totals || {};
+        const totalRevenue = totals.revenue ?? tickets.reduce((s, t) => s + (t.revenue || 0), 0);
+        const totalSold = totals.ticketsSold ?? tickets.reduce((s, t) => s + (t.soldQuantity || 0), 0);
+        const totalRefunds = totals.refunds ?? 0;
+        setEventOverview({
+          revenue: totalRevenue,
+          ticketsSold: totalSold,
+          bookings: timeline.length,
+          payoutSummary: totalRevenue > 0
+            ? {
+                organizerPayout: totalRevenue - totalRefunds,
+                platformFees: tickets.reduce((s, t) => s + (t.platformFee || 0), 0),
+                gstCollected: tickets.reduce((s, t) => s + (t.gst || 0), 0),
+                refundsProcessed: totalRefunds,
+                netPayout: totalRevenue - totalRefunds,
+              }
+            : null,
+        });
       } catch (err) {
         console.error("Failed to load event analytics", err);
         setEventError(err?.message || "Unable to load event analytics");

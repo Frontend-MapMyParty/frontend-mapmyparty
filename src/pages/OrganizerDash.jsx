@@ -11,10 +11,26 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useOrganizerEvents } from "@/hooks/useOrganizerEvents";
+import { useOrganizerAnalytics } from "@/hooks/useOrganizerAnalytics";
+import { useOrganizerPayouts } from "@/hooks/useOrganizerPayouts";
+import { useRecentBookings } from "@/hooks/useRecentBookings";
 
 const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
   // Real data via hook
   const { events, loading, error, statistics, refresh } = useOrganizerEvents();
+
+  // Analytics data
+  const { analytics, loading: analyticsLoading, metrics } = useOrganizerAnalytics("month");
+
+  // Payouts data
+  const { summary: payoutSummary, loading: payoutsLoading } = useOrganizerPayouts({
+    page: 1,
+    limit: 10,
+    autoFetch: true,
+  });
+
+  // Recent bookings data
+  const { bookings: recentBookings, loading: bookingsLoading } = useRecentBookings(5);
 
   const totals = useMemo(
     () => ({
@@ -53,11 +69,20 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
     { label: "Tickets Sold", value: formatNumber(totals.totalTickets), hint: "All time", icon: Ticket },
   ];
 
-  const eventHealth = [
-    { label: "Check-ins", value: 92 },
-    { label: "Refund rate", value: 3 },
-    { label: "No-show risk", value: 8 },
-  ];
+  const eventHealth = useMemo(() => {
+    // Calculate refund rate percentage (if we have booking data)
+    const totalBookings = analytics?.breakdown?.byBookingStatus ?
+      Object.values(analytics.breakdown.byBookingStatus).reduce((sum, count) => sum + count, 0) : 0;
+
+    const refundCount = metrics?.refundRate || 0;
+    const refundRatePercent = totalBookings > 0 ? Math.round((refundCount / totalBookings) * 100) : 0;
+
+    return [
+      { label: "Check-ins", value: metrics?.checkInRate || 0 },
+      { label: "Refund rate", value: refundRatePercent },
+      { label: "No-show risk", value: metrics?.noShowRisk || 0 },
+    ];
+  }, [analytics, metrics]);
 
   const getStatusBadge = (status) => {
     const base = "px-2 py-1 rounded-full text-[11px] font-semibold";
@@ -194,20 +219,27 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
                 </div>
               </div>
               <div className="mt-4 space-y-3">
-                {eventHealth.map((metric) => (
-                  <div key={metric.label}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">{metric.label}</span>
-                      <span className="font-semibold">{metric.value}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-                      <div
-                        className={`h-full bg-gray-600`}
-                        style={{ width: `${metric.value}%` }}
-                      />
-                    </div>
+                {analyticsLoading ? (
+                  <div className="text-center py-4 text-gray-400">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+                    <p className="text-xs">Loading metrics...</p>
                   </div>
-                ))}
+                ) : (
+                  eventHealth.map((metric) => (
+                    <div key={metric.label}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">{metric.label}</span>
+                        <span className="font-semibold">{metric.value}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
+                        <div
+                          className={`h-full bg-gray-600`}
+                          style={{ width: `${metric.value}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -215,45 +247,123 @@ const OrganizerDash = ({ user, handleLogout, setActiveTab, activeTab }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-gray-400">Payouts</p>
-                  <h4 className="text-base font-semibold">This week</h4>
+                  <h4 className="text-base font-semibold">Summary</h4>
                 </div>
                 <Sparkles className="w-5 h-5 text-gray-300" />
               </div>
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Cleared</span>
-                  <span className="font-semibold">{formatCurrency(124000)}</span>
+              {payoutsLoading ? (
+                <div className="mt-4 text-center py-4 text-gray-400">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+                  <p className="text-xs">Loading payouts...</p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Pending</span>
-                  <span className="font-semibold">{formatCurrency(14500)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Next drop</span>
-                  <span className="font-semibold">Thu • 6:00 PM</span>
-                </div>
-              </div>
-              <div className="mt-4 h-2 rounded-full bg-gray-800 overflow-hidden">
-                <div className="h-full w-[76%] bg-gray-600" />
-              </div>
+              ) : (
+                <>
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Cleared</span>
+                      <span className="font-semibold">{formatCurrency(payoutSummary?.cleared?.amount || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Pending</span>
+                      <span className="font-semibold">{formatCurrency(payoutSummary?.pending?.amount || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Next drop</span>
+                      <span className="font-semibold">
+                        {payoutSummary?.nextPayout?.date
+                          ? formatDate(payoutSummary.nextPayout.date)
+                          : "Not scheduled"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-gray-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gray-600"
+                      style={{
+                        width: payoutSummary?.total?.amount > 0
+                          ? `${Math.min(100, (payoutSummary.cleared.amount / payoutSummary.total.amount) * 100)}%`
+                          : "0%"
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Bookings table - empty state */}
+        {/* Bookings table */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-gray-400">Recent bookings</p>
               <h3 className="text-lg font-semibold">Latest ticket actions</h3>
             </div>
-            <button className="text-xs font-semibold text-gray-300 hover:text-white">View all</button>
+            <button
+              onClick={() => setActiveTab?.("myevents")}
+              className="text-xs font-semibold text-gray-300 hover:text-white"
+            >
+              View all
+            </button>
           </div>
-          <div className="px-5 py-12 text-center text-gray-400">
-            <Ticket className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No recent bookings</p>
-            <p className="text-xs mt-1">Bookings will appear here when customers purchase tickets</p>
-          </div>
+          {bookingsLoading ? (
+            <div className="px-5 py-12 text-center text-gray-400">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Loading bookings...</p>
+            </div>
+          ) : recentBookings.length === 0 ? (
+            <div className="px-5 py-12 text-center text-gray-400">
+              <Ticket className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">No recent bookings</p>
+              <p className="text-xs mt-1">Bookings will appear here when customers purchase tickets</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-950 border-b border-gray-800">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Customer</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Event</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Booking #</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {recentBookings.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-950 transition">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs font-semibold">
+                            {(booking.user?.name || "U").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{booking.user?.name || "Guest"}</p>
+                            <p className="text-xs text-gray-500">{booking.user?.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-medium">{booking.event?.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {booking.event?.startDate ? formatDate(booking.event.startDate) : "TBA"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-mono text-gray-300">#{booking.id.slice(0, 8)}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-semibold">{formatCurrency(booking.totalAmount || booking.payment?.amount || 0)}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm text-gray-400">{formatDate(booking.createdAt)}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { clearSessionData, resetSessionCache, fetchSession } from "@/utils/auth";
+import { clearSessionData, resetSessionCache } from "@/utils/auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { buildUrl, apiFetch } from "@/config/api";
 import {
   Calendar,
@@ -43,10 +44,13 @@ import LiveEvents from "./LiveEvents";
 import LiveEventPage from "./LiveEventPage";
 import Reception from "./Reception";
 import FoodBeverages from "./FoodBeverages";
+import OrganizerPayouts from "./OrganizerPayouts";
+import EventAttendees from "./EventAttendees";
+import EventRefunds from "./EventRefunds";
 import Logo from "@/assets/MMP logo.svg";
 
 // Profile Content Component
-const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) => {
+const OrganizerProfileContent = ({ user }) => {
   const buildInitialData = (payload = {}, owner = {}) => ({
     id: payload.id || "",
     name: payload.name || "",
@@ -91,18 +95,6 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
     },
   });
 
-  // "create" when no profile exists, "view" when profile is loaded
-  const [profileMode, setProfileMode] = useState(() =>
-    organizerProfile === null ? "create" : "view"
-  );
-  const [createData, setCreateData] = useState({
-    name: "", email: "", contact: "", state: "", address: "",
-    description: "", gstNumber: "",
-    instagram: "", linkedin: "", facebook: "", x: "", reddit: "", snapchat: "",
-  });
-  const [createError, setCreateError] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-
   const [profileData, setProfileData] = useState(() => buildInitialData(user?.organizer || {}, user));
   const [editData, setEditData] = useState(() => buildInitialData(user?.organizer || {}, user));
   const [bankDraft, setBankDraft] = useState(() => buildInitialData(user?.organizer || {}, user).bankDetails);
@@ -117,6 +109,7 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
   const [isEditing, setIsEditing] = useState(false);
   const [isBankPanelOpen, setIsBankPanelOpen] = useState(false);
   const [isBankEditing, setIsBankEditing] = useState(false);
+  const [bankExists, setBankExists] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isBankSaving, setIsBankSaving] = useState(false);
   const [isBankLoading, setIsBankLoading] = useState(false);
@@ -135,51 +128,28 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
     setOwnerDraft(user || {});
   }, [user]);
 
-  // Sync profileMode when organizerProfile prop changes
-  useEffect(() => {
-    if (organizerProfile === null) {
-      setProfileMode("create");
-    } else if (organizerProfile && typeof organizerProfile === "object") {
-      setProfileMode("view");
-    }
-  }, [organizerProfile]);
-
   const fetchProfileData = useCallback(async () => {
     setLoadingProfile(true);
     try {
-      // Use cached session instead of redundant /auth/me call
-      const session = await fetchSession();
-      const ownerData = session?.user || {};
+      // Use user prop from context as owner data
+      const ownerData = user || {};
       setOwner(ownerData);
       setOwnerDraft(ownerData);
 
-      let organizerPayload = session?.organizer;
-      if (!organizerPayload) {
-        try {
-          const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
-          organizerPayload = orgRes?.data || orgRes || {};
-        } catch (orgError) {
-          if (orgError?.status === 404) {
-            // No profile exists — stay in create mode
-            setProfileMode("create");
-            setLoadingProfile(false);
-            return;
-          }
-          throw orgError;
-        }
-      }
+      // Fetch organizer-specific profile data (lazy-loaded)
+      const orgRes = await apiFetch("organizer/me/profile", { method: "GET" });
+      const organizerPayload = orgRes?.data || orgRes || {};
 
       const normalized = buildInitialData(organizerPayload, ownerData);
       setProfileData(normalized);
       setEditData(normalized);
       setBankDraft(normalized.bankDetails);
-      setProfileMode("view");
     } catch (error) {
       console.error("Failed to load organizer profile:", error);
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchProfileData();
@@ -245,61 +215,23 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
     setEditData(profileData);
   };
 
-  const handleCreateInputChange = (field, value) => {
-    setCreateData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleCreateProfile = async () => {
-    if (isCreating) return;
-    if (!createData.name.trim()) {
-      setCreateError("Organization name is required.");
-      return;
-    }
-    setIsCreating(true);
-    setCreateError("");
-    try {
-      const payload = Object.fromEntries(
-        Object.entries(createData).filter(
-          ([, v]) => v !== undefined && v !== null && String(v).trim() !== ""
-        )
-      );
-      const res = await apiFetch("organizer/me/profile", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      const data = res?.data || res || {};
-      const normalized = buildInitialData(data, owner);
-      setProfileData(normalized);
-      setEditData(normalized);
-      setBankDraft(normalized.bankDetails);
-      setProfileMode("view");
-      if (onProfileCreated) onProfileCreated(data);
-      resetSessionCache();
-    } catch (error) {
-      if (error?.status === 409) {
-        setCreateError("An organizer profile already exists for this account.");
-      } else {
-        setCreateError(error?.message || "Failed to create profile. Please try again.");
-      }
-      console.error("Failed to create organizer profile:", error);
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
   const handleOpenBankPanel = async () => {
     setIsBankLoading(true);
     try {
       const res = await apiFetch("organizer/me/bank-details", { method: "GET" });
       const data = res?.data || res || {};
+      const exists = !!(data?.accountHolder || data?.accountNumber);
+      setBankExists(exists);
       setBankDraft((prev) => ({ ...prev, ...data }));
       setProfileData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
       setEditData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
+      setIsBankEditing(!exists); // auto-open form when no bank details yet
     } catch (error) {
       console.error("Failed to load bank details:", error);
       setBankDraft(editData.bankDetails);
+      setBankExists(false);
+      setIsBankEditing(true); // assume no details on error, open form
     } finally {
-      setIsBankEditing(false);
       setIsBankPanelOpen(true);
       setIsBankLoading(false);
     }
@@ -320,10 +252,11 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
         bankName: bankDraft.bankName,
       };
       const res = await apiFetch("organizer/me/bank-details", {
-        method: "PATCH",
+        method: bankExists ? "PATCH" : "POST",
         body: JSON.stringify(payload),
       });
       const data = res?.data || res || {};
+      setBankExists(true);
       setBankDraft((prev) => ({ ...prev, ...data }));
       setProfileData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
       setEditData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, ...data } }));
@@ -494,146 +427,6 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
     stopOwnerCameraStream();
     setOwnerCapturedPhoto(null);
   };
-
-  // Create mode form
-  if (profileMode === "create") {
-    return (
-      <div className="space-y-6 text-white">
-        <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-[0.25em] text-white/50">New Organizer</p>
-          <h2 className="text-3xl font-extrabold">Set Up Your Profile</h2>
-          <p className="text-sm text-white/60">Fill in your organization details to get started.</p>
-        </div>
-
-        {createError && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {createError}
-          </div>
-        )}
-
-        <div className="bg-[#0f1628] rounded-2xl border border-white/10 shadow-lg shadow-black/30 overflow-hidden backdrop-blur">
-          <div className="p-8 space-y-6 bg-[#0b1220]">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">Organization Name <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={createData.name}
-                  onChange={(e) => handleCreateInputChange("name", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="Your organization name"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">Email Address</label>
-                <input
-                  type="email"
-                  value={createData.email}
-                  onChange={(e) => handleCreateInputChange("email", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="org@example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">Contact</label>
-                <input
-                  type="text"
-                  value={createData.contact}
-                  onChange={(e) => handleCreateInputChange("contact", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="+1234567890"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">State</label>
-                <input
-                  type="text"
-                  value={createData.state}
-                  onChange={(e) => handleCreateInputChange("state", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="e.g. Maharashtra"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">Address</label>
-                <input
-                  type="text"
-                  value={createData.address}
-                  onChange={(e) => handleCreateInputChange("address", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="Full address"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-white/80">GST Number</label>
-                <input
-                  type="text"
-                  value={createData.gstNumber}
-                  onChange={(e) => handleCreateInputChange("gstNumber", e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                  placeholder="22AAAAA0000A1Z5"
-                />
-              </div>
-              <div className="md:col-span-2 space-y-2">
-                <label className="block text-sm font-medium text-white/80">Description</label>
-                <textarea
-                  value={createData.description}
-                  onChange={(e) => handleCreateInputChange("description", e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none min-h-[120px]"
-                  maxLength={2000}
-                  placeholder="Tell attendees about your organization"
-                />
-              </div>
-            </div>
-
-            {/* Social handles */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Social Handles</h3>
-                <span className="text-xs text-white/50">Optional</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { key: "instagram", label: "Instagram URL" },
-                  { key: "linkedin", label: "LinkedIn URL" },
-                  { key: "facebook", label: "Facebook URL" },
-                  { key: "x", label: "X (Twitter) URL" },
-                  { key: "reddit", label: "Reddit handle or URL" },
-                  { key: "snapchat", label: "Snapchat handle" },
-                ].map((social) => (
-                  <div className="space-y-2" key={social.key}>
-                    <label className="block text-sm font-medium text-white/80">{social.label}</label>
-                    <input
-                      type="text"
-                      value={createData[social.key]}
-                      onChange={(e) => handleCreateInputChange(social.key, e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:ring-2 focus:ring-rose-500/60 focus:outline-none"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Create button */}
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={handleCreateProfile}
-                disabled={isCreating}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-semibold shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isCreating ? (
-                  <span className="h-4 w-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {isCreating ? "Creating..." : "Create Profile"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 text-white">
@@ -957,15 +750,10 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
               <div className="text-white space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-2xl font-semibold">{editData.name}</h2>
-                  {editData.isVerified ? (
+                  {editData.isVerified && (
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-100 text-xs font-semibold border border-emerald-500/30">
                       <BadgeCheck className="w-4 h-4" />
                       Verified
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/15 text-amber-100 text-xs font-semibold border border-amber-500/30">
-                      <Shield className="w-4 h-4" />
-                      Pending Verification
                     </span>
                   )}
                 </div>
@@ -1153,15 +941,25 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
               {/* Bank Summary */}
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center border border-emerald-400/40">
-                    <CreditCard className="w-5 h-5 text-emerald-100" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${bankExists ? "bg-emerald-500/20 border-emerald-400/40" : "bg-amber-500/10 border-amber-400/30"}`}>
+                    <CreditCard className={`w-5 h-5 ${bankExists ? "text-emerald-100" : "text-amber-300"}`} />
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Payout Provider</p>
-                    <p className="text-base font-semibold text-white">
-                      {editData.bankDetails.providerName} • {editData.bankDetails.verificationStatus}
-                    </p>
-                    <p className="text-xs text-white/60">Txn ID: {editData.bankDetails.verificationTxnId}</p>
+                    {bankExists ? (
+                      <>
+                        <p className="text-xs uppercase tracking-wide text-white/50">Payout Provider</p>
+                        <p className="text-base font-semibold text-white">
+                          {editData.bankDetails.providerName} • {editData.bankDetails.verificationStatus}
+                        </p>
+                        <p className="text-xs text-white/60">Txn ID: {editData.bankDetails.verificationTxnId}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs uppercase tracking-wide text-white/50">Bank Account</p>
+                        <p className="text-base font-semibold text-amber-300">Not added yet</p>
+                        <p className="text-xs text-white/50">Add bank details to receive payouts</p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1170,7 +968,7 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
                     onClick={handleOpenBankPanel}
                     className="px-3 py-2 text-sm rounded-lg bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-md"
                   >
-                    View Bank
+                    {bankExists ? "View Bank" : "Add Bank"}
                   </button>
                 </div>
               </div>
@@ -1288,7 +1086,7 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/50">Payouts</p>
                 <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-emerald-200" />
-                  Bank Details
+                  {bankExists ? "Bank Details" : "Add Bank Details"}
                 </h2>
               </div>
               <button onClick={handleCancelBank} className="text-white/60 hover:text-white">
@@ -1297,28 +1095,44 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
             </div>
 
             <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Provider</p>
-                  <p className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-emerald-200" />
-                    {bankDraft.providerName}
-                  </p>
+              {/* Provider / Status — only shown when bank details exist */}
+              {bankExists && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Provider</p>
+                    <p className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-200" />
+                      {bankDraft.providerName}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Status</p>
+                    <p className="text-lg font-semibold text-white flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      {bankDraft.verificationStatus}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Status</p>
-                  <p className="text-lg font-semibold text-white flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                    {bankDraft.verificationStatus}
-                  </p>
+              )}
+
+              {/* Prompt when no bank details */}
+              {!bankExists && (
+                <div className="rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+                  <CreditCard className="w-5 h-5 text-amber-300 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-200">No bank details added</p>
+                    <p className="text-xs text-white/50 mt-0.5">Fill in the form below to set up your payout account.</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-white">Account</h4>
-                  <span className="text-xs text-white/60">Txn: {bankDraft.verificationTxnId}</span>
-                </div>
+                {bankExists && (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-white">Account</h4>
+                    <span className="text-xs text-white/60">Txn: {bankDraft.verificationTxnId}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { key: "accountHolder", label: "Account Holder" },
@@ -1343,16 +1157,19 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Created</p>
-                  <p className="text-base font-semibold text-white">{formatDate(bankDraft.createdAt)}</p>
+              {/* Created / Updated — only shown when bank details exist */}
+              {bankExists && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Created</p>
+                    <p className="text-base font-semibold text-white">{formatDate(bankDraft.createdAt)}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-white/50">Updated</p>
+                    <p className="text-base font-semibold text-white">{formatDate(bankDraft.updatedAt)}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Updated</p>
-                  <p className="text-base font-semibold text-white">{formatDate(bankDraft.updatedAt)}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-white/10 bg-white/5 flex items-center gap-3">
@@ -1360,10 +1177,11 @@ const OrganizerProfileContent = ({ user, organizerProfile, onProfileCreated }) =
                 <>
                   <button
                     onClick={handleSaveBank}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition"
+                    disabled={isBankSaving}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-sky-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Save className="w-4 h-4" />
-                    Save Bank Details
+                    {isBankSaving ? "Saving…" : bankExists ? "Save Bank Details" : "Add Bank Details"}
                   </button>
                   <button
                     onClick={handleCancelBank}
@@ -1423,92 +1241,21 @@ const OrganizerDashboardV2 = () => {
   // Note: Authentication is handled by ProtectedRoute wrapper
   // No need for redundant auth check here
 
-  // Organizer profile from session - will be populated after ProtectedRoute validates
-  const [user, setUser] = useState({ name: "Organizer", email: "" });
-  // false = loading, null = no profile, object = profile exists
-  const [organizerProfile, setOrganizerProfile] = useState(false);
-  const [organizerWarning, setOrganizerWarning] = useState(null);
-
-  useEffect(() => {
-    // Fetch user data from validated session (ProtectedRoute ensures we're authenticated)
-    const loadUserData = async () => {
-      try {
-        const session = await fetchSession();
-        if (session?.user) {
-          setUser({
-            name: session.user.name || sessionStorage.getItem("userName") || "Organizer",
-            email: session.user.email || sessionStorage.getItem("userEmail") || "",
-          });
-        } else {
-          // Fallback to sessionStorage if session.user not available yet
-          const profileRaw = sessionStorage.getItem("userProfile");
-          const profile = profileRaw ? JSON.parse(profileRaw) : {};
-          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
-          const email = sessionStorage.getItem("userEmail") || profile.email || "";
-          setUser({ name, email });
-        }
-        // Extract organizer profile from session
-        setOrganizerProfile(session?.organizer || null);
-        setOrganizerWarning(session?.organizerWarning || null);
-      } catch (err) {
-        console.warn("Failed to load user data:", err);
-        setOrganizerProfile(null);
-        setOrganizerWarning(null);
-        // Fallback to sessionStorage
-        try {
-          const profileRaw = sessionStorage.getItem("userProfile");
-          const profile = profileRaw ? JSON.parse(profileRaw) : {};
-          const name = sessionStorage.getItem("userName") || profile.name || "Organizer";
-          const email = sessionStorage.getItem("userEmail") || profile.email || "";
-          setUser({ name, email });
-        } catch {}
-      }
-    };
-    loadUserData();
-  }, []);
+  // User data from auth context (populated by AuthProvider on app load)
+  const { user: authUser, logout: contextLogout } = useAuth();
+  const user = {
+    name: authUser?.name || "Organizer",
+    email: authUser?.email || "",
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    // Call logout API to clear cookies on backend (if available)
-    try {
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      // Continue even if logout API fails
-      console.warn("Logout API call failed:", err);
-    }
-    
-    // Clear all session data using centralized function
-    clearSessionData();
-    resetSessionCache();
-    
-    // Redirect to home
+    await contextLogout();
     navigate("/");
     setIsLoggingOut(false);
   };
 
-
-  // Auto-redirect to profile tab when no organizer profile exists
-  useEffect(() => {
-    if (organizerProfile === null) {
-      setActiveTab("profile");
-      navigate("/organizer/profile");
-    }
-  }, [organizerProfile, navigate]);
-
-  // Called from OrganizerProfileContent after successful profile creation
-  const handleProfileCreated = (newProfile) => {
-    setOrganizerProfile(newProfile);
-    // Profile created but not yet verified
-    if (newProfile && !newProfile.isVerified) {
-      setOrganizerWarning('Your event organizer profile is pending verification');
-    } else {
-      setOrganizerWarning(null);
-    }
-  };
 
   // Navigation items with their corresponding tab values
   const navItems = [
@@ -1518,6 +1265,7 @@ const OrganizerDashboardV2 = () => {
     { id: "live", name: "Live Events", icon: <Radio className="w-6 h-6 mr-3" /> },
     { id: "reception", name: "Reception", icon: <Shield className="w-6 h-6 mr-3" /> },
     { id: "food-beverages", name: "Food & Beverages", icon: <CupSoda className="w-6 h-6 mr-3" /> },
+    { id: "payouts", name: "Payouts", icon: <CreditCard className="w-6 h-6 mr-3" /> },
     // { id: "financial", name: "Financial Reporting", icon: <Download className="w-6 h-6 mr-3" /> },
   ];
 
@@ -1529,6 +1277,9 @@ const OrganizerDashboardV2 = () => {
     else if (path.startsWith("/organizer/live")) setActiveTab("live");
     else if (path.startsWith("/organizer/reception")) setActiveTab("reception");
     else if (path.startsWith("/organizer/food-beverages")) setActiveTab("food-beverages");
+    else if (path.startsWith("/organizer/payouts")) setActiveTab("payouts");
+    else if (path.startsWith("/organizer/events") && path.includes("/attendees")) setActiveTab("attendees");
+    else if (path.startsWith("/organizer/events") && path.includes("/refunds")) setActiveTab("refunds");
     else if (path.startsWith("/organizer/financial")) setActiveTab("financial");
     else if (path.startsWith("/organizer/profile")) setActiveTab("profile");
     else setActiveTab("dashboard");
@@ -1651,46 +1402,7 @@ const OrganizerDashboardV2 = () => {
         <main className="flex-1 overflow-y-auto">
           {/* Tab Content */}
           <div className="p-4 lg:p-5 space-y-5">
-            {/* Organizer warning banner */}
-            {organizerWarning && activeTab !== "profile" && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-center gap-3 text-sm text-amber-100">
-                <Shield className="w-5 h-5 flex-shrink-0 text-amber-300" />
-                {organizerWarning}
-              </div>
-            )}
-
-            {/* Loading state */}
-            {organizerProfile === false && activeTab !== "profile" && (
-              <div className="flex items-center justify-center py-24">
-                <span className="h-8 w-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              </div>
-            )}
-
-            {/* Gating: no profile exists and not on profile tab */}
-            {organizerProfile === null && activeTab !== "profile" && (
-              <div className="flex items-center justify-center py-24">
-                <div className="bg-[#0f1628] rounded-2xl border border-white/10 shadow-lg shadow-black/30 p-10 text-center max-w-md">
-                  <div className="w-16 h-16 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto mb-5">
-                    <User className="w-8 h-8 text-rose-200" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Create Your Organizer Profile</h3>
-                  <p className="text-sm text-white/60 mb-6">Set up your organizer profile to access dashboard features, create events, and manage your audience.</p>
-                  <button
-                    onClick={() => {
-                      setActiveTab("profile");
-                      navigate("/organizer/profile");
-                    }}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-500 text-white font-semibold shadow-lg shadow-rose-500/20 hover:shadow-rose-500/30 transition"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Go to Profile Setup
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Normal tab content - shown when profile exists or still loading */}
-            {organizerProfile !== null && activeTab === "dashboard" && (
+            {activeTab === "dashboard" && (
               <OrganizerDash
                 user={user}
                 handleLogout={handleLogout}
@@ -1699,20 +1411,17 @@ const OrganizerDashboardV2 = () => {
               />
             )}
 
-            {organizerProfile !== null && activeTab === "myevents" && <MyEvents />}
-            {organizerProfile !== null && activeTab === "analytics" && <AudienceAnalytics />}
-            {organizerProfile !== null && activeTab === "live" && !liveEventId && <LiveEvents />}
-            {organizerProfile !== null && activeTab === "live" && liveEventId && <LiveEventPage embedded />}
-            {organizerProfile !== null && activeTab === "reception" && <Reception />}
-            {organizerProfile !== null && activeTab === "food-beverages" && <FoodBeverages />}
-            {organizerProfile !== null && activeTab === "financial" && <FinancialReporting />}
-            {activeTab === "profile" && (
-              <OrganizerProfileContent
-                user={user}
-                organizerProfile={organizerProfile}
-                onProfileCreated={handleProfileCreated}
-              />
-            )}
+            {activeTab === "myevents" && <MyEvents />}
+            {activeTab === "analytics" && <AudienceAnalytics />}
+            {activeTab === "live" && !liveEventId && <LiveEvents />}
+            {activeTab === "live" && liveEventId && <LiveEventPage embedded />}
+            {activeTab === "reception" && <Reception />}
+            {activeTab === "food-beverages" && <FoodBeverages />}
+            {activeTab === "payouts" && <OrganizerPayouts />}
+            {activeTab === "attendees" && <EventAttendees />}
+            {activeTab === "refunds" && <EventRefunds />}
+            {activeTab === "financial" && <FinancialReporting />}
+            {activeTab === "profile" && <OrganizerProfileContent user={user} />}
           </div>
         </main>
       </div>
