@@ -56,7 +56,7 @@ const PaymentCheckout = () => {
 
     try {
       // Process test payment (creates payment + confirms booking)
-      const response = await apiFetch("/api/payment/test/process", {
+      const response = await apiFetch("/api/payments/test/process", {
         method: "POST",
         body: JSON.stringify({
           bookingId: bookingData.bookingId,

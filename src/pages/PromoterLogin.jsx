@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { apiFetch } from "@/config/api";
 import { resetSessionCache, fetchSession } from "@/utils/auth";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDashboardPathForRole } from "@/utils/roleRedirect";
 import Logo from "../assets/android-chrome-192x192.png";
 
 const PromoterLogin = () => {
@@ -48,7 +49,7 @@ const PromoterLogin = () => {
       contextLogin(session);
 
       toast.success("Logged in successfully!");
-      navigate("/promoter", { replace: true });
+      navigate(getDashboardPathForRole(session.user?.role || "ADMIN"), { replace: true });
     } catch (err) {
       toast.error(err?.message || "Authentication failed");
     } finally {

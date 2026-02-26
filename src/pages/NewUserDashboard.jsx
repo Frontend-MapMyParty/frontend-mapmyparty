@@ -102,7 +102,7 @@ const NewUserDashboard = () => {
   const [geocodeResult, setGeocodeResult] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const { user: authUser } = useAuth();
+  const { user: authUser, logout: contextLogout } = useAuth();
 
   useEffect(() => {
     if (authUser) {
@@ -204,31 +204,13 @@ const NewUserDashboard = () => {
     );
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    try {
-      await apiFetch("auth/logout", { method: "POST" });
-      toast.success("Logged out");
-    } catch (err) {
-      if (err?.status === 401) {
-        console.warn("Logout 401: session already invalid/expired");
-        toast("Session expired, logging out");
-      } else {
-        console.warn("Logout API call failed:", err);
-        toast.error(err?.message || "Logout failed, clearing session");
-      }
-    } finally {
-      try {
-        const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
-        clearSessionData();
-        resetSessionCache();
-      } catch (e) {
-        console.warn("Failed to clear session cache", e);
-      }
-      setIsLoggingOut(false);
-      navigate("/");
-    }
+    contextLogout();
+    toast.success("Logged out");
+    setIsLoggingOut(false);
+    navigate("/", { replace: true });
   };
 
   const navItems = [

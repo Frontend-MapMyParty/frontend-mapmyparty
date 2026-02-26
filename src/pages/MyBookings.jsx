@@ -30,7 +30,6 @@ const MyBookings = () => {
     "Felt the schedule ran late; could improve timing.",
   ];
 
-  const [selectedTicket, setSelectedTicket] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -241,7 +240,10 @@ const MyBookings = () => {
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(booking => {
-      const matchesSearch = (booking.eventTitle || "").toLowerCase().includes(searchQuery.toLowerCase()) || (booking.orderId || "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        (booking.eventTitle || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (booking.location || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (booking.venue?.name || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesFilter = filterStatus === 'all' || booking.status === filterStatus;
       return matchesSearch && matchesFilter;
     });
@@ -348,35 +350,34 @@ const MyBookings = () => {
         })}
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-          <Input
-            type="search"
-            placeholder="Search by event name or order ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 h-10 bg-white/[0.05] border-white/[0.08] text-white text-sm placeholder:text-white/30 rounded-lg focus:ring-1 focus:ring-[#D60024]/50"
-          />
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#C99774]" />
+            <Input
+              type="search"
+              placeholder="Search by event name or venue..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-[rgba(255,255,255,0.08)] border border-[#772256]/30 text-white placeholder:text-[rgba(255,255,255,0.6)] focus:ring-2 focus:ring-[#772256] focus:border-[#772256] rounded-lg"
+            />
+          </div>
+          <div className="flex gap-2">
+            {["all", "confirmed"].map((status) => (
+              <Button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`text-xs h-10 px-4 ${
+                  filterStatus === status
+                    ? "bg-[#D60024] text-white hover:bg-[#b8001f]"
+                    : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08] border border-white/[0.06]"
+                }`}
+              >
+                {status === "all" ? "All" : "Confirmed"}
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-2">
-          {["all", "confirmed"].map((status) => (
-            <Button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`text-xs h-10 px-4 ${
-                filterStatus === status
-                  ? "bg-[#D60024] text-white hover:bg-[#b8001f]"
-                  : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08] border border-white/[0.06]"
-              }`}
-            >
-              {status === "all" ? "All" : "Confirmed"}
-            </Button>
-          ))}
-        </div>
-      </div>
-
       {/* Upcoming Events Section */}
       {upcomingBookings.length > 0 && (
         <section className="space-y-4">
@@ -443,103 +444,92 @@ const MyBookings = () => {
               </Button>
             </Link>
           </div>
-        ) : !hasFilteredBookings ? (
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-12 text-center">
-            <Search className="w-10 h-10 text-white/15 mx-auto mb-3" />
-            <h3 className="text-sm font-semibold text-white mb-1">No matching bookings</h3>
-            <p className="text-xs text-white/40">Try adjusting your search or filters.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredBookings.map((booking) => (
-              <div key={booking.id} className="rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.04] hover:border-white/[0.1] transition-all overflow-hidden">
-                {/* Header bar */}
-                <div className="px-4 py-2.5 border-b border-white/[0.04] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs text-white/40">
-                    <span className="font-mono">{booking.orderId?.substring(0, 12)}...</span>
-                    <span className="text-white/15">|</span>
-                    <span>{formatBookingDate(booking.bookingDate)}</span>
+      ) : !hasFilteredBookings ? (
+        <Card className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] to-[#48285D]/10 rounded-xl">
+          <CardContent className="p-12 text-center">
+            <Search className="w-16 h-16 text-[rgba(255,255,255,0.4)] mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-white">No matching bookings</h3>
+            <p className="text-[rgba(255,255,255,0.65)]">
+              Try adjusting your search or filters.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredBookings.map((booking) => (
+            <Card
+              key={booking.id}
+              className="border-2 border-[#772256]/20 bg-gradient-to-br from-[rgba(255,255,255,0.08)] via-[#48285D]/05 to-[#772256]/05 rounded-xl hover:border-[#772256]/40 hover:shadow-[0_20px_50px_-20px_rgba(119,34,86,0.3)] transition-all duration-300 overflow-hidden"
+            >
+              <div className="relative h-44 overflow-hidden">
+                <img
+                  src={booking.image}
+                  alt={booking.eventTitle}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                <Badge
+                  className={`${booking.status === 'confirmed'
+                    ? 'bg-[#772256]/80 text-[#C99774] border border-[#772256]/50'
+                    : 'bg-amber-500/30 text-amber-100 border border-amber-500/50'
+                    } absolute top-3 right-3 text-xs px-2 py-0.5`}
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {booking.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+                </Badge>
+              </div>
+
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-xs text-[rgba(255,255,255,0.65)]">
+                  <Calendar className="h-3.5 w-3.5 text-[#C99774] flex-shrink-0" />
+                  <span>Booked on {formatBookingDate(booking.bookingDate)}</span>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold text-white line-clamp-2">{booking.eventTitle}</h3>
+                  <p className="text-xs text-[rgba(255,255,255,0.6)] mt-1">{booking.category}</p>
+                </div>
+
+                <div className="space-y-2 text-sm text-[rgba(255,255,255,0.8)]">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-[#C99774] flex-shrink-0" />
+                    <span className="line-clamp-1">{formatDate(booking.eventDate)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className={`text-[10px] px-2 py-0.5 border ${
-                      booking.status === 'confirmed'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}>
-                      {booking.status === 'confirmed' ? 'Confirmed' : 'Pending'}
-                    </Badge>
-                    <Badge className={`text-[10px] px-2 py-0.5 border ${
-                      booking.paymentStatus === 'success'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}>
-                      {booking.paymentStatus ? booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1) : 'Payment'}
-                    </Badge>
+                    <Clock className="h-4 w-4 text-[#C99774] flex-shrink-0" />
+                    <span>{booking.eventTime}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-[#C99774] flex-shrink-0" />
+                    <span className="line-clamp-1">
+                      {booking.venue?.name || booking.location || "Venue TBA"}
+                    </span>
                   </div>
                 </div>
 
-                {/* Body */}
-                <div className="p-4">
-                  <div className="flex flex-col lg:flex-row gap-4">
-                    {/* Event info */}
-                    <div className="flex gap-3 flex-1 min-w-0">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 border border-white/[0.06]">
-                        <img src={booking.image} alt={booking.eventTitle} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <Badge className="bg-white/[0.06] text-white/50 border-0 text-[10px] mb-1.5">{booking.category}</Badge>
-                        <h3 className="text-sm font-semibold text-white line-clamp-1 mb-1.5">{booking.eventTitle}</h3>
-                        <div className="space-y-1 text-xs text-white/40">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3 flex-shrink-0" />
-                            <span>{formatDate(booking.eventDate)}</span>
-                            <span className="text-white/15">|</span>
-                            <span>{booking.eventTime}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span className="line-clamp-1">{booking.location}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ticket summary */}
-                    <div className="flex items-center gap-4 sm:gap-6 px-4 py-3 rounded-lg bg-white/[0.03] border border-white/[0.04] flex-shrink-0">
-                      <div className="text-center">
-                        <p className="text-[10px] text-white/30 mb-0.5">Tickets</p>
-                        <p className="text-sm font-semibold text-white">{booking.quantity}</p>
-                      </div>
-                      <div className="h-6 w-px bg-white/[0.06]" />
-                      <div className="text-center">
-                        <p className="text-[10px] text-white/30 mb-0.5">Type</p>
-                        <p className="text-sm font-semibold text-white line-clamp-1">{booking.ticketType}</p>
-                      </div>
-                      <div className="h-6 w-px bg-white/[0.06]" />
-                      <div className="text-center">
-                        <p className="text-[10px] text-white/30 mb-0.5">Total</p>
-                        <p className="text-sm font-bold text-[#D60024]">₹{booking.totalPrice.toLocaleString()}</p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex lg:flex-col gap-2 flex-shrink-0">
-                      <Button size="sm" className="flex-1 lg:flex-none h-8 bg-[#D60024] hover:bg-[#b8001f] text-white text-xs font-medium px-3" onClick={() => fetchBookingTickets(booking)}>
-                        <Eye className="h-3 w-3 mr-1.5" /> View Tickets
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 lg:flex-none h-8 border-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.06] text-xs px-3" onClick={() => setSelectedTicket(booking)}>
-                        <Ticket className="h-3 w-3 mr-1.5" /> Details
-                      </Button>
-                      {isEventPast(booking) && (
-                        <Button size="sm" variant="ghost" className="flex-1 lg:flex-none h-8 text-white/40 hover:text-white hover:bg-white/[0.06] text-xs px-3 border border-dashed border-white/[0.08]" onClick={() => handleOpenReview(booking)}>
-                          <Star className="h-3 w-3 mr-1.5" />
-                          {booking.review ? "Edit Feedback" : "Feedback"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 min-w-[130px] bg-gradient-to-r from-[#772256] to-[#48285D] text-white font-semibold hover:shadow-[0_10px_25px_-10px_rgba(119,34,86,0.5)] transition-all text-xs px-3 py-2"
+                    onClick={() => fetchBookingTickets(booking)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1.5" />
+                    View Tickets
+                  </Button>
+                  {isEventPast(booking) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="flex-1 min-w-[130px] border border-dashed border-[#C99774]/40 text-[#C99774] hover:border-[#C99774] hover:bg-[#772256]/10 text-xs px-3 py-2"
+                      onClick={() => handleOpenReview(booking)}
+                    >
+                      <Star className="h-3.5 w-3.5 mr-1.5 fill-current" />
+                      {booking.review ? "Edit Feedback" : "Leave Feedback"}
+                    </Button>
+                  )}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
             ))}
           </div>
         )}

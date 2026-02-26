@@ -451,10 +451,10 @@ const EventDetailNew = () => {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      const booking = res?.data || res;
-      if (!booking?.success) {
-        throw new Error(booking?.message || "Booking failed");
+      if (!res?.success || !res?.data?.bookingId) {
+        throw new Error(res?.errorMessage || res?.message || "Booking failed");
       }
+      const bookingData = res.data;
 
       // Close billing modal
       setBillingModalOpen(false);
@@ -472,11 +472,12 @@ const EventDetailNew = () => {
             banner: event.flyerImage || event.coverImage || FALLBACK_IMAGE,
           },
           tickets: selectedTickets,
-          bookingData: booking.data,
+          bookingData,
         },
       });
     } catch (err) {
       toast.error(err?.message || "Unable to create booking. Please try again.");
+    } finally {
       setBookingLoading(false);
     }
   };

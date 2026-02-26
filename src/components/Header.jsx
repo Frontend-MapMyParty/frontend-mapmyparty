@@ -37,7 +37,7 @@ const Header = ({
 
   const normalizedRole = typeof resolvedUserRole === "string" ? resolvedUserRole.toLowerCase() : null;
   const isOrganizer = normalizedRole === "organizer";
-  const isPromoter = normalizedRole === "promoter";
+  const isPromoter = normalizedRole === "promoter" || normalizedRole === "admin";
   const isAttendee = !isOrganizer && !isPromoter;
 
   const handleProfileNav = () => {
@@ -56,10 +56,10 @@ const Header = ({
     navigate("/auth");
   };
 
-  const handleLogout = async () => {
-    await contextLogout();
+  const handleLogout = () => {
+    contextLogout();
     if (onLogout) onLogout();
-    navigate("/");
+    navigate("/", { replace: true });
   };
 
   const isDashboard = location.pathname.startsWith('/dashboard') || 

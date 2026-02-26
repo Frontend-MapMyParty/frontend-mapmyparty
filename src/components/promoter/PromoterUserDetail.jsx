@@ -9,59 +9,88 @@ import {
   Users,
   Wallet2,
   Ticket,
-  ShieldCheck,
-  Clock,
-  CheckCircle,
-  XCircle,
+  Loader,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { usePromoterUserDetail } from "@/hooks/usePromoterUserDetail";
+
+const statusVariant = (status) => {
+  if (status === "CONFIRMED") return "success";
+  if (status === "PENDING") return "secondary";
+  if (status === "CANCELLED" || status === "REFUNDED") return "destructive";
+  return "outline";
+};
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return String(value);
+  return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
 
 const PromoterUserDetail = () => {
   const { id } = useParams();
-  const { data, currency, statusBadge } = useOutletContext();
+  const { currency } = useOutletContext();
+  const { user, bookings, pagination, loading, isFetching, error, changePage } = usePromoterUserDetail(id);
 
-  const user = useMemo(() => {
-    const dummyUsers = data.users || [];
-    const bookings = Array.isArray(data.bookings) ? data.bookings : [];
-    const userMap = {};
-    dummyUsers.forEach((u) => {
-      userMap[u.email] = {
-        id: u.email,
-        name: u.name,
-        email: u.email,
-        phone: "+91 XXXXX XXXXX",
-        joinedDate: "Jan 2024",
-        city: u.state || "Unknown",
-        status: "active",
-        totalTickets: u.bookings || 0,
-        totalSpent: u.bookings * 850 || 0,
-        bookings: [],
-      };
-    });
+  const events = useMemo(() => {
+    const eventMap = new Map();
     bookings.forEach((booking) => {
-      const uid = booking.userId || booking.userEmail;
-      if (!userMap[uid]) {
-        userMap[uid] = {
-          id: uid,
-          name: booking.userName || "Unknown",
-          email: booking.userEmail,
-          phone: booking.userPhone,
-          joinedDate: booking.createdAt,
-          city: booking.userCity || "Unknown",
-          status: booking.userStatus || "active",
-          totalTickets: 0,
-          totalSpent: 0,
-          bookings: [],
-        };
-      }
-      userMap[uid].totalTickets += booking.tickets || 1;
-      userMap[uid].totalSpent += booking.amount || booking.totalAmount || 0;
-      userMap[uid].bookings.push(booking);
+      if (!booking.eventId) return;
+
+      const existing = eventMap.get(booking.eventId) || {
+        id: booking.eventId,
+        title: booking.eventTitle,
+        date: booking.eventDate,
+        city: booking.eventCity,
+        organizer: booking.eventOrganizer,
+        tickets: 0,
+        spent: 0,
+      };
+
+      existing.tickets += booking.tickets || 0;
+      existing.spent += booking.totalAmount || 0;
+      eventMap.set(booking.eventId, existing);
     });
-    return userMap[id];
-  }, [data.users, data.bookings, id]);
+    return Array.from(eventMap.values());
+  }, [bookings]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Link to="/promoter/users" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back to users
+        </Link>
+        <Card className="bg-destructive/10 border-destructive/30">
+          <CardContent className="pt-6 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-destructive">Error loading user details</p>
+              <p className="text-sm text-destructive/80">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -80,31 +109,18 @@ const PromoterUserDetail = () => {
   }
 
   const avgTicketPrice = user.totalTickets ? Math.round(user.totalSpent / user.totalTickets) : 0;
-  const eventsMap = {};
-  user.bookings.forEach((b) => {
-    if (!eventsMap[b.eventId]) {
-      eventsMap[b.eventId] = {
-        id: b.eventId,
-        title: b.eventTitle,
-        date: b.eventDate,
-        city: b.eventCity,
-        organizer: b.eventOrganizer,
-        tickets: 0,
-        spent: 0,
-        items: [],
-      };
-    }
-    eventsMap[b.eventId].tickets += b.tickets || 1;
-    eventsMap[b.eventId].spent += b.amount || b.totalAmount || 0;
-    eventsMap[b.eventId].items.push(b);
-  });
-  const events = Object.values(eventsMap);
 
   return (
     <div className="space-y-6">
       <Link to="/promoter/users" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
         <ArrowLeft className="w-4 h-4" /> Back to users
       </Link>
+
+      {isFetching && (
+        <div className="h-0.5 w-full bg-muted overflow-hidden rounded-full">
+          <div className="h-full w-1/3 bg-primary rounded-full animate-pulse" />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -115,8 +131,8 @@ const PromoterUserDetail = () => {
                   <CardTitle className="text-2xl">{user.name}</CardTitle>
                   <CardDescription className="text-muted-foreground flex items-center gap-2">
                     <Badge variant={user.status === "active" ? "success" : "secondary"}>{user.status}</Badge>
-                    <span className="text-muted-foreground/60">•</span>
-                    Joined {user.joinedDate}
+                    <span className="text-muted-foreground/60">|</span>
+                    Joined {formatDate(user.joinedAt)}
                   </CardDescription>
                 </div>
                 <div className="rounded-xl border border-border/60 bg-card/80 px-4 py-2">
@@ -131,13 +147,10 @@ const PromoterUserDetail = () => {
                   <Mail className="w-4 h-4" /> {user.email}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="w-4 h-4" /> {user.phone}
+                  <Phone className="w-4 h-4" /> {user.phone || "-"}
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="w-4 h-4" /> {user.city}
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="w-4 h-4" /> Joined {user.joinedDate}
+                  <Calendar className="w-4 h-4" /> Joined {formatDate(user.joinedAt)}
                 </div>
               </div>
             </CardContent>
@@ -176,7 +189,7 @@ const PromoterUserDetail = () => {
                 <p className="text-xs text-muted-foreground flex items-center gap-2">
                   <Users className="w-4 h-4" /> Events
                 </p>
-                <p className="text-2xl font-semibold">{events.length}</p>
+                <p className="text-2xl font-semibold">{user.eventsAttended || 0}</p>
                 <p className="text-xs text-muted-foreground">Attended</p>
               </CardContent>
             </Card>
@@ -184,51 +197,69 @@ const PromoterUserDetail = () => {
 
           <Card className="bg-card/70 border-border/60">
             <CardHeader>
-              <CardTitle>Events & Bookings</CardTitle>
+              <CardTitle>Recent Bookings</CardTitle>
               <CardDescription className="text-muted-foreground">
-                All events this user has booked tickets for.
+                Booking history for this attendee.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {events.map((event) => (
+              {bookings.length === 0 && (
+                <p className="text-sm text-muted-foreground">No bookings found for this user.</p>
+              )}
+
+              {bookings.map((booking) => (
                 <div
-                  key={event.id}
+                  key={booking.id}
                   className="rounded-xl border border-border/60 bg-card/80 p-4"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-semibold">{event.title}</p>
+                      <p className="font-semibold">{booking.eventTitle}</p>
                       <p className="text-sm text-muted-foreground flex flex-wrap items-center gap-2">
-                        <Users className="w-3 h-3" /> {event.organizer}
-                        <span className="text-muted-foreground/60">•</span>
-                        <Calendar className="w-3 h-3" /> {event.date}
-                        <span className="text-muted-foreground/60">•</span>
-                        <MapPin className="w-3 h-3" /> {event.city}
+                        <Calendar className="w-3 h-3" /> {formatDate(booking.eventDate)}
+                        <span className="text-muted-foreground/60">|</span>
+                        <MapPin className="w-3 h-3" /> {booking.eventCity || "-"}
+                        <span className="text-muted-foreground/60">|</span>
+                        <Users className="w-3 h-3" /> {booking.eventOrganizer}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total spent</p>
-                      <p className="font-semibold text-accent">{currency(event.spent)}</p>
+                      <p className="font-semibold text-accent">{currency(booking.totalAmount)}</p>
+                      <Badge variant={statusVariant(booking.status)} className="text-xs">
+                        {booking.status}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Tickets booked</span>
-                      <span className="font-semibold">{event.tickets}</span>
-                    </div>
-                    <div className="space-y-1">
-                      {event.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs text-muted-foreground pl-2 border-l border-border/60">
-                          <span>
-                            {item.tickets || 1} × {item.ticketName || "Ticket"}
-                          </span>
-                          <span>{currency(item.amount || item.totalAmount || 0)}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Tickets</span>
+                    <span className="font-semibold">{booking.tickets}</span>
                   </div>
                 </div>
               ))}
+
+              {pagination.totalPages > 1 && (
+                <div className="flex justify-center pt-2">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => changePage(pagination.page - 1)}
+                          className={!pagination.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationLink isActive>{pagination.page}</PaginationLink>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => changePage(pagination.page + 1)}
+                          className={!pagination.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -237,7 +268,7 @@ const PromoterUserDetail = () => {
           <Card className="bg-card/70 border-border/60">
             <CardHeader>
               <CardTitle>Account</CardTitle>
-              <CardDescription className="text-muted-foreground">User profile and verification.</CardDescription>
+              <CardDescription className="text-muted-foreground">User profile and account summary.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="rounded-xl border border-border/60 bg-card/80 p-3">
@@ -246,11 +277,11 @@ const PromoterUserDetail = () => {
               </div>
               <div className="rounded-xl border border-border/60 bg-card/80 p-3">
                 <p className="text-xs text-muted-foreground">Joined</p>
-                <p className="font-semibold">{user.joinedDate}</p>
+                <p className="font-semibold">{formatDate(user.joinedAt)}</p>
               </div>
               <div className="rounded-xl border border-border/60 bg-card/80 p-3">
-                <p className="text-xs text-muted-foreground">City</p>
-                <p className="font-semibold">{user.city}</p>
+                <p className="text-xs text-muted-foreground">Last booking</p>
+                <p className="font-semibold">{formatDate(user.lastBookingAt)}</p>
               </div>
             </CardContent>
           </Card>
@@ -263,7 +294,7 @@ const PromoterUserDetail = () => {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total bookings</span>
-                <span className="font-semibold">{user.bookings.length}</span>
+                <span className="font-semibold">{user.totalBookings}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total tickets</span>
@@ -279,31 +310,8 @@ const PromoterUserDetail = () => {
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Events attended</span>
-                <span className="font-semibold">{events.length}</span>
+                <span className="font-semibold">{user.eventsAttended || 0}</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/70 border-border/60">
-            <CardHeader>
-              <CardTitle>Payment History</CardTitle>
-              <CardDescription className="text-muted-foreground">Recent booking transactions.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {user.bookings.slice(0, 4).map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{booking.eventTitle}</p>
-                    <p className="text-xs text-muted-foreground">{booking.createdAt}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{currency(booking.amount || booking.totalAmount || 0)}</p>
-                    <Badge variant={booking.status === "PAID" ? "success" : "secondary"} className="text-xs">
-                      {booking.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>

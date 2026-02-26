@@ -3,10 +3,9 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buildUrl } from "@/config/api";
-import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import Logo from "@/assets/MMP logo.svg";
 import { usePromoterDashboard } from "@/hooks/usePromoterDashboard";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   Users,
@@ -51,6 +50,7 @@ const PromoterDashboard = () => {
   const footerMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout: contextLogout } = useAuth();
 
   // Fetch real dashboard data
   const { dashboard, loading: dashboardLoading } = usePromoterDashboard();
@@ -553,21 +553,11 @@ const PromoterDashboard = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    try {
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      console.warn("Logout API call failed:", err);
-    }
-
-    clearSessionData();
-    resetSessionCache();
-    navigate("/");
+    contextLogout();
+    navigate("/", { replace: true });
     setIsLoggingOut(false);
   };
 

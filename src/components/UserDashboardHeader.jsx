@@ -10,6 +10,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import logo from "@/assets/MMP logo.svg";
+import { useAuth } from "@/contexts/AuthContext";
 
 const getInitials = (name, email) => {
   if (name) {
@@ -29,6 +30,7 @@ const UserDashboardHeader = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const navigate = useNavigate();
+  const { logout: contextLogout } = useAuth();
 
   // Get user info from sessionStorage
   const userInfo = useMemo(() => {
@@ -37,26 +39,9 @@ const UserDashboardHeader = () => {
     return { name, email };
   }, []);
 
-  const handleLogout = async () => {
-    // Call logout API to clear cookies on backend (if available)
-    try {
-      const { buildUrl } = await import("@/config/api");
-      await fetch(buildUrl("auth/logout"), {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      // Continue even if logout API fails
-      console.warn("Logout API call failed:", err);
-    }
-    
-    // Clear all session data using centralized function
-    const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
-    clearSessionData();
-    resetSessionCache();
-    
-    // Redirect to home
-    navigate("/");
+  const handleLogout = () => {
+    contextLogout();
+    navigate("/", { replace: true });
   };
 
   const handleSearchSubmit = (e) => {

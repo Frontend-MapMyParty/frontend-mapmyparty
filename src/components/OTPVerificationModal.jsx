@@ -23,6 +23,14 @@ const OTPVerificationModal = ({
   email,
   onVerificationSuccess,
   expiryMinutes = 10,
+  title = "Verify Your Email",
+  descriptionPrefix = "We've sent a 6-digit verification code to",
+  verifyEndpoint = "auth/verify-signup-otp",
+  resendEndpoint = "auth/resend-signup-otp",
+  verifyPayload = {},
+  successMessage = "Email verified successfully!",
+  submitLabel = "Verify Email",
+  verifyingLabel = "Verifying...",
 }) => {
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
@@ -93,12 +101,12 @@ const OTPVerificationModal = ({
     setError("");
 
     try {
-      const response = await apiFetch("auth/verify-signup-otp", {
+      const response = await apiFetch(verifyEndpoint, {
         method: "POST",
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify({ email, otp, ...verifyPayload }),
       });
 
-      toast.success("Email verified successfully!");
+      toast.success(successMessage);
       onVerificationSuccess(response);
     } catch (err) {
       const errorMessage = err?.message || "Verification failed. Please try again.";
@@ -113,7 +121,7 @@ const OTPVerificationModal = ({
     } finally {
       setIsVerifying(false);
     }
-  }, [otp, email, onVerificationSuccess]);
+  }, [otp, email, onVerificationSuccess, successMessage, verifyEndpoint, verifyPayload]);
 
   const handleResend = async () => {
     if (resendCooldown > 0) return;
@@ -122,7 +130,7 @@ const OTPVerificationModal = ({
     setError("");
 
     try {
-      const response = await apiFetch("auth/resend-signup-otp", {
+      await apiFetch(resendEndpoint, {
         method: "POST",
         body: JSON.stringify({ email }),
       });
@@ -163,9 +171,9 @@ const OTPVerificationModal = ({
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <Mail className="w-8 h-8 text-primary" />
           </div>
-          <DialogTitle className="text-2xl font-bold">Verify Your Email</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">{title}</DialogTitle>
           <DialogDescription className="text-base">
-            We've sent a 6-digit verification code to
+            {descriptionPrefix}
             <span className="block font-semibold text-foreground mt-1">{email}</span>
           </DialogDescription>
         </DialogHeader>
@@ -229,12 +237,12 @@ const OTPVerificationModal = ({
               {isVerifying ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Verifying...
+                  {verifyingLabel}
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-5 w-5" />
-                  Verify Email
+                  {submitLabel}
                 </>
               )}
             </Button>

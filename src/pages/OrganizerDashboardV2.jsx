@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { clearSessionData, resetSessionCache } from "@/utils/auth";
 import { useAuth } from "@/contexts/AuthContext";
-import { buildUrl, apiFetch } from "@/config/api";
+import { apiFetch } from "@/config/api";
 import {
   Calendar,
   X,
@@ -1248,11 +1247,11 @@ const OrganizerDashboardV2 = () => {
     email: authUser?.email || "",
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    await contextLogout();
-    navigate("/");
+    contextLogout();
+    navigate("/", { replace: true });
     setIsLoggingOut(false);
   };
 

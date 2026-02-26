@@ -1,4 +1,4 @@
- import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { apiFetch, buildUrl } from "@/config/api";
 import { resetSessionCache, fetchSession } from "@/utils/auth";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDashboardPathForRole } from "@/utils/roleRedirect";
 import OTPVerificationModal from "@/components/OTPVerificationModal";
 import Logo from "../assets/android-chrome-192x192.png";
 
@@ -18,12 +19,15 @@ const Auth = () => {
   const { login: contextLogin } = useAuth();
   const [userType, setUserType] = useState(null);
   const [isLogin, setIsLogin] = useState(true);
+  const [loginMethod, setLoginMethod] = useState("password");
   const [isLoading, setIsLoading] = useState(false);
 
   // OTP verification state
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpEmail, setOtpEmail] = useState("");
+  const [otpFlow, setOtpFlow] = useState("signup");
   const [pendingSignupType, setPendingSignupType] = useState(null);
+  const [pendingLoginType, setPendingLoginType] = useState(null);
 
   // Password visibility states
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -39,6 +43,27 @@ const Auth = () => {
       const role = roleMap[type] || "USER";
 
       if (mode === "login") {
+        if (loginMethod === "otp") {
+          const email = form.querySelector("#otp-email")?.value?.trim();
+          if (!email) {
+            toast.error("Please enter your registered email");
+            return;
+          }
+
+          setIsLoading(true);
+          await apiFetch("auth/send-login-otp", {
+            method: "POST",
+            body: JSON.stringify({ email, role }),
+          });
+
+          setOtpEmail(email);
+          setPendingLoginType(type);
+          setOtpFlow("login");
+          setShowOtpModal(true);
+          toast.success("Verification code sent to your email!");
+          return;
+        }
+
         const email = form.querySelector("#email")?.value?.trim();
         const password = form.querySelector("#password")?.value;
         if (!email || !password) {
@@ -68,10 +93,7 @@ const Auth = () => {
         toast.success("Logged in successfully!");
 
         // Navigate after session is established
-        const dashboardPath =
-          type === "organizer"
-            ? "/organizer/dashboard-v2"
-            : "/dashboard";
+        const dashboardPath = getDashboardPathForRole(session.user?.role || (type === "organizer" ? "ORGANIZER" : "USER"));
 
         navigate(dashboardPath, { replace: true });
         return;
@@ -112,6 +134,7 @@ const Auth = () => {
         // Store pending signup info and show OTP modal
         setOtpEmail(email);
         setPendingSignupType(type);
+        setOtpFlow("signup");
         setShowOtpModal(true);
         setIsLoading(false);
 
@@ -133,12 +156,13 @@ const Auth = () => {
   };
 
   // Handle OTP verification success
-  const handleOtpVerificationSuccess = async () => {
+  const handleSignupOtpVerificationSuccess = async () => {
     const signupType = pendingSignupType;
 
     // Close OTP modal
     setShowOtpModal(false);
     setOtpEmail("");
+    setOtpFlow("signup");
     setPendingSignupType(null);
 
     // Reset cache and fetch fresh session from backend
@@ -158,19 +182,54 @@ const Auth = () => {
     toast.success("Account created successfully!");
 
     // Navigate to dashboard
-    const dashboardPath =
-      signupType === "organizer"
-        ? "/organizer/dashboard-v2"
-        : "/dashboard";
+    const dashboardPath = getDashboardPathForRole(signupType === "organizer" ? "ORGANIZER" : "USER");
 
+    navigate(dashboardPath, { replace: true });
+  };
+
+  const handleLoginOtpVerificationSuccess = async () => {
+    const loginType = pendingLoginType;
+
+    setShowOtpModal(false);
+    setOtpEmail("");
+    setPendingLoginType(null);
+    setOtpFlow("signup");
+
+    resetSessionCache();
+    const session = await fetchSession(true);
+
+    if (!session?.isAuthenticated) {
+      toast.error("Login succeeded but session validation failed. Please try again.");
+      return;
+    }
+
+    contextLogin(session);
+    toast.success("Logged in successfully!");
+
+    const dashboardPath = getDashboardPathForRole(
+      session.user?.role || (loginType === "organizer" ? "ORGANIZER" : "USER")
+    );
     navigate(dashboardPath, { replace: true });
   };
 
   // Handle OTP modal close
   const handleOtpModalClose = () => {
     setShowOtpModal(false);
-    // Don't clear email so user can retry if they close accidentally
+    setOtpFlow("signup");
   };
+
+  const isLoginOtpFlow = otpFlow === "login";
+  const otpVerifyEndpoint = isLoginOtpFlow ? "auth/verify-login-otp" : "auth/verify-signup-otp";
+  const otpResendEndpoint = isLoginOtpFlow ? "auth/resend-login-otp" : "auth/resend-signup-otp";
+  const otpModalTitle = isLoginOtpFlow ? "Verify Login OTP" : "Verify Your Email";
+  const otpModalDescription = isLoginOtpFlow
+    ? "We've sent a 6-digit login code to"
+    : "We've sent a 6-digit verification code to";
+  const otpSubmitLabel = isLoginOtpFlow ? "Verify & Login" : "Verify Email";
+  const otpSuccessMessage = isLoginOtpFlow ? "OTP verified. Signing you in..." : "Email verified successfully!";
+  const handleOtpVerificationSuccess = isLoginOtpFlow
+    ? handleLoginOtpVerificationSuccess
+    : handleSignupOtpVerificationSuccess;
 
   if (!userType) {
     return (
@@ -288,46 +347,84 @@ const Auth = () => {
                 </TabsList>
 
                 <TabsContent value="login" className="space-y-4 mt-0">
-                  <form onSubmit={(e) => handleSubmit(e, userType)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-gray-300 text-sm font-medium">Email</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="Enter your email" 
-                        required 
-                        className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 h-10 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="text-gray-300 text-sm font-medium">Password</Label>
-                      <div className="relative">
-                        <Input 
-                          id="password" 
-                          type={showLoginPassword ? "text" : "password"} 
-                          placeholder="Enter your password" 
-                          required 
-                          className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 pr-10 h-10 text-sm"
-                        />
+                  <Tabs value={loginMethod} onValueChange={setLoginMethod} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 mb-5 bg-gray-800 p-1 rounded-lg h-10">
+                      <TabsTrigger value="password" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white text-gray-400 text-sm font-medium rounded-md">
+                        Password
+                      </TabsTrigger>
+                      <TabsTrigger value="otp" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white text-gray-400 text-sm font-medium rounded-md">
+                        Email OTP
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="password" className="space-y-4 mt-0">
+                      <form onSubmit={(e) => handleSubmit(e, userType)} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="email" className="text-gray-300 text-sm font-medium">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="Enter your email"
+                            required
+                            className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 h-10 text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="password" className="text-gray-300 text-sm font-medium">Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="password"
+                              type={showLoginPassword ? "text" : "password"}
+                              placeholder="Enter your password"
+                              required
+                              className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 pr-10 h-10 text-sm"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-gray-300"
+                              onClick={() => setShowLoginPassword(!showLoginPassword)}
+                            >
+                              {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
                         <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-gray-300"
-                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          type="submit"
+                          className="w-full bg-red-600 hover:bg-red-700 text-white h-10 text-sm font-medium mt-1"
+                          disabled={isLoading}
                         >
-                          {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing In...</> : "Sign In"}
                         </Button>
-                      </div>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-red-600 hover:bg-red-700 text-white h-10 text-sm font-medium mt-1" 
-                      disabled={isLoading}
-                    >
-                      {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing In...</> : "Sign In"}
-                    </Button>
-                  </form>
+                      </form>
+                    </TabsContent>
+
+                    <TabsContent value="otp" className="space-y-4 mt-0">
+                      <form onSubmit={(e) => handleSubmit(e, userType)} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="otp-email" className="text-gray-300 text-sm font-medium">Registered Email</Label>
+                          <Input
+                            id="otp-email"
+                            type="email"
+                            placeholder="Enter your registered email"
+                            required
+                            className="border-gray-700 bg-gray-800 text-white placeholder:text-gray-500 focus:border-red-500 h-10 text-sm"
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full bg-red-600 hover:bg-red-700 text-white h-10 text-sm font-medium mt-1"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending Code...</> : "Send OTP"}
+                        </Button>
+                      </form>
+                      <p className="text-xs text-gray-500 text-center">
+                        We'll send a 6-digit OTP to your email for secure sign in.
+                      </p>
+                    </TabsContent>
+                  </Tabs>
                   
                   {/* Google Login Button - Only for Attendee */}
                   {userType === "user" && (
@@ -460,6 +557,12 @@ const Auth = () => {
           email={otpEmail}
           onVerificationSuccess={handleOtpVerificationSuccess}
           expiryMinutes={10}
+          title={otpModalTitle}
+          descriptionPrefix={otpModalDescription}
+          verifyEndpoint={otpVerifyEndpoint}
+          resendEndpoint={otpResendEndpoint}
+          submitLabel={otpSubmitLabel}
+          successMessage={otpSuccessMessage}
         />
       </div>
     </div>

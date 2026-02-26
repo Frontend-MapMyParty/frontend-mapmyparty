@@ -168,18 +168,16 @@ export function AuthProvider({ children }) {
     return session;
   }, [emitCrossTabEvent]);
 
-  const logout = useCallback(async () => {
-    try {
-      await apiFetch("auth/logout", {
-        method: "POST",
-      });
-    } catch {
-      // Continue even if logout API fails
-    }
-
+  const logout = useCallback(() => {
     clearSessionData();
     setUser(null);
     emitCrossTabEvent("logout");
+
+    return apiFetch("auth/logout", {
+      method: "POST",
+    }).catch(() => {
+      // Continue even if logout API fails
+    });
   }, [emitCrossTabEvent]);
 
   const refreshAuth = useCallback(async () => {

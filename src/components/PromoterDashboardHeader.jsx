@@ -22,9 +22,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 import logoSvg from '@/assets/MMP logo.svg';
+import { useAuth } from "@/contexts/AuthContext";
 
 const getInitials = (name, email) => {
     if (name) {
@@ -61,32 +61,15 @@ const PromoterDashboardHeader = ({ isHeaderVisible = true }) => {
     const navigate = useNavigate();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const userInfo = useMemo(() => getStoredUserInfo(), []);
+    const { logout: contextLogout } = useAuth();
 
-    const handleLogout = async () => {
+    const handleLogout = () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
-        try {
-            await apiFetch("auth/logout", { method: "POST" });
-            toast.success("Logged out");
-        } catch (err) {
-            if (err?.status === 401) {
-                console.warn("Logout 401: session already invalid/expired");
-                toast("Session expired, logging out");
-            } else {
-                console.warn("Logout API call failed:", err);
-                toast.error(err?.message || "Logout failed, clearing session");
-            }
-        } finally {
-            try {
-                const { clearSessionData, resetSessionCache } = await import("@/utils/auth");
-                clearSessionData();
-                resetSessionCache();
-            } catch (e) {
-                console.warn("Failed to clear session cache", e);
-            }
-            setIsLoggingOut(false);
-            navigate("/");
-        }
+        contextLogout();
+        toast.success("Logged out");
+        setIsLoggingOut(false);
+        navigate("/", { replace: true });
     };
 
     const navItems = [
