@@ -400,12 +400,16 @@ const EventDetailNew = () => {
         setSessionUser(session.user || null);
         return true;
       }
+      setIsSessionAuthed(false);
+      setSessionUser(null);
     } catch (err) {
       console.warn("Auth check failed, using cached flag", err);
       if (isAuthedSync()) {
         setIsSessionAuthed(true);
         return true;
       }
+      setIsSessionAuthed(false);
+      setSessionUser(null);
     } finally {
       setAuthLoading(false);
     }
@@ -418,16 +422,16 @@ const EventDetailNew = () => {
       return;
     }
 
-    // Check if user is authenticated
-    if (!isSessionAuthed) {
+    // Always verify session before deciding auth UI.
+    // This prevents false login prompts when local auth cache is stale.
+    const hasValidSession = await ensureSession();
+    if (!hasValidSession) {
       setAuthModalOpen(true);
       return;
     }
 
-    // Ensure we have fresh session data
-    await ensureSession();
-
     // Show billing modal to collect address details
+    setAuthModalOpen(false);
     setBillingModalOpen(true);
   };
 

@@ -16,6 +16,55 @@ import {
 import { apiFetch } from "@/config/api";
 import { toast } from "sonner";
 
+const normalizeBookingData = (raw) => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  // New API shape from /api/booking/:id => { booking, event, user, tickets }
+  if (raw.booking && raw.event) {
+    const normalizedTickets = Array.isArray(raw.tickets)
+      ? raw.tickets.map((ticket) => ({
+          id: ticket.id,
+          quantity: ticket.quantity || 0,
+          subtotal: ticket.subtotal || 0,
+          ticket: {
+            name: ticket.name || "Ticket",
+          },
+        }))
+      : [];
+
+    return {
+      id: raw.booking.id,
+      totalAmount: raw.booking.totalAmount || 0,
+      platformFeeTotal: raw.booking.platformFeeTotal || 0,
+      gstTotal: raw.booking.gstTotal || 0,
+      gstType: raw.booking.gstType || "IGST",
+      createdAt: raw.booking.createdAt || null,
+      event: {
+        title: raw.event.name || "Event",
+        eventStartDate: raw.event.startDate || null,
+        eventStartTime: raw.event.startDate
+          ? new Date(raw.event.startDate).toLocaleTimeString("en-IN", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            })
+          : null,
+        venue:
+          raw.event.venue?.name ||
+          [raw.event.venue?.city, raw.event.venue?.state].filter(Boolean).join(", ") ||
+          "Venue TBA",
+        city: raw.event.venue?.city || null,
+      },
+      booking_items: normalizedTickets,
+    };
+  }
+
+  // Legacy shape fallback
+  return raw;
+};
+
 const BookingSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -33,7 +82,11 @@ const BookingSuccess = () => {
       try {
         const response = await apiFetch(`/api/booking/${bookingId}`);
         if (response?.success && response?.data) {
-          setBooking(response.data);
+          const normalized = normalizeBookingData(response.data);
+          if (!normalized?.id) {
+            throw new Error("Unexpected booking response format");
+          }
+          setBooking(normalized);
         } else {
           toast.error("Failed to fetch booking details");
           navigate("/dashboard");
