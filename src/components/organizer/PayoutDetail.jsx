@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 const statusColors = {
+  AUTO_APPROVED: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   REVIEW_REQUIRED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   APPROVED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -96,7 +97,17 @@ const PayoutDetail = ({ payoutId, onBack }) => {
     );
   }
 
-  const { payout, bankDetails, organizer, event, summary, eventBreakdowns } = data;
+  const {
+    payout,
+    bankDetails,
+    organizer,
+    event,
+    summary,
+    eventBreakdowns,
+    revisions = [],
+    transferAttempts = [],
+    timeline = [],
+  } = data;
   const payoutAmount = getPayoutAmount(payout, summary);
 
   return (
@@ -160,6 +171,11 @@ const PayoutDetail = ({ payoutId, onBack }) => {
           {payout.blockedReason && (
             <p className="mt-2 text-xs text-yellow-400">{payout.blockedReason}</p>
           )}
+          <div className="mt-3 space-y-1 text-xs text-white/55">
+            <p>Expected eligibility: {payout.eligibleAt || payout.holdUntil ? new Date(payout.eligibleAt || payout.holdUntil).toLocaleString("en-IN") : "Not scheduled"}</p>
+            <p>Transfer attempts: {payout.automaticAttemptCount || 0}/{payout.maxAutomaticAttempts || 3}</p>
+            {payout.providerUtr && <p>UTR: {payout.providerUtr}</p>}
+          </div>
         </div>
 
         {/* Event Info */}
@@ -189,7 +205,7 @@ const PayoutDetail = ({ payoutId, onBack }) => {
               <p className="text-white/60">{bankDetails.bankName}</p>
               <p className="text-white/40 text-xs">Branch: {bankDetails.branchName}</p>
               <p className="text-white/40 text-xs">
-                A/C: ****{bankDetails.accountNumber?.slice(-4)}
+                A/C: {bankDetails.accountNumberMasked || (bankDetails.accountNumberLast4 ? `****${bankDetails.accountNumberLast4}` : "Not available")}
               </p>
               <p className="text-white/40 text-xs">IFSC: {bankDetails.ifscCode}</p>
             </div>
@@ -340,6 +356,72 @@ const PayoutDetail = ({ payoutId, onBack }) => {
             <p>No breakdown data available for this payout.</p>
           </div>
         )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-[#1a1a1a] p-5">
+          <h3 className="font-semibold text-white">Payout changes</h3>
+          <p className="mt-1 text-xs text-white/40">Audited corrections made before disbursement.</p>
+          <div className="mt-4 space-y-3">
+            {revisions.length === 0 ? (
+              <p className="text-sm text-white/50">No payout revisions were made.</p>
+            ) : revisions.map((revision) => (
+              <div key={revision.publicId || revision.revisionNumber} className="rounded-lg border border-white/10 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-white">Revision {revision.revisionNumber}</span>
+                  <Badge className={`${statusColors[revision.status] || "bg-white/10 text-white/60"} border`}>
+                    {formatStatus(revision.status)}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-white/60">{revision.reason}</p>
+                {(revision.adjustments || []).map((adjustment, index) => (
+                  <div key={adjustment.publicId || adjustment.id || index} className="mt-2 flex justify-between gap-3 text-xs">
+                    <span className="text-white/50">{formatStatus(adjustment.category)} - {adjustment.description}</span>
+                    <span className={adjustment.direction === "CREDIT" ? "text-green-400" : "text-yellow-400"}>
+                      {adjustment.direction === "CREDIT" ? "+" : "-"}Rs. {formatAmount(adjustment.amountCents / 100)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-xl border border-white/10 bg-[#1a1a1a] p-5">
+            <h3 className="font-semibold text-white">Transfer attempts</h3>
+            <div className="mt-4 space-y-3">
+              {transferAttempts.length === 0 ? (
+                <p className="text-sm text-white/50">No transfer attempt submitted yet.</p>
+              ) : transferAttempts.map((attempt) => (
+                <div key={attempt.attemptNumber} className="rounded-lg border border-white/10 p-3 text-sm">
+                  <div className="flex justify-between gap-3 text-white">
+                    <span>Attempt {attempt.attemptNumber}</span>
+                    <span>{formatStatus(attempt.status)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/40">
+                    {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString("en-IN") : "Not submitted"}
+                    {attempt.failureReason ? ` - ${attempt.failureReason}` : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-[#1a1a1a] p-5">
+            <h3 className="font-semibold text-white">Status history</h3>
+            <div className="mt-4 space-y-2">
+              {timeline.length === 0 ? (
+                <p className="text-sm text-white/50">No status history available.</p>
+              ) : timeline.map((entry) => (
+                <div key={entry.id} className="flex justify-between gap-4 border-b border-white/5 pb-2 text-sm last:border-0">
+                  <span className="text-white/70">{formatStatus(entry.fromStatus || "CREATED")} to {formatStatus(entry.toStatus)}</span>
+                  <span className="text-xs text-white/40">{new Date(entry.createdAt).toLocaleString("en-IN")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

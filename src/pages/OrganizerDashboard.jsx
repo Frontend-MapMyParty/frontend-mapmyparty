@@ -105,7 +105,8 @@ const OrganizerProfileContent = ({ user }) => {
     },
     bankDetails: {
       accountHolder: payload?.bankDetails?.accountHolder || "",
-      accountNumber: payload?.bankDetails?.accountNumber || "",
+      accountNumber: "",
+      accountNumberMasked: payload?.bankDetails?.accountNumberMasked || "",
       ifscCode: payload?.bankDetails?.ifscCode || "",
       bankName: payload?.bankDetails?.bankName || "",
       branchName: payload?.bankDetails?.branchName || "",
@@ -115,6 +116,8 @@ const OrganizerProfileContent = ({ user }) => {
       verificationMethod: payload?.bankDetails?.verificationMethod || "",
       verifiedAt: payload?.bankDetails?.verifiedAt || "",
       verificationFailureReason: payload?.bankDetails?.verificationFailureReason || "",
+      beneficiaryStatus: payload?.bankDetails?.beneficiaryStatus || "NOT_PROVISIONED",
+      payoutEnabled: Boolean(payload?.bankDetails?.payoutEnabled),
       lastVerificationRequestedAt: payload?.bankDetails?.lastVerificationRequestedAt || "",
       reviewNotes: payload?.bankDetails?.reviewNotes || "",
       createdAt: payload?.bankDetails?.createdAt || "",
@@ -369,10 +372,10 @@ const OrganizerProfileContent = ({ user }) => {
     try {
       const payload = {
         accountHolder: bankDraft.accountHolder,
-        accountNumber: bankDraft.accountNumber,
         ifscCode: bankDraft.ifscCode,
         bankName: bankDraft.bankName,
         branchName: bankDraft.branchName,
+        ...((!bankExists || bankDraft.accountNumber.trim()) ? { accountNumber: bankDraft.accountNumber.trim() } : {}),
       };
       const res = await apiFetch("organizer/me/bank-details", {
         method: bankExists ? "PATCH" : "POST",
@@ -380,7 +383,7 @@ const OrganizerProfileContent = ({ user }) => {
       });
       const data = res?.data || res || {};
       setBankExists(true);
-      mergeBankDetailsState(data);
+      mergeBankDetailsState({ ...data, accountNumber: "" });
       resetSessionCache();
       setIsBankEditing(false);
       setIsBankPanelOpen(false);
@@ -1355,12 +1358,19 @@ const OrganizerProfileContent = ({ user }) => {
                 </div>
               )}
 
-              {bankExists && bankDraft.verificationStatus === "VERIFIED" && (
+              {bankExists && bankDraft.verificationStatus === "VERIFIED" && bankDraft.payoutEnabled && (
                 <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 animate-in fade-in-0 slide-in-from-right-2 duration-300">
                   <p className="text-sm font-medium text-emerald-200">Bank account verified</p>
                   <p className="text-xs text-white/55 mt-0.5">
-                    {bankDraft.verifiedAt ? `Verified on ${formatDate(bankDraft.verifiedAt)}` : "Ready for payout operations"}
+                    {bankDraft.verifiedAt ? `Verified on ${formatDate(bankDraft.verifiedAt)} and ready for payout` : "Ready for payout operations"}
                   </p>
+                </div>
+              )}
+
+              {bankExists && bankDraft.verificationStatus === "VERIFIED" && !bankDraft.payoutEnabled && (
+                <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-200">Payout destination provisioning</p>
+                  <p className="text-xs text-white/55 mt-0.5">Cashfree beneficiary status: {bankDraft.beneficiaryStatus || "Pending"}</p>
                 </div>
               )}
 
@@ -1379,7 +1389,7 @@ const OrganizerProfileContent = ({ user }) => {
                 {bankExists && (
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-semibold text-white">Account</h4>
-                    <span className="text-xs text-white/60">Txn: {bankDraft.verificationTxnId}</span>
+                    <span className="text-xs text-white/60">{bankDraft.accountNumberMasked || "New account"}</span>
                   </div>
                 )}
                 <div className="grid grid-cols-1 gap-3">
@@ -1395,12 +1405,15 @@ const OrganizerProfileContent = ({ user }) => {
                       {isBankEditing ? (
                         <input
                           type="text"
-                          value={bankDraft[field.key]}
+                          value={bankDraft[field.key] || ""}
+                          placeholder={field.key === "accountNumber" && bankExists ? "Enter a new account number only to replace it" : ""}
                           onChange={(e) => handleBankFieldChange(field.key, e.target.value)}
                           className="mt-1 w-full px-4 py-2 rounded-lg bg-background/60 border border-border/60 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/50 focus:outline-none"
                         />
                       ) : (
-                        <p className="text-base font-semibold text-white mt-1">{bankDraft[field.key]}</p>
+                        <p className="text-base font-semibold text-white mt-1">
+                          {field.key === "accountNumber" ? bankDraft.accountNumberMasked : bankDraft[field.key]}
+                        </p>
                       )}
                     </div>
                   ))}

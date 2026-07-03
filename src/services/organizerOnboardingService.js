@@ -10,9 +10,10 @@ let pendingUserId = null;
 
 const hasBankDetailsData = (bankDetails) =>
   Boolean(
-    bankDetails?.id ||
+      bankDetails?.id ||
       bankDetails?.accountHolder ||
-      bankDetails?.accountNumber ||
+      bankDetails?.accountNumberMasked ||
+      bankDetails?.accountNumberLast4 ||
       bankDetails?.ifscCode ||
       bankDetails?.bankName ||
       bankDetails?.branchName

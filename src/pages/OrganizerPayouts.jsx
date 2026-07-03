@@ -13,6 +13,7 @@ import {
 import PayoutDetail from "@/components/organizer/PayoutDetail";
 
 const statusColors = {
+  AUTO_APPROVED: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   REVIEW_REQUIRED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   APPROVED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -252,7 +253,7 @@ const OrganizerPayouts = () => {
                         <div>
                           <div>{payout.bank_details.bankName}</div>
                           <div className="text-xs text-white/40">
-                            ****{payout.bank_details.accountNumber?.slice(-4)}
+                            {payout.bank_details.accountNumberMasked || (payout.bank_details.accountNumberLast4 ? `****${payout.bank_details.accountNumberLast4}` : "Not available")}
                           </div>
                         </div>
                       ) : (

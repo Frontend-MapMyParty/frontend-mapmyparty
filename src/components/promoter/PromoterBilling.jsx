@@ -182,7 +182,7 @@ const PromoterBilling = () => {
                     </div>
                     <div className="rounded-xl border border-border/60 bg-card/80 p-3">
                       <p className="text-xs text-muted-foreground">Account number</p>
-                      <p className="font-semibold">{bank.accountNumber}</p>
+                      <p className="font-semibold">{bank.accountNumberMasked || "Not available"}</p>
                     </div>
                     <div className="rounded-xl border border-border/60 bg-card/80 p-3">
                       <p className="text-xs text-muted-foreground">IFSC</p>

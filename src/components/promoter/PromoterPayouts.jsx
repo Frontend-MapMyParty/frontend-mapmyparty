@@ -33,21 +33,25 @@ import {
 import { toast } from "sonner";
 import { useAdminPayouts } from "@/hooks/useAdminPayouts";
 import {
+  approvePayoutRevision,
   approveEventPayout,
   calculateEventPayout,
   cancelAdminBalanceAdjustment,
   createAdminOrganizerBalanceAdjustment,
   createEventPayout,
+  createPayoutRevision,
+  disbursePayout,
   fetchAdminOrganizerBalanceAdjustments,
   fetchAdminEvents,
   fetchAdminPayoutDetail,
   holdEventPayout,
-  updateAdminPayoutStatus,
+  resolvePayout,
 } from "@/services/adminService";
 
 const payoutStatusOptions = [
   "ALL",
   "REVIEW_REQUIRED",
+  "AUTO_APPROVED",
   "APPROVED",
   "PROCESSING",
   "COMPLETED",
@@ -58,9 +62,7 @@ const payoutStatusOptions = [
   "PENDING",
 ];
 
-const updateStatusOptions = payoutStatusOptions.filter((status) => status !== "ALL");
-
-const reviewableStatuses = new Set(["REVIEW_REQUIRED", "PENDING", "APPROVED", "FAILED", "RETRY_PENDING"]);
+const reviewableStatuses = new Set(["REVIEW_REQUIRED", "PENDING", "FAILED", "RETRY_PENDING"]);
 const terminalStatuses = new Set(["COMPLETED", "RECONCILED", "CANCELLED"]);
 
 const formatMoney = (value, maximumFractionDigits = 0) =>
@@ -94,6 +96,7 @@ const statusClass = (status) => {
     case "RECONCILED":
       return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
     case "APPROVED":
+    case "AUTO_APPROVED":
     case "PROCESSING":
       return "border-blue-500/40 bg-blue-500/15 text-blue-300";
     case "REVIEW_REQUIRED":
@@ -131,9 +134,58 @@ const SummaryTile = ({ label, value, tone = "text-foreground" }) => (
   </div>
 );
 
-const PayoutDetailModal = ({ payout, loading, onOpenChange }) => {
+const PayoutDetailModal = ({
+  payout,
+  loading,
+  onOpenChange,
+  onCreateRevision,
+  onApproveRevision,
+  revisionBusy,
+}) => {
   const lineItems = payout?.lineItems || [];
+  const revisions = payout?.revisions || [];
+  const transferAttempts = payout?.transferAttempts || [];
+  const statusHistory = payout?.statusHistory || [];
   const adjustmentAmount = Number(payout?.organizerBalanceAdjustmentCents || 0) / 100;
+  const [revisionForm, setRevisionForm] = useState({
+    direction: "DEBIT",
+    amount: "",
+    category: "MANUAL_CORRECTION",
+    description: "",
+    reason: "",
+  });
+
+  useEffect(() => {
+    setRevisionForm({
+      direction: "DEBIT",
+      amount: "",
+      category: "MANUAL_CORRECTION",
+      description: "",
+      reason: "",
+    });
+  }, [payout?.id]);
+
+  const canRevise = payout && ["REVIEW_REQUIRED", "AUTO_APPROVED", "APPROVED", "FAILED"].includes(payout.status)
+    && !payout.initiatedAt
+    && Number(payout.automaticAttemptCount || 0) === 0;
+
+  const submitRevision = async (event) => {
+    event.preventDefault();
+    const amountCents = Math.round(Number(revisionForm.amount) * 100);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      toast.error("Enter a valid positive adjustment amount.");
+      return;
+    }
+    await onCreateRevision(payout.id, {
+      reason: revisionForm.reason.trim(),
+      adjustments: [{
+        direction: revisionForm.direction,
+        amountCents,
+        category: revisionForm.category.trim(),
+        description: revisionForm.description.trim(),
+      }],
+    });
+  };
 
   return (
     <Dialog open={Boolean(payout) || loading} onOpenChange={onOpenChange}>
@@ -210,7 +262,7 @@ const PayoutDetailModal = ({ payout, loading, onOpenChange }) => {
                     <div className="flex justify-between gap-4">
                       <span>Bank</span>
                       <span className="text-right text-foreground">
-                        {payout.bank_details?.bankName || "N/A"} {payout.bank_details?.accountNumber ? `- ****${payout.bank_details.accountNumber.slice(-4)}` : ""}
+                        {payout.bank_details?.bankName || "N/A"} {payout.bank_details?.accountNumberMasked ? `- ${payout.bank_details.accountNumberMasked}` : ""}
                       </span>
                     </div>
                   </div>
@@ -261,6 +313,129 @@ const PayoutDetailModal = ({ payout, loading, onOpenChange }) => {
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+                  <h3 className="text-sm font-semibold">Structured payout revisions</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Every debit or credit is recorded and must be approved by a different staff member.
+                  </p>
+                  {canRevise && (
+                    <form className="mt-4 grid gap-3" onSubmit={submitRevision}>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <select
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          value={revisionForm.direction}
+                          onChange={(event) => setRevisionForm((current) => ({ ...current, direction: event.target.value }))}
+                        >
+                          <option value="DEBIT">Deduct from payout</option>
+                          <option value="CREDIT">Add to payout</option>
+                        </select>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          placeholder="Amount in INR"
+                          value={revisionForm.amount}
+                          onChange={(event) => setRevisionForm((current) => ({ ...current, amount: event.target.value }))}
+                          required
+                        />
+                      </div>
+                      <Input
+                        placeholder="Category"
+                        value={revisionForm.category}
+                        onChange={(event) => setRevisionForm((current) => ({ ...current, category: event.target.value }))}
+                        required
+                      />
+                      <Input
+                        placeholder="Adjustment description"
+                        value={revisionForm.description}
+                        onChange={(event) => setRevisionForm((current) => ({ ...current, description: event.target.value }))}
+                        minLength={3}
+                        required
+                      />
+                      <Textarea
+                        placeholder="Reason for changing this payout"
+                        value={revisionForm.reason}
+                        onChange={(event) => setRevisionForm((current) => ({ ...current, reason: event.target.value }))}
+                        minLength={5}
+                        required
+                      />
+                      <Button type="submit" disabled={revisionBusy}>
+                        <Plus className="h-4 w-4" />
+                        Propose revision
+                      </Button>
+                    </form>
+                  )}
+                  <div className="mt-4 grid gap-3">
+                    {revisions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No payout revisions.</p>
+                    ) : revisions.map((revision) => (
+                      <div key={revision.id} className="rounded-lg border border-border/60 p-3 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium">Revision {revision.revisionNumber}</span>
+                          <Badge className={`${statusClass(revision.status)} border`}>{formatStatus(revision.status)}</Badge>
+                        </div>
+                        <p className="mt-2 text-muted-foreground">{revision.reason}</p>
+                        {(revision.adjustments || []).map((adjustment) => (
+                          <div key={adjustment.id} className="mt-2 flex justify-between gap-3 text-xs">
+                            <span>{formatStatus(adjustment.category)} - {adjustment.description}</span>
+                            <span className={adjustment.direction === "CREDIT" ? "text-emerald-300" : "text-amber-300"}>
+                              {adjustment.direction === "CREDIT" ? "+" : "-"}{formatMoney(adjustment.amountCents / 100, 2)}
+                            </span>
+                          </div>
+                        ))}
+                        {revision.status === "PENDING_APPROVAL" && (
+                          <Button
+                            className="mt-3"
+                            size="sm"
+                            variant="outline"
+                            disabled={revisionBusy}
+                            onClick={() => onApproveRevision(payout.id, revision.id)}
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                            Approve as second staff member
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+                    <h3 className="text-sm font-semibold">Provider attempts</h3>
+                    <div className="mt-3 grid gap-2 text-sm">
+                      {transferAttempts.length === 0 ? (
+                        <p className="text-muted-foreground">No transfer attempt has been submitted.</p>
+                      ) : transferAttempts.map((attempt) => (
+                        <div key={attempt.id} className="rounded-lg border border-border/50 p-3">
+                          <div className="flex justify-between gap-3">
+                            <span>Attempt {attempt.attemptNumber}</span>
+                            <span>{formatStatus(attempt.status)}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(attempt.submittedAt || attempt.createdAt)}{attempt.failureReason ? ` - ${attempt.failureReason}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+                    <h3 className="text-sm font-semibold">Status audit trail</h3>
+                    <div className="mt-3 grid gap-2 text-sm">
+                      {statusHistory.length === 0 ? (
+                        <p className="text-muted-foreground">No status history.</p>
+                      ) : statusHistory.map((entry) => (
+                        <div key={entry.id} className="flex justify-between gap-4 border-b border-border/40 pb-2 last:border-0">
+                          <span>{formatStatus(entry.fromStatus || "CREATED")} to {formatStatus(entry.toStatus)}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -440,6 +615,7 @@ const PromoterPayouts = () => {
   const [updatingId, setUpdatingId] = useState(null);
   const [detailPayout, setDetailPayout] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [revisionBusy, setRevisionBusy] = useState(false);
   const [adjustmentOrganizer, setAdjustmentOrganizer] = useState(null);
   const [adjustmentData, setAdjustmentData] = useState(null);
   const [adjustmentLoading, setAdjustmentLoading] = useState(false);
@@ -571,28 +747,6 @@ const PromoterPayouts = () => {
     }
   };
 
-  const handleUpdateStatus = async (payoutId) => {
-    const form = statusForm[payoutId];
-    if (!form?.status) {
-      toast.error("Choose a status first.");
-      return;
-    }
-
-    setUpdatingId(payoutId);
-    try {
-      await updateAdminPayoutStatus(payoutId, {
-        status: form.status,
-        ...getActionPayload(payoutId),
-      });
-      toast.success("Payout status updated.");
-      refresh();
-    } catch (updateError) {
-      toast.error(updateError.message || "Failed to update payout.");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
   const handleApprove = async (payoutId) => {
     setUpdatingId(payoutId);
     try {
@@ -628,6 +782,34 @@ const PromoterPayouts = () => {
     }
   };
 
+  const handleDisburse = async (payoutId) => {
+    setUpdatingId(payoutId);
+    try {
+      await disbursePayout(payoutId);
+      toast.success("Payout released to the Cashfree queue.");
+      refresh();
+    } catch (error) {
+      toast.error(error.message || "Failed to disburse payout.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleManualRetry = async (payoutId) => {
+    const reason = statusForm[payoutId]?.remarks?.trim();
+    if (!reason) return toast.error("Add a resolution reason first.");
+    setUpdatingId(payoutId);
+    try {
+      await resolvePayout(payoutId, { action: "RETRY", reason });
+      toast.success("Manual retry authorized. Review and disburse the payout.");
+      refresh();
+    } catch (error) {
+      toast.error(error.message || "Failed to resolve payout.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const openDetail = async (payoutId) => {
     setDetailLoading(true);
     setDetailPayout(null);
@@ -638,6 +820,39 @@ const PromoterPayouts = () => {
       toast.error(detailError.message || "Failed to load payout detail.");
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const reloadDetail = async (payoutId) => {
+    const payout = await fetchAdminPayoutDetail(payoutId);
+    setDetailPayout(payout);
+  };
+
+  const handleCreateRevision = async (payoutId, payload) => {
+    setRevisionBusy(true);
+    try {
+      await createPayoutRevision(payoutId, payload);
+      await reloadDetail(payoutId);
+      refresh();
+      toast.success("Payout revision proposed for second-person approval.");
+    } catch (revisionError) {
+      toast.error(revisionError.message || "Failed to propose payout revision.");
+    } finally {
+      setRevisionBusy(false);
+    }
+  };
+
+  const handleApproveRevision = async (payoutId, revisionId) => {
+    setRevisionBusy(true);
+    try {
+      await approvePayoutRevision(payoutId, revisionId);
+      await reloadDetail(payoutId);
+      refresh();
+      toast.success("Payout revision approved and ready for disbursement.");
+    } catch (revisionError) {
+      toast.error(revisionError.message || "Failed to approve payout revision.");
+    } finally {
+      setRevisionBusy(false);
     }
   };
 
@@ -1007,7 +1222,7 @@ const PromoterPayouts = () => {
                         <p className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4" /> Bank</p>
                         <p className="truncate font-semibold">{payout.bank_details?.bankName || "No bank"}</p>
                         <p className="text-xs text-muted-foreground">
-                          {payout.bank_details?.accountNumber ? `****${payout.bank_details.accountNumber.slice(-4)}` : "No account"} - {payout.bank_details?.verificationStatus || "Unknown"}
+                          {payout.bank_details?.accountNumberMasked || (payout.bank_details?.accountNumberLast4 ? `****${payout.bank_details.accountNumberLast4}` : "No account")} - {payout.bank_details?.verificationStatus || "Unknown"}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border/60 bg-background/40 p-3">
@@ -1024,30 +1239,9 @@ const PromoterPayouts = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 xl:grid-cols-[160px_1fr_1fr_1fr_auto]">
-                      <select
-                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                        value={form.status || payout.status}
-                        onChange={(event) => updatePayoutForm(payout.id, { status: event.target.value })}
-                      >
-                        {updateStatusOptions.map((status) => (
-                          <option key={status} value={status}>
-                            {formatStatus(status)}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="mt-4 grid gap-3 xl:grid-cols-[1fr_auto]">
                       <Input
-                        placeholder="Provider batch id"
-                        value={form.providerBatchId ?? payout.providerBatchId ?? ""}
-                        onChange={(event) => updatePayoutForm(payout.id, { providerBatchId: event.target.value })}
-                      />
-                      <Input
-                        placeholder="Provider payout id"
-                        value={form.providerPayoutId ?? payout.providerPayoutId ?? ""}
-                        onChange={(event) => updatePayoutForm(payout.id, { providerPayoutId: event.target.value })}
-                      />
-                      <Input
-                        placeholder="Review note, hold reason, or failure reason"
+                        placeholder="Review, hold, or manual-resolution reason"
                         value={form.remarks ?? form.blockedReason ?? payout.blockedReason ?? payout.failureReason ?? payout.remarks ?? ""}
                         onChange={(event) =>
                           updatePayoutForm(payout.id, {
@@ -1064,15 +1258,24 @@ const PromoterPayouts = () => {
                             Approve
                           </Button>
                         )}
+                        {["APPROVED", "AUTO_APPROVED"].includes(payout.status) && !payout.manualInterventionRequired && (
+                          <Button onClick={() => handleDisburse(payout.id)} disabled={updatingId === payout.id}>
+                            <Banknote className="h-4 w-4" />
+                            Disburse
+                          </Button>
+                        )}
+                        {payout.manualInterventionRequired && (
+                          <Button variant="outline" onClick={() => handleManualRetry(payout.id)} disabled={updatingId === payout.id}>
+                            <RefreshCw className="h-4 w-4" />
+                            Resolve & Retry
+                          </Button>
+                        )}
                         {isEventPayout && !terminalStatuses.has(payout.status) && (
                           <Button variant="outline" onClick={() => handleHold(payout.id)} disabled={updatingId === payout.id}>
                             <PauseCircle className="h-4 w-4" />
                             Hold
                           </Button>
                         )}
-                        <Button onClick={() => handleUpdateStatus(payout.id)} disabled={updatingId === payout.id}>
-                          {updatingId === payout.id ? "Saving..." : "Update"}
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -1086,6 +1289,9 @@ const PromoterPayouts = () => {
       <PayoutDetailModal
         payout={detailPayout}
         loading={detailLoading}
+        revisionBusy={revisionBusy}
+        onCreateRevision={handleCreateRevision}
+        onApproveRevision={handleApproveRevision}
         onOpenChange={(open) => {
           if (!open) {
             setDetailPayout(null);

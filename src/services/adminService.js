@@ -157,6 +157,34 @@ export async function holdEventPayout(payoutId, payload = {}) {
   return response.data;
 }
 
+export async function createPayoutRevision(payoutId, payload) {
+  const response = await apiFetch(`admin/payouts/${payoutId}/revisions`, {
+    method: "POST",
+    body: payload,
+  });
+  return response.data;
+}
+
+export async function approvePayoutRevision(payoutId, revisionId) {
+  const response = await apiFetch(`admin/payouts/${payoutId}/revisions/${revisionId}/approve`, {
+    method: "POST",
+  });
+  return response.data;
+}
+
+export async function disbursePayout(payoutId) {
+  const response = await apiFetch(`admin/payouts/${payoutId}/disburse`, { method: "POST" });
+  return response.data;
+}
+
+export async function resolvePayout(payoutId, payload) {
+  const response = await apiFetch(`admin/payouts/${payoutId}/resolve`, {
+    method: "POST",
+    body: payload,
+  });
+  return response.data;
+}
+
 export async function updateAdminPayoutStatus(payoutId, payload) {
   const response = await apiFetch(`admin/payouts/${payoutId}/status`, {
     method: "PATCH",

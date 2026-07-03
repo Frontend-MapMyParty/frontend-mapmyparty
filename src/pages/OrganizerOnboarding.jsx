@@ -38,7 +38,8 @@ const buildProfileDefaults = (user, profile = null) => ({
 
 const buildBankDefaults = (bank = null) => ({
   accountHolder: bank?.accountHolder || "",
-  accountNumber: bank?.accountNumber || "",
+  accountNumber: "",
+  accountNumberMasked: bank?.accountNumberMasked || "",
   ifscCode: bank?.ifscCode || "",
   bankName: bank?.bankName || "",
   branchName: bank?.branchName || "",
