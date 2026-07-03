@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { fetchSession, resetSessionCache } from "@/utils/auth";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDashboardPathForRole } from "@/utils/roleRedirect";
 
 const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
@@ -60,13 +61,7 @@ const GoogleCallback = () => {
           return;
         }
 
-        const role = (session.user?.role || "USER").toUpperCase();
-        const redirectPath =
-          role === "ORGANIZER"
-            ? "/organizer/dashboard-v2"
-            : role === "PROMOTER"
-              ? "/promoter/dashboard"
-              : "/dashboard";
+        const redirectPath = getDashboardPathForRole(session.user?.role || "USER");
 
         toast.success("Google authentication successful!");
         navigate(redirectPath, { replace: true });

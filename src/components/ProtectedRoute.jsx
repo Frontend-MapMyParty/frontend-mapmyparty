@@ -88,10 +88,11 @@ const ProtectedRoute = ({ children, requiredRole = null, skipOrganizerOnboarding
 
   if (normalizedRequiredRole) {
     const userRole = (user?.role || "").toString().toUpperCase();
-    // App aliases promoter <-> admin in backend role naming.
+    // Promoter routes are the frontend surface for backend admin roles.
     const roleAliases = {
-      PROMOTER: ["PROMOTER", "ADMIN"],
-      ADMIN: ["PROMOTER", "ADMIN"],
+      PROMOTER: ["PROMOTER", "ADMIN", "SUPER_ADMIN"],
+      ADMIN: ["PROMOTER", "ADMIN", "SUPER_ADMIN"],
+      SUPER_ADMIN: ["SUPER_ADMIN"],
       USER: ["USER"],
       ORGANIZER: ["ORGANIZER"],
     };

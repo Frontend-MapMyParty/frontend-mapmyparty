@@ -1,7 +1,7 @@
 export function normalizeRoleForRouting(role) {
   const normalized = (role || "").toString().trim().toUpperCase();
 
-  if (normalized === "PROMOTER" || normalized === "ADMIN") {
+  if (normalized === "PROMOTER" || normalized === "ADMIN" || normalized === "SUPER_ADMIN") {
     return "PROMOTER";
   }
 
