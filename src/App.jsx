@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import Events from "./pages/Events";
@@ -59,6 +59,7 @@ import Footer from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
 import OrganizerOnboarding from "./pages/OrganizerOnboarding";
 import PromoterSupport from "./pages/PromoterSupport";
+import IntroLoader from "./components/IntroLoader/IntroLoader";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,13 +71,25 @@ const queryClient = new QueryClient({
   },
 });
 
-const PublicShell = () => (
-  <div className="min-h-screen flex flex-col bg-background text-foreground">
-    <div className="flex-1">
-      <Outlet />
+const LANDING_PATHS = new Set(["/", "/landing/homepage"]);
+
+const shouldOfferLandingIntro = () => {
+  if (typeof window === "undefined") return false;
+
+  const normalizedPath =
+    window.location.pathname.replace(/\/+$/, "") || "/";
+  return LANDING_PATHS.has(normalizedPath);
+};
+
+const PublicShell = ({ showLandingIntro, onIntroConsumed }) => (
+  <IntroLoader enabled={showLandingIntro} onIntroConsumed={onIntroConsumed}>
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
+      <div className="flex-1">
+        <Outlet />
+      </div>
+      <Footer />
     </div>
-    <Footer />
-  </div>
+  </IntroLoader>
 );
 
 const ScrollToTop = () => {
@@ -92,6 +105,13 @@ const ScrollToTop = () => {
 };
 
 const App = () => {
+  const [landingIntroAvailable, setLandingIntroAvailable] = useState(
+    shouldOfferLandingIntro,
+  );
+  const consumeLandingIntro = useCallback(() => {
+    setLandingIntroAvailable(false);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="app-theme promoter-theme min-h-screen bg-background text-foreground">
@@ -102,7 +122,14 @@ const App = () => {
             <AuthProvider>
               <ScrollToTop />
               <Routes>
-              <Route element={<PublicShell />}>
+              <Route
+                element={
+                  <PublicShell
+                    showLandingIntro={landingIntroAvailable}
+                    onIntroConsumed={consumeLandingIntro}
+                  />
+                }
+              >
                 <Route path="/" element={<Index />} />
                 <Route path="/landing/homepage" element={<Index />} />
                 <Route path="/my-bookings" element={<Navigate to="/dashboard/bookings" replace />} />
