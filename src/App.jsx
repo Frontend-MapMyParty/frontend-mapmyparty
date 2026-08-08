@@ -94,7 +94,7 @@ const ScrollToTop = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="app-theme promoter-theme min-h-screen bg-background text-foreground">
+      <div className="app-theme promoter-theme party-theme min-h-screen bg-background text-foreground">
         <TooltipProvider>
           <Toaster />
           <Sonner />

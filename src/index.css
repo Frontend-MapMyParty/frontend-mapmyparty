@@ -115,8 +115,9 @@
     --gradient-surface: linear-gradient(180deg, hsl(var(--background)), hsl(var(--card)), hsl(var(--background)));
   }
 
+  .party-theme,
   .landing-homepage {
-    --background: 278 100% 94%; /* #f3deff */
+    --background: 278 34% 68%; /* #b491c9 */
     --foreground: 276 40% 12%;
 
     --card: 0 0% 100%;
@@ -569,6 +570,10 @@
   }
 
   .app-theme .text-white,
+  .app-theme .text-slate-50,
+  .app-theme .text-slate-100,
+  .app-theme .text-gray-50,
+  .app-theme .text-gray-100,
   .dashboard-theme .text-white {
     color: hsl(var(--foreground)) !important;
   }
@@ -599,12 +604,27 @@
     color: hsl(var(--muted-foreground)) !important;
   }
 
+  .app-theme .text-slate-200,
+  .app-theme .text-slate-300,
+  .app-theme .text-slate-400,
+  .app-theme .text-gray-300,
+  .app-theme .text-gray-400,
+  .app-theme .text-gray-500 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
   .app-theme .bg-\[\#040712\],
+  .app-theme .bg-\[\#050510\],
+  .app-theme .bg-\[\#05060c\],
   .app-theme .bg-\[\#090d1a\],
+  .app-theme .bg-\[\#090f1c\],
   .app-theme .bg-\[\#0a0f1a\],
+  .app-theme .bg-\[\#0a0a12\],
   .app-theme .bg-\[\#0b1220\],
   .app-theme .bg-\[\#0d1526\],
   .app-theme .bg-\[\#0e0e18\],
+  .app-theme .bg-black,
+  .app-theme .bg-gray-950,
   .app-theme .bg-slate-950 {
     background-color: hsl(var(--background)) !important;
   }
@@ -612,8 +632,24 @@
   .app-theme .bg-\[\#140a2b\],
   .app-theme .bg-\[\#0a0619\],
   .app-theme .bg-\[\#1b0c2f\],
-  .app-theme .bg-\[\#31154a\] {
+  .app-theme .bg-\[\#31154a\],
+  .app-theme .bg-gray-800,
+  .app-theme .bg-gray-900 {
     background-color: hsl(var(--card)) !important;
+  }
+
+  .app-theme .bg-gray-900\/50,
+  .app-theme .bg-gray-950\/40,
+  .app-theme .bg-slate-950\/35,
+  .app-theme .bg-slate-950\/40 {
+    background-color: hsl(var(--card) / 0.62) !important;
+  }
+
+  .app-theme .border-gray-700,
+  .app-theme .border-gray-700\/50,
+  .app-theme .border-gray-800,
+  .app-theme .border-gray-800\/50 {
+    border-color: hsl(var(--border) / 0.52) !important;
   }
 
   .app-theme .bg-\[\#D60024\],
@@ -717,6 +753,35 @@
     --tw-gradient-from: hsl(var(--secondary) / 0.2) var(--tw-gradient-from-position) !important;
     --tw-gradient-to: hsl(var(--secondary) / 0) var(--tw-gradient-to-position) !important;
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .app-theme .from-black,
+  .app-theme .from-gray-950,
+  .app-theme .from-\[\#050510\],
+  .app-theme .from-\[\#05060b\],
+  .app-theme .from-\[\#05060c\],
+  .app-theme .from-\[\#0b1220\] {
+    --tw-gradient-from: hsl(var(--background)) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: hsl(var(--background) / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  .app-theme .via-gray-900,
+  .app-theme .via-\[\#090f1c\],
+  .app-theme .via-\[\#0a0a0a\],
+  .app-theme .via-\[\#0a0f1c\],
+  .app-theme .via-\[\#0a0f1f\],
+  .app-theme .via-\[\#0b0f1a\],
+  .app-theme .via-\[\#0c1120\] {
+    --tw-gradient-stops: var(--tw-gradient-from), hsl(var(--card) / 0.72) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  }
+
+  .app-theme .to-\[\#050510\],
+  .app-theme .to-\[\#05060c\],
+  .app-theme .to-\[\#05070f\],
+  .app-theme .to-\[\#0a0b10\],
+  .app-theme .to-\[\#0b0f18\] {
+    --tw-gradient-to: hsl(var(--background)) var(--tw-gradient-to-position) !important;
   }
 
   .dashboard-theme .bg-gradient-to-b,

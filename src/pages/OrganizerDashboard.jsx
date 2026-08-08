@@ -1553,7 +1553,7 @@ const OrganizerDashboard = () => {
   };
 
   return (
-    <div className="organizer-dashboard-theme dashboard-theme flex h-screen bg-background text-foreground">
+    <div className="organizer-dashboard-theme dashboard-theme party-theme flex h-screen bg-background text-foreground">
       {/* Sidebar */}
       <aside
         className={`${sidebarOpen ? "w-64" : "w-24"} bg-sidebar border-r border-sidebar-border/60 flex flex-col transition-all duration-300`}
@@ -1563,7 +1563,9 @@ const OrganizerDashboard = () => {
             onClick={() => navigate("/")}
             className={`${sidebarOpen ? "block" : "hidden"} hover:opacity-80 transition flex items-center gap-3`}
           >
-            <img src={Logo} alt="MapMyParty" className="h-10 w-auto" />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/45 bg-card/90 p-1 shadow-[var(--shadow-card)]">
+              <img src={Logo} alt="MapMyParty" className="h-full w-full object-contain" />
+            </span>
             <span className="font-sans text-xl font-bold text-white tracking-[0.02em] leading-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">MapMyParty</span>
           </button>
           <button

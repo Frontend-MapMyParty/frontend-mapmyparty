@@ -60,7 +60,9 @@ const UserDashboardHeader = () => {
       <div className="container flex h-16 items-center justify-between">
         {/* Brand */}
         <Link to="/dashboard" className="flex items-center gap-2 font-bold text-xl text-white">
-          <img src={logo} alt="MapMyParty" className="h-8 w-auto" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-card/90 p-1 shadow-[var(--shadow-card)]">
+            <img src={logo} alt="MapMyParty" className="h-full w-full object-contain" />
+          </span>
           <span className="text-white">Map MyParty</span>
         </Link>
 

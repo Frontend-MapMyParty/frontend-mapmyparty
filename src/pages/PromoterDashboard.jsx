@@ -600,7 +600,7 @@ const PromoterDashboard = () => {
               }`}
               aria-label="Go to promoter overview"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sidebar-border/45 bg-sidebar/80 transition-all duration-200 ease-out group-hover:border-sidebar-accent/60 group-hover:scale-[1.03]">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/45 bg-card/90 p-1 shadow-[var(--shadow-card)] transition-all duration-200 ease-out group-hover:border-border/70 group-hover:scale-[1.03]">
                 <img src={Logo} alt="MapMyParty" className="h-8 w-8" />
               </span>
               {expanded && (
@@ -767,7 +767,7 @@ const PromoterDashboard = () => {
   };
 
   return (
-    <div className="promoter-theme dashboard-theme min-h-screen bg-background text-foreground flex">
+    <div className="promoter-theme dashboard-theme party-theme min-h-screen bg-background text-foreground flex">
       {/* Mobile Sidebar Overlay */}
       {mobileSidebarOpen && (
         <div

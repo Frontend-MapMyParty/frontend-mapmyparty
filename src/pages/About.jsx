@@ -66,15 +66,17 @@ const About = () => {
               </div>
             </div>
 
-            <Card className="border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_25px_80px_-35px_rgba(0,0,0,0.75)]">
+            <Card className="border-border/50 bg-card/85 text-foreground backdrop-blur-xl shadow-[var(--shadow-card)]">
               <CardContent className="grid grid-cols-2 gap-4 p-6">
                 {highlights.map(({ title, value, icon: Icon }) => (
-                  <div key={title} className="space-y-2 rounded-xl border border-white/10 bg-white/10 p-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-200/75">
-                      <Icon className="h-4 w-4 text-pink-200" />
+                  <div key={title} className="space-y-2 rounded-xl border border-border/45 bg-background/45 p-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-card/90 text-primary shadow-[var(--shadow-card)]">
+                        <Icon className="h-4 w-4" />
+                      </span>
                       <span>{title}</span>
                     </div>
-                    <div className="text-2xl font-bold text-white">{value}</div>
+                    <div className="text-2xl font-bold text-foreground">{value}</div>
                   </div>
                 ))}
               </CardContent>
@@ -89,14 +91,14 @@ const About = () => {
             {pillars.map(({ title, desc, icon: Icon }) => (
               <Card
                 key={title}
-                className="border-white/10 bg-white/5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-amber-300/40 hover:shadow-[0_25px_80px_-24px_rgba(0,0,0,0.65)]"
+                className="border-border/50 bg-card/85 text-foreground shadow-[var(--shadow-card)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-border hover:shadow-[var(--shadow-elegant)]"
               >
                 <CardContent className="space-y-3 p-6">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 text-pink-200">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border/50 bg-background/70 text-primary shadow-[var(--shadow-card)]">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white">{title}</h3>
-                  <p className="text-sm leading-relaxed text-slate-300/80">{desc}</p>
+                  <h3 className="text-xl font-semibold text-foreground">{title}</h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
                 </CardContent>
               </Card>
             ))}

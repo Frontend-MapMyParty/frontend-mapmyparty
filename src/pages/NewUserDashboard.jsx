@@ -461,7 +461,7 @@ const NewUserDashboard = () => {
       <header className="hidden lg:flex items-center justify-between h-16 px-6 bg-[#0a0a12]/80 backdrop-blur-lg border-b border-white/[0.06] fixed top-0 left-0 right-0 z-40">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <div className="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-card/90 border border-border/45 flex items-center justify-center shadow-[var(--shadow-card)]">
               <img src={logoSvg} alt="MMP" className="w-6 h-6 object-contain" />
             </div>
             <span className="text-base font-bold tracking-tight">MapMyParty</span>
@@ -638,7 +638,7 @@ const NewUserDashboard = () => {
       {/* ── Mobile Header ── */}
       <header className="lg:hidden flex items-center justify-between h-14 px-4 bg-[#0a0a12]/90 backdrop-blur-lg border-b border-white/[0.06] fixed top-0 left-0 right-0 z-40">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/[0.08] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-card/90 border border-border/45 flex items-center justify-center shadow-[var(--shadow-card)]">
             <img src={logoSvg} alt="MMP" className="w-5 h-5 object-contain" />
           </div>
           <span className="text-sm font-bold">MapMyParty</span>

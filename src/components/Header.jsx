@@ -556,11 +556,13 @@ const Header = ({
             to="/"
             className="group flex min-w-0 items-center gap-2.5 whitespace-nowrap text-base font-semibold text-foreground"
           >
-            <img
-              src={logo}
-              alt="MapMyParty"
-              className="h-8 w-8 object-contain"
-            />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-card/90 p-1 shadow-[var(--shadow-card)]">
+              <img
+                src={logo}
+                alt="MapMyParty"
+                className="h-full w-full object-contain"
+              />
+            </span>
             <span className="hidden text-foreground sm:inline">Map MyParty</span>
           </Link>
 

@@ -200,19 +200,19 @@ const Contact = () => {
           {contactChannels.map(({ title, value, icon: Icon, desc }) => (
             <Card
               key={title}
-              className="h-full min-h-[196px] border-white/10 bg-white/5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_24px_70px_-28px_rgba(0,0,0,0.65)]"
+              className="h-full min-h-[196px] border-border/50 bg-card/85 text-foreground shadow-[var(--shadow-card)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:border-border hover:shadow-[var(--shadow-elegant)]"
             >
               <CardContent className="flex h-full flex-col items-start justify-between p-6">
                 <div className="space-y-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/15 text-pink-200 ring-1 ring-white/10">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-border/50 bg-background/70 text-primary shadow-[var(--shadow-card)]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-lg font-semibold leading-tight text-white">{title}</h2>
-                    <p className="text-sm leading-6 text-slate-300/75">{desc}</p>
+                    <h2 className="text-lg font-semibold leading-tight text-foreground">{title}</h2>
+                    <p className="text-sm leading-6 text-muted-foreground">{desc}</p>
                   </div>
                 </div>
-                <p className="pt-5 text-base font-semibold leading-6 text-white md:text-[17px]">{value}</p>
+                <p className="pt-5 text-base font-semibold leading-6 text-foreground md:text-[17px]">{value}</p>
               </CardContent>
             </Card>
           ))}

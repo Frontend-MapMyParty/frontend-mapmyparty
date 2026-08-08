@@ -1031,7 +1031,7 @@ const EventDetailNew = () => {
 
   if (loading) {
     return (
-      <div className="event-detail-theme min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] flex items-center justify-center">
+      <div className="event-detail-theme party-theme min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#D60024] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white">Loading event details...</p>
@@ -1042,7 +1042,7 @@ const EventDetailNew = () => {
 
   if (!event) {
     return (
-      <div className="event-detail-theme min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] flex items-center justify-center">
+      <div className="event-detail-theme party-theme min-h-screen bg-gradient-to-br from-[#000000] via-[#0a0a0a] to-[#050510] flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-4">
             Event Not Found
@@ -1060,13 +1060,15 @@ const EventDetailNew = () => {
   }
 
   return (
-    <div className="event-detail-theme min-h-screen text-white bg-gray-950">
+    <div className="event-detail-theme party-theme min-h-screen text-white bg-gray-950">
       <style>{pageCss}</style>
 
       <header className="sticky top-0 z-40 bg-black/35 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-12">
           <Link to="/" className="flex items-center gap-3">
-            <img src={logoSvg} alt="Map My Party" className="h-9 w-auto" />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/45 bg-card/90 p-1 shadow-[var(--shadow-card)]">
+              <img src={logoSvg} alt="Map My Party" className="h-full w-full object-contain" />
+            </span>
             <span className="text-sm font-semibold tracking-[0.06em] text-white">
               MapMyParty
             </span>
