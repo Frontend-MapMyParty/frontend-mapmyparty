@@ -33,6 +33,12 @@ import {
   normalizeEventSubCategoryValue,
 } from "@/config/eventCategories";
 import { toast } from "sonner";
+import {
+  formatDistanceKm,
+  getCurrentPosition,
+  getGeolocationErrorMessage,
+  isGeolocationSupported,
+} from "@/utils/geolocation";
 
 const PAGE_SIZE = 20;
 
@@ -98,6 +104,7 @@ const toDisplayLabel = (value) => {
 const parseBrowsePage = (value) => Math.max(1, Number.parseInt(value, 10) || 1);
 
 const parseBrowseCoordinate = (value) => {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
@@ -147,7 +154,8 @@ const getBrowseStateFromSearchParams = (searchParams) => {
   const nearby =
     parseBrowseNearby(searchParams.get("nearby")) &&
     Number.isFinite(parsedLatitude) &&
-    Number.isFinite(parsedLongitude);
+    Number.isFinite(parsedLongitude) &&
+    !(parsedLatitude === 0 && parsedLongitude === 0);
 
   return {
     searchQuery: normalizeBrowseValue(searchParams.get("search")),
@@ -432,17 +440,30 @@ export default function BrowseEvents({ showPublicHeader = false }) {
   }, [catalogEvents, urlState.selectedCategory, urlState.selectedSubCategory]);
 
   const trendingEvents = useMemo(() => {
-    return [...filteredEvents]
-      .sort((left, right) => {
-        const scoreDifference = getEventTrendScore(right) - getEventTrendScore(left);
-        if (scoreDifference !== 0) return scoreDifference;
+    const ranked = urlState.nearby
+      ? [...filteredEvents].sort((left, right) => {
+          const leftDistance = Number(left.distanceKm);
+          const rightDistance = Number(right.distanceKm);
+          const distanceDifference =
+            (Number.isFinite(leftDistance) ? leftDistance : Number.POSITIVE_INFINITY) -
+            (Number.isFinite(rightDistance) ? rightDistance : Number.POSITIVE_INFINITY);
+          if (distanceDifference !== 0) return distanceDifference;
 
-        const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-        const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-        return leftDate - rightDate;
-      })
-      .slice(0, 4);
-  }, [filteredEvents]);
+          const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return leftDate - rightDate;
+        })
+      : [...filteredEvents].sort((left, right) => {
+          const scoreDifference = getEventTrendScore(right) - getEventTrendScore(left);
+          if (scoreDifference !== 0) return scoreDifference;
+
+          const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return leftDate - rightDate;
+        });
+
+    return ranked.slice(0, 4);
+  }, [filteredEvents, urlState.nearby]);
 
   useEffect(() => {
     setActiveTrendingIndex((currentIndex) => {
@@ -612,41 +633,32 @@ export default function BrowseEvents({ showPublicHeader = false }) {
     return normalizePriceLabel(event.price) || "Free";
   };
 
-  const isLocationSupported =
-    typeof window !== "undefined" &&
-    window.isSecureContext &&
-    typeof navigator !== "undefined" &&
-    "geolocation" in navigator;
+  const isLocationSupported = isGeolocationSupported();
 
-  const applyNearbyFilter = () => {
+  const applyNearbyFilter = async () => {
     if (!isLocationSupported) {
       toast.error("Location is not available in this browser or page context.");
       return;
     }
 
     setNearbyLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        updateBrowseState({
-          nearby: true,
-          latitude,
-          longitude,
-          radiusKm: 50,
-          page: 1,
-        });
-        setNearbyLoading(false);
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        toast.error(
-          error?.code === 1
-            ? "Location access denied. Please allow location to use Nearby."
-            : "Unable to detect your location right now.",
-        );
-        setNearbyLoading(false);
-      },
-    );
+    try {
+      const position = await getCurrentPosition();
+      const { latitude, longitude } = position.coords;
+      updateBrowseState({
+        nearby: true,
+        latitude,
+        longitude,
+        radiusKm: 50,
+        page: 1,
+      });
+      toast.success("Showing events near you");
+    } catch (error) {
+      console.error("Geolocation error:", error);
+      toast.error(getGeolocationErrorMessage(error, "Nearby"));
+    } finally {
+      setNearbyLoading(false);
+    }
   };
 
   const clearNearbyFilter = () => {
@@ -717,6 +729,11 @@ export default function BrowseEvents({ showPublicHeader = false }) {
                 <MapPin className="h-3 w-3 shrink-0 text-accent" />
                 <span className="line-clamp-1">{getEventLocation(event)}</span>
               </div>
+              {Number.isFinite(Number(event.distanceKm)) && formatDistanceKm(event.distanceKm) && (
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="line-clamp-1">{formatDistanceKm(event.distanceKm)}</span>
+                </div>
+              )}
             </div>
             <div className="mt-3 flex items-center justify-between gap-2.5">
               <span className="h-px flex-1 bg-gradient-to-r from-border/70 via-border/30 to-transparent" />
@@ -816,6 +833,11 @@ export default function BrowseEvents({ showPublicHeader = false }) {
                               <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
                               <span className="truncate">{getEventLocation(event)}</span>
                             </span>
+                            {formatDistanceKm(event.distanceKm) && (
+                              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2 py-1 text-[10px] font-medium text-accent shadow-[var(--shadow-card)] backdrop-blur-md sm:px-2.5 sm:py-1.5 sm:text-xs">
+                                {formatDistanceKm(event.distanceKm)}
+                              </span>
+                            )}
                           </div>
 
                           <div className={`mt-3 ${isSideCard ? "hidden" : ""}`}>
@@ -1090,50 +1112,77 @@ export default function BrowseEvents({ showPublicHeader = false }) {
         )}
 
         <div className="space-y-6 sm:space-y-8">
-          {groupedByCategory.map((category) => {
-            if (category.events.length === 0) return null;
-            const Icon = category.icon;
-
-            return (
-              <section key={category.key} className="space-y-3 border-t border-border/20 pt-4 sm:pt-5">
+          {urlState.nearby ? (
+            visibleEvents.length > 0 && (
+              <section className="space-y-3 border-t border-border/20 pt-4 sm:pt-5">
                 <div className="flex items-end justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-card/70 text-accent shadow-[var(--shadow-card)] sm:h-10 sm:w-10">
-                      <Icon className="h-4.5 w-4.5" />
+                      <MapPin className="h-4.5 w-4.5" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="truncate text-xl font-black leading-tight text-foreground sm:text-2xl">
-                        {category.label}
+                        Events near you
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {category.events.length} events on this page
+                        {pagination.totalEvents} events within {urlState.radiusKm} km, closest first
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="accent"
-                    className="h-9 shrink-0 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm"
-                    onClick={() =>
-                      updateBrowseState({
-                        selectedCategory: category.key,
-                        selectedSubCategory: "all",
-                        page: 1,
-                      })
-                    }
-                  >
-                    Browse All
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
                 </div>
                 <div className={categoryEventGridClass}>
-                  {category.events.map((event) => (
+                  {visibleEvents.map((event) => (
                     <EventCard key={event.id} event={event} />
                   ))}
                 </div>
               </section>
-            );
-          })}
+            )
+          ) : (
+            groupedByCategory.map((category) => {
+              if (category.events.length === 0) return null;
+              const Icon = category.icon;
+
+              return (
+                <section key={category.key} className="space-y-3 border-t border-border/20 pt-4 sm:pt-5">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-card/70 text-accent shadow-[var(--shadow-card)] sm:h-10 sm:w-10">
+                        <Icon className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-xl font-black leading-tight text-foreground sm:text-2xl">
+                          {category.label}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {category.events.length} events on this page
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="accent"
+                      className="h-9 shrink-0 rounded-full px-3 text-xs sm:h-10 sm:px-4 sm:text-sm"
+                      onClick={() =>
+                        updateBrowseState({
+                          selectedCategory: category.key,
+                          selectedSubCategory: "all",
+                          page: 1,
+                        })
+                      }
+                    >
+                      Browse All
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className={categoryEventGridClass}>
+                    {category.events.map((event) => (
+                      <EventCard key={event.id} event={event} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })
+          )}
         </div>
 
         {loading && (
@@ -1156,17 +1205,21 @@ export default function BrowseEvents({ showPublicHeader = false }) {
         {!loading && visibleEvents.length === 0 && (
           <div className="mt-6 rounded-xl border border-border/40 bg-card/70 p-7 text-center shadow-[var(--shadow-card)] sm:p-12">
             <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground/45 sm:mb-4 sm:h-12 sm:w-12" />
-            <h3 className="mb-1 text-base font-semibold text-foreground">No events found</h3>
+            <h3 className="mb-1 text-base font-semibold text-foreground">
+              {urlState.nearby ? "No events near you" : "No events found"}
+            </h3>
             <p className="mb-5 text-sm text-muted-foreground">
-              {appliedSearchQuery
-                ? "Try adjusting your search or filters"
-                : "No events are available for this category yet"}
+              {urlState.nearby
+                ? `No events found within ${urlState.radiusKm} km of your location. Try a broader search or check back later.`
+                : appliedSearchQuery
+                  ? "Try adjusting your search or filters"
+                  : "No events are available for this category yet"}
             </p>
             <Button
-              onClick={clearAllFilters}
+              onClick={urlState.nearby ? clearNearbyFilter : clearAllFilters}
               className="h-9 bg-primaryCTA px-4 text-sm text-primary-foreground hover:bg-primaryCTA-hover active:bg-primaryCTA-active"
             >
-              Clear Filters
+              {urlState.nearby ? "Remove nearby" : "Clear Filters"}
             </Button>
           </div>
         )}

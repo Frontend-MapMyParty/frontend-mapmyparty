@@ -1067,8 +1067,8 @@ const CreateEvent = () => {
           state: firstVenue.state || "",
           country: firstVenue.country || eventToEdit.country || "India",
           postalCode: firstVenue.postalCode || eventToEdit.postalCode || "",
-          latitude: firstVenue.latitude || 0,
-          longitude: firstVenue.longitude || 0,
+          latitude: Number.isFinite(Number(firstVenue.latitude)) ? Number(firstVenue.latitude) : null,
+          longitude: Number.isFinite(Number(firstVenue.longitude)) ? Number(firstVenue.longitude) : null,
         });
         setVenueCreated(true);
       } else if (eventToEdit.location) {
@@ -2049,8 +2049,8 @@ const CreateEvent = () => {
         state: state,
         country: country || "India",
         postalCode: postalCode,
-        latitude: 0,
-        longitude: 0,
+        latitude: null,
+        longitude: null,
         googlePlaceId: "", // Optional - not used in manual mode
         eventId: backendEventId, // Use backend event ID
         isPrimary: true,

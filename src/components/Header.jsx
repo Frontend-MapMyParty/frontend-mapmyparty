@@ -23,6 +23,11 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/config/api";
 import logo from "@/assets/MMP logo.svg";
+import {
+  getCurrentPosition,
+  getGeolocationErrorMessage,
+  isGeolocationSupported,
+} from "@/utils/geolocation";
 
 const HEADER_SEARCH_MIN_LENGTH = 2;
 const HEADER_SEARCH_DEBOUNCE_MS = 300;
@@ -171,11 +176,7 @@ const Header = ({
   const isPromoter =
     normalizedRole === "promoter" || normalizedRole === "admin";
   const isAttendee = !isOrganizer && !isPromoter;
-  const isLocationSupported =
-    typeof window !== "undefined" &&
-    window.isSecureContext &&
-    typeof navigator !== "undefined" &&
-    "geolocation" in navigator;
+  const isLocationSupported = isGeolocationSupported();
 
   const handleProfileNav = () => {
     navigate("/dashboard/profile");
@@ -374,32 +375,21 @@ const Header = ({
 
     setLocationLoading(true);
     try {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          navigate(
-            buildBrowseEventsUrl((params) => {
-              params.set("nearby", "true");
-              params.set("lat", String(latitude));
-              params.set("lng", String(longitude));
-              params.delete("page");
-            }),
-          );
-          setLocationLoading(false);
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          toast.error(
-            error?.code === 1
-              ? "Location access denied. Please allow location to use Near Me."
-              : "Unable to detect your location right now.",
-          );
-          setLocationLoading(false);
-        },
+      const position = await getCurrentPosition();
+      const { latitude, longitude } = position.coords;
+      navigate(
+        buildBrowseEventsUrl((params) => {
+          params.set("nearby", "true");
+          params.set("lat", String(latitude));
+          params.set("lng", String(longitude));
+          params.delete("page");
+        }),
       );
+      toast.success("Showing events near you");
     } catch (error) {
-      console.error("Error detecting location:", error);
-      toast.error("Unable to detect your location right now.");
+      console.error("Geolocation error:", error);
+      toast.error(getGeolocationErrorMessage(error));
+    } finally {
       setLocationLoading(false);
     }
   };
@@ -777,22 +767,13 @@ const Header = ({
               )}
             </>
           ) : (
-            <>
-              <Button
-                variant="ghost"
-                onClick={handleAuthClick}
-                className="h-9 rounded-full border border-border/50 bg-card/45 px-3 text-[13px] text-foreground hover:bg-muted/70 hover:text-foreground"
-              >
-                Login
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleAuthClick}
-                className="h-9 rounded-full px-4 text-[13px] shadow-[var(--shadow-card)]"
-              >
-                Sign Up
-              </Button>
-            </>
+            <Button
+              variant="default"
+              onClick={handleAuthClick}
+              className="h-9 rounded-full px-4 text-[13px] shadow-[var(--shadow-card)]"
+            >
+              Login / Sign Up
+            </Button>
           )}
         </div>
 
@@ -1027,28 +1008,16 @@ const Header = ({
                 ) : (
                   <div className={mobileSectionClass}>
                     <div className={mobileSectionLabelClass}>Account</div>
-                    <div className="space-y-1">
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          handleAuthClick();
-                          setMobileMenuOpen(false);
-                        }}
-                        className={mobileMenuItemClass}
-                      >
-                        Login
-                      </Button>
-                      <Button
-                        variant="default"
-                        onClick={() => {
-                          handleAuthClick();
-                          setMobileMenuOpen(false);
-                        }}
-                        className="h-11 w-full justify-start rounded-xl px-3 text-left text-sm font-medium"
-                      >
-                        Sign Up
-                      </Button>
-                    </div>
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        handleAuthClick();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="h-11 w-full rounded-xl px-3 text-sm font-medium"
+                    >
+                      Login / Sign Up
+                    </Button>
                   </div>
                 )}
               </div>

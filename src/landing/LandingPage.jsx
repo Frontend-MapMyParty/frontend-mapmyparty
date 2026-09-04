@@ -212,19 +212,37 @@ const heroSlides = [
   { id: "party-image-3", type: "image", src: "/images/ph3.jpg" },
 ];
 
-const heroCarouselStyles = `
-  @keyframes heroImageDrift {
-    0% {
-      transform: scale(1.035) translate3d(0, 0, 0);
-    }
-    50% {
-      transform: scale(1.075) translate3d(0, -1.2%, 0);
-    }
-    100% {
-      transform: scale(1.105) translate3d(0, -2.4%, 0);
-    }
+const getHeroSlide = (index) =>
+  heroSlides[(index + heroSlides.length) % heroSlides.length];
+
+const HeroMediaFill = ({
+  slide,
+  className,
+  videoRef,
+  onEnded,
+  autoPlay = false,
+  loop = false,
+}) => {
+  if (slide.type === "video") {
+    return (
+      <video
+        ref={videoRef}
+        className={className}
+        src={slide.src}
+        muted
+        playsInline
+        preload="auto"
+        autoPlay={autoPlay}
+        loop={loop}
+        onEnded={onEnded}
+      />
+    );
   }
 
+  return <img src={slide.src} alt="" className={className} />;
+};
+
+const heroCarouselStyles = `
   @keyframes landingReveal {
     0% {
       opacity: 0;
@@ -303,6 +321,56 @@ const heroCarouselStyles = `
   .landing-hero-particle {
     animation: landingHeroParticleFloat 7.5s ease-in-out infinite;
     animation-delay: var(--landing-delay, 0ms);
+  }
+
+  .landing-hero-stage {
+    background-color: #08060d;
+    background-image:
+      radial-gradient(ellipse 58% 70% at 74% 48%, rgba(124, 58, 237, 0.22) 0%, transparent 58%),
+      radial-gradient(ellipse 42% 50% at 18% 18%, rgba(168, 85, 247, 0.08) 0%, transparent 55%),
+      linear-gradient(180deg, #08060d 0%, #0c0814 48%, #08060d 100%);
+  }
+
+  .landing-hero-dots {
+    background-image: radial-gradient(rgba(168, 85, 247, 0.32) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+    mask-image: radial-gradient(ellipse 68% 72% at 42% 50%, black 12%, transparent 72%);
+    opacity: 0.28;
+  }
+
+  .landing-hero-main-glow {
+    box-shadow:
+      0 0 0 1px rgba(168, 85, 247, 0.42),
+      0 0 28px rgba(124, 58, 237, 0.28),
+      0 18px 50px rgba(0, 0, 0, 0.45);
+  }
+
+  .landing-hero-satellite-glow {
+    box-shadow:
+      0 0 0 1px rgba(168, 85, 247, 0.4),
+      0 0 18px rgba(124, 58, 237, 0.28);
+  }
+
+  .landing-hero-deco-ring {
+    border: 1px solid rgba(168, 85, 247, 0.38);
+    box-shadow: 0 0 14px rgba(124, 58, 237, 0.18);
+  }
+
+  .landing-hero-cta {
+    background-color: hsl(var(--primary)) !important;
+    box-shadow: var(--shadow-accent);
+  }
+
+  .landing-hero-cta:hover {
+    background-color: hsl(var(--primary-cta-hover)) !important;
+  }
+
+  .landing-hero-cta:active {
+    background-color: hsl(var(--primary-cta-active)) !important;
+  }
+
+  .landing-hero-vibe {
+    color: hsl(var(--primary));
   }
 
   .landing-event-card {
@@ -894,112 +962,140 @@ const LandingPage = () => {
 
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative isolate overflow-hidden bg-background pb-4 pt-16 sm:pb-6 sm:pt-20">
-          <div className="absolute inset-0 overflow-hidden">
-            {heroSlides.map((slide, index) => {
-              const isActive = index === activeHeroSlide;
+        <section className="landing-hero-stage relative isolate overflow-hidden pb-10 pt-20 sm:pb-12 sm:pt-24 md:min-h-[calc(100svh-0.5rem)] md:pb-8">
+          <div className="landing-hero-haze pointer-events-none absolute right-[12%] top-[22%] h-[22rem] w-[22rem] rounded-full bg-primary/25 blur-3xl" />
+          <div className="landing-hero-haze pointer-events-none absolute bottom-[12%] right-[28%] h-56 w-56 rounded-full bg-secondary/15 blur-3xl [animation-delay:1.2s]" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background" />
 
-              return (
-                <div
-                  key={slide.id}
-                  className={`absolute inset-0 transition-opacity duration-1000 ease-out ${isActive ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                >
-                  {slide.type === "video" ? (
-                    <video
-                      ref={index === 0 ? heroVideoRef : null}
-                      className="h-full w-full scale-[1.04] object-cover"
-                      src={slide.src}
-                      muted
-                      playsInline
-                      preload="auto"
-                      onEnded={handleHeroVideoEnded}
-                    />
-                  ) : (
-                    <div
-                      className="h-full w-full bg-cover bg-center will-change-transform"
-                      style={{
-                        backgroundImage: `url(${slide.src})`,
-                        animation: isActive
-                          ? "heroImageDrift 4200ms ease-out forwards"
-                          : "none",
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <div className="container relative z-10 grid items-center gap-10 px-4 sm:px-6 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.18fr)] lg:px-8 xl:gap-10">
+            <div className="landing-reveal max-w-[34rem] md:self-start md:pt-2 lg:pt-4">
+              <h1 className="hero-heading max-w-[11ch] text-left text-[2.65rem] font-extrabold leading-[0.98] tracking-tight text-foreground text-pretty sm:text-6xl md:text-5xl lg:text-[4.35rem] xl:text-[4.7rem]">
+                Find your{" "}
+                <span className="theme-gradient-primary bg-clip-text text-transparent">
+                  vibe.
+                </span>
+              </h1>
+              <p className="mt-6 max-w-[34rem] text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+                Create events, sell tickets, and thrill your guests. Or jump
+                in as an attendee and enjoy the city's best experiences.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/auth">
+                  <Button
+                    size="lg"
+                    variant="default"
+                    className="landing-hero-cta h-auto w-full rounded-xl px-7 py-4 text-base font-semibold text-primary-foreground transition-all duration-300 hover:-translate-y-0.5 sm:w-auto"
+                  >
+                    Host an Event
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
 
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-background/92 via-background/58 to-background/20 lg:from-background/88 lg:via-background/46 lg:to-background/12" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/68 via-background/8 to-background" />
-          <div className="theme-gradient-primary pointer-events-none absolute inset-0 opacity-20" />
-          <div className="theme-gradient-primary pointer-events-none absolute inset-x-0 top-0 h-96 opacity-10 blur-3xl" />
-          <div className="landing-hero-haze pointer-events-none absolute -right-20 top-0 h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
-          <div className="landing-hero-haze pointer-events-none absolute bottom-0 right-1/4 h-72 w-72 rounded-full bg-primaryCTA/20 blur-3xl [animation-delay:1.2s]" />
-          <div className="landing-glow pointer-events-none absolute -left-16 top-16 h-56 w-56 rounded-full bg-card/70 blur-3xl" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background" />
-          {Array.from({ length: 9 }).map((_, index) => (
-            <span
-              key={index}
-              aria-hidden="true"
-              className="landing-hero-particle pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-accent/45 shadow-[var(--shadow-card)]"
-              style={{
-                left: `${44 + (index % 5) * 10}%`,
-                top: `${20 + Math.floor(index / 5) * 28 + (index % 2) * 6}%`,
-                "--landing-delay": `${index * 320}ms`,
-              }}
-            />
-          ))}
+            <div className="relative mx-auto h-[min(88vw,32rem)] w-full max-w-[42rem] overflow-visible md:h-[min(48vw,30rem)] lg:ml-auto lg:mr-0 lg:h-[min(46vw,38rem)]">
+              <div
+                aria-hidden="true"
+                className="landing-hero-dots pointer-events-none absolute left-0 top-[12%] h-[70%] w-[58%]"
+              />
 
-          <div className="absolute bottom-4 right-4 z-30 flex items-center gap-2 sm:right-6 lg:right-10">
-            <button
-              type="button"
-              aria-label="Previous hero slide"
-              onClick={goToPreviousHeroSlide}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-card/45 text-foreground/75 shadow-[var(--shadow-card)] backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent hover:text-accent-foreground sm:h-11 sm:w-11"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Next hero slide"
-              onClick={goToNextHeroSlide}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-card/45 text-foreground/75 shadow-[var(--shadow-card)] backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:bg-accent hover:text-accent-foreground sm:h-11 sm:w-11"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
+              <span
+                aria-hidden="true"
+                className="landing-hero-deco-ring pointer-events-none absolute right-[6%] top-[3%] size-12 rounded-full bg-transparent sm:size-14"
+              />
+              <span
+                aria-hidden="true"
+                className="landing-hero-deco-ring pointer-events-none absolute right-0 top-[38%] size-16 rounded-full bg-transparent sm:size-[4.5rem]"
+              />
+              <span
+                aria-hidden="true"
+                className="landing-hero-deco-ring pointer-events-none absolute bottom-[8%] right-[16%] size-10 rounded-full bg-transparent"
+              />
+              <span
+                aria-hidden="true"
+                className="landing-hero-deco-ring pointer-events-none absolute left-[22%] top-[30%] size-8 rounded-full bg-transparent"
+              />
 
-          <div className="container relative z-10 px-4 sm:px-6 lg:px-8">
-            <div className="grid min-h-[22.5rem] items-center pb-16 pt-4 sm:min-h-[24rem] sm:pt-5 lg:min-h-[25.5rem] lg:grid-cols-[0.42fr_0.58fr] lg:pb-8">
-              <div className="landing-reveal max-w-[30rem]">
-                <h1 className="mt-4 max-w-[26rem] text-left text-2xl font-black leading-[1.02] tracking-tight text-foreground drop-shadow-2xl text-pretty sm:max-w-[28rem] sm:text-3xl md:text-[3.1rem] lg:text-[2.55rem] xl:text-[2.85rem]">
-                  Find your{" "}
-                  <span className="theme-gradient-primary bg-clip-text text-transparent">
-                    vibe.
-                  </span>
-                </h1>
-                <p className="mt-4 max-w-[28rem] text-sm leading-6 text-foreground/80 drop-shadow-xl sm:text-base sm:leading-7">
-                  Create events, sell tickets, and thrill your guests. Or jump
-                  in as an attendee and enjoy the city's best experiences.
-                </p>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <Link to="/auth">
-                    <Button
-                      size="lg"
-                      variant="accent"
-                      className="h-12 w-full rounded-full px-7 text-base shadow-[var(--shadow-card)] transition-all duration-300 hover:-translate-y-0.5 sm:w-auto"
-                    >
-                      Host an Event
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
+              <div
+                key={`satellite-a-${getHeroSlide(activeHeroSlide + 1).id}`}
+                className="landing-hero-satellite-glow pointer-events-none absolute left-[2%] top-[6%] z-10 size-[clamp(6.75rem,16vw,10.5rem)] overflow-hidden rounded-full"
+                aria-hidden="true"
+              >
+                <HeroMediaFill
+                  slide={getHeroSlide(activeHeroSlide + 1)}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  loop
+                />
               </div>
               <div
-                className="pointer-events-none hidden lg:block"
+                key={`satellite-b-${getHeroSlide(activeHeroSlide + 2).id}`}
+                className="landing-hero-satellite-glow pointer-events-none absolute bottom-[8%] left-0 z-10 size-[clamp(6.5rem,15vw,10rem)] overflow-hidden rounded-full"
                 aria-hidden="true"
-              />
+              >
+                <HeroMediaFill
+                  slide={getHeroSlide(activeHeroSlide + 2)}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  loop
+                />
+              </div>
+
+              <div className="absolute right-0 top-1/2 z-20 aspect-square h-[92%] max-h-[36.25rem] -translate-y-1/2">
+                <div className="relative aspect-square w-full">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-3 rounded-full border border-[color:var(--color-accent-secondary)]/25 sm:-inset-5"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-7 rounded-full border border-[color:var(--color-accent-primary)]/15 sm:-inset-9"
+                  />
+                  <div
+                    className="landing-hero-main-glow relative h-full w-full overflow-hidden rounded-full"
+                    role="region"
+                    aria-roledescription="carousel"
+                    aria-label="Featured event media"
+                  >
+                    {heroSlides.map((slide, index) => {
+                      const isActive = index === activeHeroSlide;
+
+                      return (
+                        <div
+                          key={slide.id}
+                          className={`absolute inset-0 transition-opacity duration-700 ease-out ${isActive ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                        >
+                          <HeroMediaFill
+                            slide={slide}
+                            videoRef={index === 0 ? heroVideoRef : null}
+                            onEnded={handleHeroVideoEnded}
+                            className={`h-full w-full object-cover transition-transform duration-700 ease-out ${isActive ? "scale-100" : "scale-[1.04]"}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="absolute -bottom-1 -right-1 z-30 flex items-center gap-2 sm:bottom-3 sm:right-3">
+                    <button
+                      type="button"
+                      aria-label="Previous hero slide"
+                      onClick={goToPreviousHeroSlide}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--color-accent-secondary)]/45 bg-background/70 text-foreground shadow-[var(--shadow-card)] backdrop-blur-md transition-all duration-300 hover:border-[color:var(--color-accent-secondary)] hover:bg-background/90 hover:shadow-[0_0_18px_rgba(124,58,237,0.35)] sm:h-11 sm:w-11"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Next hero slide"
+                      onClick={goToNextHeroSlide}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[color:var(--color-accent-secondary)]/45 bg-background/70 text-foreground shadow-[var(--shadow-card)] backdrop-blur-md transition-all duration-300 hover:border-[color:var(--color-accent-secondary)] hover:bg-background/90 hover:shadow-[0_0_18px_rgba(124,58,237,0.35)] sm:h-11 sm:w-11"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>

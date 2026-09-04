@@ -4,18 +4,19 @@ import { apiFetch } from "@/config/api";
 const DEFAULT_LOCATION_RADIUS_KM = 50;
 
 const toFiniteNumber = (value) => {
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
 const getEventCoordinates = (event) => {
-  const venue = Array.isArray(event?.venues) ? event.venues[0] : null;
+  const venues = Array.isArray(event?.venues) ? event.venues : [];
+  const venue = venues.find((item) => item?.isPrimary) || venues[0] || event?.venue || null;
 
   const latitude =
     toFiniteNumber(event?.coordinates?.lat) ??
     toFiniteNumber(event?.latitude) ??
     toFiniteNumber(event?.venueLatitude) ??
-    toFiniteNumber(event?.venue?.latitude) ??
     toFiniteNumber(venue?.latitude) ??
     toFiniteNumber(venue?.lat);
 
@@ -23,13 +24,11 @@ const getEventCoordinates = (event) => {
     toFiniteNumber(event?.coordinates?.lng) ??
     toFiniteNumber(event?.longitude) ??
     toFiniteNumber(event?.venueLongitude) ??
-    toFiniteNumber(event?.venue?.longitude) ??
     toFiniteNumber(venue?.longitude) ??
     toFiniteNumber(venue?.lng);
 
-  if (latitude === null || longitude === null) {
-    return null;
-  }
+  if (latitude === null || longitude === null) return null;
+  if (latitude === 0 && longitude === 0) return null;
 
   return { latitude, longitude };
 };
@@ -51,10 +50,18 @@ const getDistanceKm = (originLatitude, originLongitude, targetLatitude, targetLo
   return earthRadiusKm * c;
 };
 
+const hasNearbyOrigin = (latitude, longitude) =>
+  latitude !== null &&
+  longitude !== null &&
+  !(latitude === 0 && longitude === 0);
+
 const getServerBackedFilters = (filterParams = {}) => ({
   search: filterParams.search || null,
   category: filterParams.category || null,
   subCategory: filterParams.subCategory || null,
+  latitude: toFiniteNumber(filterParams.latitude),
+  longitude: toFiniteNumber(filterParams.longitude),
+  radiusKm: toFiniteNumber(filterParams.radiusKm) ?? DEFAULT_LOCATION_RADIUS_KM,
 });
 
 const extractEventsArray = (payload) => {
@@ -180,38 +187,42 @@ export const usePublicEvents = (initialFilters = {}) => {
     const radiusKm =
       toFiniteNumber(filterParams.radiusKm) ?? DEFAULT_LOCATION_RADIUS_KM;
 
-    if (latitude !== null && longitude !== null) {
-      const eventsWithDistance = catalog
+    if (hasNearbyOrigin(latitude, longitude)) {
+      catalog = catalog
         .map((event) => {
+          if (Number.isFinite(Number(event.distanceKm))) {
+            return {
+              ...event,
+              distanceKm: Number(event.distanceKm),
+            };
+          }
+
           const coordinates = getEventCoordinates(event);
           if (!coordinates) return null;
 
-          const distanceKm = getDistanceKm(
-            latitude,
-            longitude,
-            coordinates.latitude,
-            coordinates.longitude
-          );
-
           return {
             ...event,
-            distanceKm,
+            distanceKm: getDistanceKm(
+              latitude,
+              longitude,
+              coordinates.latitude,
+              coordinates.longitude
+            ),
           };
         })
-        .filter(Boolean);
+        .filter((event) => (
+          event &&
+          Number.isFinite(event.distanceKm) &&
+          event.distanceKm <= radiusKm
+        ))
+        .sort((left, right) => {
+          const distanceDifference = left.distanceKm - right.distanceKm;
+          if (distanceDifference !== 0) return distanceDifference;
 
-      if (eventsWithDistance.length > 0) {
-        catalog = eventsWithDistance
-          .filter((event) => event.distanceKm <= radiusKm)
-          .sort((left, right) => {
-            const distanceDifference = left.distanceKm - right.distanceKm;
-            if (distanceDifference !== 0) return distanceDifference;
-
-            const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-            const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
-            return leftDate - rightDate;
-          });
-      }
+          const leftDate = left.startDate ? new Date(left.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightDate = right.startDate ? new Date(right.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return leftDate - rightDate;
+        });
     }
 
     let filtered = [...catalog];
@@ -278,6 +289,18 @@ export const usePublicEvents = (initialFilters = {}) => {
       if (filterParams.search) params.set("search", filterParams.search);
       if (filterParams.category) params.set("category", filterParams.category);
       if (filterParams.subCategory) params.set("subCategory", filterParams.subCategory);
+
+      const latitude = toFiniteNumber(filterParams.latitude);
+      const longitude = toFiniteNumber(filterParams.longitude);
+      const radiusKm =
+        toFiniteNumber(filterParams.radiusKm) ?? DEFAULT_LOCATION_RADIUS_KM;
+
+      if (hasNearbyOrigin(latitude, longitude)) {
+        params.set("nearby", "true");
+        params.set("lat", String(latitude));
+        params.set("lng", String(longitude));
+        params.set("radiusKm", String(radiusKm));
+      }
 
       const response = await apiFetch(`/api/event${params.toString() ? `?${params.toString()}` : ""}`, {
         method: "GET",
@@ -433,12 +456,8 @@ export const usePublicEvents = (initialFilters = {}) => {
    * Refresh events
    */
   const refresh = useCallback(() => {
-    fetchEvents(getServerBackedFilters({
-      search: filters.search,
-      category: filters.category,
-      subCategory: filters.subCategory,
-    }));
-  }, [fetchEvents, filters.search, filters.category, filters.subCategory]);
+    fetchEvents(getServerBackedFilters(filters));
+  }, [fetchEvents, filters]);
 
   useEffect(() => {
     const {
@@ -456,12 +475,16 @@ export const usePublicEvents = (initialFilters = {}) => {
 
   // Fetch source events when the server-backed query changes.
   useEffect(() => {
-    fetchEvents(getServerBackedFilters({
-      search: filters.search,
-      category: filters.category,
-      subCategory: filters.subCategory,
-    }));
-  }, [filters.search, filters.category, filters.subCategory, fetchEvents]);
+    fetchEvents(getServerBackedFilters(filters));
+  }, [
+    filters.search,
+    filters.category,
+    filters.subCategory,
+    filters.latitude,
+    filters.longitude,
+    filters.radiusKm,
+    fetchEvents,
+  ]);
 
   return {
     events,

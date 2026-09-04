@@ -1,7 +1,7 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import Header from "@/components/Header";
 import {
   BarChart3,
@@ -38,37 +38,31 @@ const features = [
     title: "Guided event builder",
     desc: "Create events step by step with full control over categories, media, scheduling, venue setup, and publish state.",
     icon: CalendarDays,
-    visual: "builder",
   },
   {
     title: "Flexible editing",
     desc: "Jump directly to any section while editing and save only that section without being forced through the entire flow again.",
     icon: PencilLine,
-    visual: "editing",
   },
   {
     title: "Ticketing and event content",
     desc: "Manage ticket types, sponsors, artists, advisories, attendee questions, and organizer notes in one workflow.",
     icon: Ticket,
-    visual: "ticketing",
   },
   {
     title: "Live reception tools",
     desc: "Run live event operations with QR-based and manual check-ins plus real-time visibility into ticket movement.",
     icon: ScanLine,
-    visual: "reception",
   },
   {
     title: "Attendee visibility",
     desc: "Review bookings, payment status, check-in progress, and export attendee data when your operations team needs it.",
     icon: UserCheck,
-    visual: "attendees",
   },
   {
     title: "Analytics, refunds, and payouts",
     desc: "Track revenue, top events, ticket performance, refund status, payout views, and organizer-side operational reporting.",
     icon: Wallet,
-    visual: "analytics",
   },
 ];
 
@@ -123,101 +117,98 @@ const capabilityGroups = [
   },
 ];
 
-const sectionClass = "host-events__section relative overflow-hidden py-16 sm:py-20 lg:py-24";
-const containerClass = "relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8";
-const eyebrowClass = "w-fit border-border/60 bg-card/80 text-foreground shadow-[var(--shadow-card)]";
-const panelClass =
-  "rounded-[8px] border border-border/50 bg-card/70 shadow-[var(--shadow-card)] backdrop-blur";
-const elevatedPanelClass =
-  "host-events__card rounded-[8px] border border-border/50 bg-card/70 shadow-[var(--shadow-card)] transition-all duration-200 hover:border-accent/60";
-const iconBoxClass =
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-border/50 bg-muted/45 text-accent";
-const ctaButtonClass = "transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0";
-
 const HostEvents = () => {
+  useEffect(() => {
+    const nodes = document.querySelectorAll(".host-events-reveal");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="host-events-page min-h-screen bg-background text-foreground">
       <Header forceMainHeader />
 
-      <section className="host-events__hero relative overflow-hidden border-b border-border/35 bg-background py-14 sm:py-16 lg:py-20">
-        <div className={containerClass}>
-          <div className="grid gap-10 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-14">
-            <div className="max-w-2xl space-y-6">
-              <div className="space-y-4">
-                <Badge className={eyebrowClass}>Host Events</Badge>
+      <section className="host-events__hero relative overflow-hidden pt-6 pb-16 sm:pt-8 sm:pb-20 lg:pt-10 lg:pb-24">
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-16 xl:gap-20">
+            <div className="host-events-reveal max-w-xl space-y-8">
+              <div className="space-y-5">
                 <h1 className="host-events__hero-title font-bold text-foreground">
                   Everything organizers need to launch, manage, and run events in one place.
                 </h1>
-                <p className="host-events__lead max-w-xl text-muted-foreground">
+                <p className="host-events__lead max-w-lg text-muted-foreground">
                   Map MyParty brings together organizer onboarding, event creation, live check-ins, attendee
                   visibility, analytics, refunds, payouts, and operations tooling so your team can work from one
                   system instead of stitching together multiple tools.
                 </p>
               </div>
 
-              <ul className="space-y-3">
+              <ul className="space-y-4">
                 {organizerBenefits.map((benefit) => (
-                  <li key={benefit} className="flex items-start gap-3 text-sm leading-relaxed text-muted-foreground">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                  <li key={benefit} className="flex items-start gap-3 text-sm leading-7 text-muted-foreground">
+                    <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#A855F7]" />
                     <span>{benefit}</span>
                   </li>
                 ))}
               </ul>
 
-              <div className="flex flex-wrap gap-3 pt-1">
+              <div className="flex flex-wrap gap-3 pt-2">
                 <Link to="/auth">
-                  <Button className={ctaButtonClass}>Start Hosting</Button>
+                  <Button className="h-11 rounded-full px-6 shadow-[var(--shadow-accent)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-16px_rgba(168,85,247,0.75)]">
+                    Start Hosting
+                  </Button>
                 </Link>
                 <Link to="/browse-events">
-                  <Button variant="outline" className={ctaButtonClass}>
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-full px-6 transition-all duration-300 hover:-translate-y-0.5"
+                  >
                     Explore Live Events
                   </Button>
                 </Link>
               </div>
             </div>
 
-            <div className={`${panelClass} host-events__dashboard-preview p-4 sm:p-5 lg:p-6`}>
-              <div className="mb-5 flex flex-col gap-4 border-b border-border/35 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Organizer command center
-                  </div>
-                  <h2 className="host-events__panel-title font-semibold text-foreground">
-                    Operate from setup to payout in one place
-                  </h2>
-                  <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    A single view for organizer setup, event editing, live reception, attendee visibility, and
-                    reporting.
-                  </p>
+            <div
+              className="host-events-reveal host-events__dashboard-preview relative rounded-[1.75rem] border border-border/40 bg-card/55 p-6 shadow-[var(--shadow-elegant)] backdrop-blur-md sm:p-8"
+              style={{ "--host-events-delay": "120ms" }}
+            >
+              <div className="relative z-10 mb-8 space-y-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C084FC]">
+                  Organizer command center
                 </div>
-                <Badge className={`${eyebrowClass} shrink-0`}>Live dashboard</Badge>
+                <h2 className="host-events__panel-title max-w-md font-semibold text-foreground">
+                  Operate from setup to payout in one place
+                </h2>
+                <p className="max-w-md text-sm leading-7 text-muted-foreground">
+                  A single view for organizer setup, event editing, live reception, attendee visibility, and
+                  reporting.
+                </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="relative z-10 grid gap-4 sm:grid-cols-2">
                 {highlights.map(({ title, value, icon: Icon }) => (
-                  <div key={title} className="rounded-[8px] border border-border/45 bg-background/45 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <span className="text-[11px] leading-tight text-muted-foreground">{title}</span>
-                      <Icon className="h-4 w-4 shrink-0 text-accent" />
+                  <div
+                    key={title}
+                    className="rounded-2xl border border-border/40 bg-background/40 px-4 py-5 transition-transform duration-300 hover:-translate-y-1"
+                  >
+                    <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-[#A855F7]/25 bg-[#A855F7]/10 text-[#C084FC]">
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <div className="host-events__metric font-semibold text-foreground">{value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                {workflow.map(({ title, desc, icon: Icon }, index) => (
-                  <div key={title} className="rounded-[8px] border border-border/45 bg-muted/25 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className={iconBoxClass}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <span className="text-[11px] font-semibold tracking-[0.16em] text-muted-foreground">
-                        0{index + 1}
-                      </span>
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold leading-snug text-foreground">{title}</h3>
-                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{desc}</p>
+                    <div className="text-xs text-muted-foreground">{title}</div>
+                    <div className="host-events__metric mt-1.5 font-semibold text-foreground">{value}</div>
                   </div>
                 ))}
               </div>
@@ -226,10 +217,48 @@ const HostEvents = () => {
         </div>
       </section>
 
-      <section className={`${sectionClass} bg-background`}>
-        <div className={containerClass}>
-          <div className="host-events__intro mx-auto mb-10 max-w-3xl space-y-4 text-center">
-            <Badge className={eyebrowClass}>Why host with us</Badge>
+      <section className="host-events__section relative overflow-hidden py-20 sm:py-24 lg:py-28">
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="host-events-reveal mx-auto mb-14 max-w-2xl space-y-4 text-center">
+            <Badge className="w-fit rounded-full border border-border/50 bg-card/70 px-3 py-1.5 text-xs text-foreground">
+              How it works
+            </Badge>
+            <h2 className="host-events__section-title font-bold text-foreground">From setup to live results</h2>
+            <p className="mx-auto max-w-xl text-muted-foreground">
+              Create your organizer profile, build and publish with control, then run check-ins, attendees, and
+              reporting from the same workspace.
+            </p>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-3 lg:gap-10">
+            {workflow.map(({ title, desc, icon: Icon }, index) => (
+              <article
+                key={title}
+                className="host-events-reveal relative space-y-5 rounded-[1.75rem] border border-border/35 bg-card/40 p-7 sm:p-8"
+                style={{ "--host-events-delay": `${index * 90}ms` }}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#A855F7]/25 bg-[#A855F7]/10 text-[#C084FC]">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-semibold tracking-[0.18em] text-muted-foreground/80">
+                    0{index + 1}
+                  </span>
+                </div>
+                <h3 className="host-events__card-title font-semibold text-foreground">{title}</h3>
+                <p className="text-sm leading-7 text-muted-foreground">{desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="host-events__section relative overflow-hidden py-20 sm:py-24 lg:py-28">
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="host-events-reveal mx-auto mb-14 max-w-2xl space-y-4 text-center">
+            <Badge className="w-fit rounded-full border border-border/50 bg-card/70 px-3 py-1.5 text-xs text-foreground">
+              Why host with us
+            </Badge>
             <h2 className="host-events__section-title font-bold text-foreground">Why Host Your Event with MapMyParty</h2>
             <p className="mx-auto max-w-2xl text-muted-foreground">
               Every part of the host experience is organized around real organizer needs, from structured event setup
@@ -237,81 +266,86 @@ const HostEvents = () => {
             </p>
           </div>
 
-          <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {features.map(({ title, desc, icon: Icon }) => (
-              <Card key={title} className={elevatedPanelClass}>
-                <CardContent className="flex h-full flex-col gap-4 p-5">
-                  <div className={iconBoxClass}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="host-events__card-title font-semibold text-foreground">{title}</h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className={`${sectionClass} bg-card/25`}>
-        <div className={containerClass}>
-          <div className="host-events__intro mb-10 max-w-2xl space-y-4">
-            <Badge className={eyebrowClass}>Organizer-ready</Badge>
-            <h2 className="host-events__section-title font-bold text-foreground">Tools Tailored for Event Hosts</h2>
-            <p className="text-muted-foreground">
-              The platform already covers the full organizer journey: setup, publishing, attendee operations, live
-              event handling, analytics, refunds, payouts, and inventory-style add-ons for published events.
-            </p>
-          </div>
-
-          <div className="grid items-stretch gap-4 lg:grid-cols-3">
-            {capabilityGroups.map(({ title, desc, points, icon: Icon }) => (
-              <article key={title} className={`${elevatedPanelClass} flex h-full flex-col p-5`}>
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <div className={iconBoxClass}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="rounded-full border border-border/45 bg-background/45 px-3 py-1 text-xs font-medium text-muted-foreground">
-                    {points.length} focus areas
-                  </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            {features.map(({ title, desc, icon: Icon }, index) => (
+              <article
+                key={title}
+                className="host-events-reveal host-events__card group rounded-[1.75rem] border border-border/40 bg-card/50 p-7 shadow-[var(--shadow-card)]"
+                style={{ "--host-events-delay": `${index * 70}ms` }}
+              >
+                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#A855F7]/25 bg-[#A855F7]/10 text-[#C084FC] transition-transform duration-300 group-hover:scale-105">
+                  <Icon className="h-5 w-5" />
                 </div>
-
-                <div className="space-y-2">
-                  <h3 className="host-events__card-title font-semibold text-foreground">{title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{desc}</p>
-                </div>
-
-                <ul className="mt-5 space-y-3 border-t border-border/35 pt-5 text-sm leading-relaxed text-muted-foreground">
-                  {points.map((point) => (
-                    <li key={point} className="flex items-start gap-3">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
+                <h3 className="host-events__card-title font-semibold text-foreground">{title}</h3>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">{desc}</p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className={`${sectionClass} bg-background`}>
-        <div className={containerClass}>
-          <div className="mx-auto max-w-2xl space-y-4 text-center">
-            <Badge className={eyebrowClass}>Start hosting</Badge>
-            <h2 className="host-events__section-title font-bold text-foreground">Host your next event with MapMyParty</h2>
-            <p className="mx-auto max-w-xl text-muted-foreground">
+      <section className="host-events__section relative overflow-hidden py-20 sm:py-24 lg:py-28">
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="host-events-reveal mb-14 max-w-2xl space-y-4">
+            <Badge className="w-fit rounded-full border border-border/50 bg-card/70 px-3 py-1.5 text-xs text-foreground">
+              Organizer-ready
+            </Badge>
+            <h2 className="host-events__section-title font-bold text-foreground">Tools Tailored for Event Hosts</h2>
+            <p className="max-w-xl text-muted-foreground">
+              The platform already covers the full organizer journey: setup, publishing, attendee operations, live
+              event handling, analytics, refunds, payouts, and inventory-style add-ons for published events.
+            </p>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-3">
+            {capabilityGroups.map(({ title, desc, points, icon: Icon }, index) => (
+              <article
+                key={title}
+                className="host-events-reveal host-events__card flex h-full flex-col rounded-[1.75rem] border border-border/40 bg-card/45 p-7 sm:p-8"
+                style={{ "--host-events-delay": `${index * 90}ms` }}
+              >
+                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#A855F7]/25 bg-[#A855F7]/10 text-[#C084FC]">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="host-events__card-title font-semibold text-foreground">{title}</h3>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">{desc}</p>
+                <div className="mt-7 space-y-3">
+                  {points.map((point) => (
+                    <p
+                      key={point}
+                      className="rounded-2xl border border-border/35 bg-background/35 px-4 py-3.5 text-sm leading-6 text-muted-foreground"
+                    >
+                      {point}
+                    </p>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="host-events__section relative overflow-hidden pb-24 pt-8 sm:pb-28 lg:pb-32">
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
+          <div className="host-events-reveal mx-auto max-w-3xl rounded-[2rem] border border-[#A855F7]/25 bg-card/40 px-6 py-14 text-center shadow-[var(--shadow-elegant)] sm:px-10 sm:py-16">
+            <Badge className="w-fit rounded-full border border-border/50 bg-background/50 px-3 py-1.5 text-xs text-foreground">
+              Start hosting
+            </Badge>
+            <h2 className="host-events__section-title mt-5 font-bold text-foreground">
+              Host your next event with MapMyParty
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
               Create, manage, and run events from one organizer-ready workspace built for launch day and everything
               after.
             </p>
-            <div className="flex flex-wrap justify-center gap-3 pt-4">
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link to="/auth">
-                <Button className={ctaButtonClass}>Get Started for Free</Button>
+                <Button className="h-11 rounded-full px-6 shadow-[var(--shadow-accent)] transition-all duration-300 hover:-translate-y-0.5">
+                  Get Started for Free
+                </Button>
               </Link>
               <Link to="/browse-events">
-                <Button variant="outline" className={ctaButtonClass}>
+                <Button variant="outline" className="h-11 rounded-full px-6 transition-all duration-300 hover:-translate-y-0.5">
                   Explore Live Events
                 </Button>
               </Link>

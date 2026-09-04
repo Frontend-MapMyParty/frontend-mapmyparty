@@ -913,8 +913,8 @@ export async function createVenue(venueData) {
     state: venueData.state || "",
     country: venueData.country || "India", // Default country
     postalCode: venueData.postalCode || "",
-    latitude: venueData.latitude || 0,
-    longitude: venueData.longitude || 0,
+    latitude: Number.isFinite(Number(venueData.latitude)) ? Number(venueData.latitude) : null,
+    longitude: Number.isFinite(Number(venueData.longitude)) ? Number(venueData.longitude) : null,
     googlePlaceId: venueData.googlePlaceId || "",
     eventId: venueData.eventId, // Backend event ID (UUID)
     isPrimary: venueData.isPrimary !== undefined ? venueData.isPrimary : true,
